@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Glowing Lava Waves at Bottom of Safe Zone -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M24,74 Q32,68 39,74 T54,74 T69,74 T84,74 L84,82 L24,82 Z" />
+    <!-- Sketched White Bridge Arc -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,66 Q54,54 84,66 L84,70 Q54,58 24,70 Z" />
+    <!-- Running Stickman Silhouette (Head + Dynamic Running Body) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,31m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,39 L58,39 L55,51 L65,57 L62,61 L51,54 L45,62 L41,59 L49,49 L51,43 L42,46 L40,42 Z" />
+    <!-- Pencil nib accent on right -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M74,36 L82,28 L86,32 L78,40 L72,42 Z" />
+</vector>

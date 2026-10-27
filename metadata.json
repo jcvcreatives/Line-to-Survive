@@ -1,0 +1,6 @@
+{
+  "name": "Draw to Survive",
+  "description": "A hand-drawn 2D physics platformer where you sketch bridges and ramps in real time to guide a running stickman safely across deadly lava pits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

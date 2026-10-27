@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Draw to Survive</string>
+    <string name="title_draw_to_survive">DRAW TO SURVIVE</string>
+    <string name="subtitle_sketchbook_runner">Sketch solid bridges in real-time before the stickman hits the molten lava!</string>
+    <string name="instruction_draw_path">DRAW A PATH TO SURVIVE!</string>
+    <string name="action_play">PLAY</string>
+    <string name="action_retry">RETRY</string>
+    <string name="action_next_level">NEXT LEVEL</string>
+    <string name="action_pause">Pause Game</string>
+    <string name="action_resume">RESUME</string>
+    <string name="action_clear_lines">CLEAR INK</string>
+    <string name="action_home">MAIN MENU</string>
+    <string name="action_sound_toggle">Toggle Sound</string>
+    <string name="game_over_title">GAME OVER</string>
+    <string name="game_over_subtitle">Burned in the lava pit! Draw a sturdy bridge across the gap.</string>
+    <string name="level_complete_title">LEVEL COMPLETE!</string>
+    <string name="level_complete_subtitle">Awesome sketching! You survived the lava crossing.</string>
+    <string name="paused_title">GAME PAUSED</string>
+    <string name="paused_subtitle">Take a breather or redraw your strategy.</string>
+    <string name="label_level">LEVEL %1$d</string>
+    <string name="label_best_level">BEST LEVEL: %1$d</string>
+    <string name="label_ink_meter">INK</string>
+    <string name="label_progress">PROGRESS: %1$d%%</string>
+    <string name="tip_ink_limit">Pencil ink depletes as you draw and recharges slowly over time. Manage your ink to survive!</string>
+</resources>
