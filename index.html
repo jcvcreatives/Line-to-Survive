@@ -3,34 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#1f2c26" />
+  <meta name="theme-color" content="#18191F" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>Draw to Survive — Chalk Runner Evolved</title>
-  <!-- Google Fonts: Cabin Sketch & Patrick Hand -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+  <title>Draw to Survive</title>
   <!-- Matter.js 2D Rigid-Body Physics Engine via CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js" crossorigin="anonymous"></script>
 
   <style>
+    /* Exact Hand-drawn Sketchbook Palette from Color.kt */
     :root {
       color-scheme: dark;
-      --wall: #141a17;
-      --slate: #23312b;
-      --slate-deep: #18221e;
-      --chalk: #f3efe6;
-      --chalk-dim: #a9b2a8;
-      --chalk-faint: rgba(243, 239, 230, 0.18);
-      --yellow: #ffd54f;
-      --cyan: #4dd0e1;
-      --pink: #ff6e6e;
-      --orange: #ff6d00;
-      --wood: #6d4628;
-      --wood-dark: #472c18;
-      --font-display: "Cabin Sketch", "Chalkboard SE", "Comic Sans MS", cursive, sans-serif;
-      --font-body: "Patrick Hand", "Chalkboard SE", "Comic Sans MS", cursive, sans-serif;
+      --sketch-charcoal-bg: #18191F;
+      --sketch-paper-surface: #23252E;
+      --sketch-paper-card: #2C2F3B;
+      --sketch-grid-line: #2A2D38;
+      --chalk-white: #F7F8F2;
+      --pencil-graphite: #D8DBD0;
+      --pencil-muted: #9EA3B0;
+      --lava-orange: #FF5722;
+      --lava-deep-red: #D50000;
+      --lava-flame-yellow: #FFCA28;
+      --finish-banner-green: #00E676;
+      --ink-cyan-accent: #40C4FF;
+      --font-sans: Roboto, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
     * {
@@ -47,9 +44,9 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: var(--wall);
-      color: var(--chalk);
-      font-family: var(--font-body);
+      background: var(--sketch-charcoal-bg);
+      color: var(--chalk-white);
+      font-family: var(--font-sans);
       touch-action: none;
       overscroll-behavior: none;
     }
@@ -57,14 +54,8 @@
     #app {
       position: fixed;
       inset: 0;
-      background: radial-gradient(circle at 50% 35%, #283831 0%, #1b2621 70%, #141c18 100%);
-       overflow: hidden;
-    }
-
-    @media (min-width: 900px) and (min-height: 600px) {
-      #app {
-        box-shadow: inset 0 0 0 8px var(--wood), inset 0 0 0 11px var(--wood-dark), inset 0 0 70px rgba(0,0,0,0.55);
-      }
+      background: var(--sketch-charcoal-bg);
+      overflow: hidden;
     }
 
     #gameCanvas {
@@ -77,259 +68,261 @@
       cursor: crosshair;
     }
 
-    /* Top HUD Overlay */
+    /* ================= TOP GAMEPLAY HUD OVERLAY (Matches GameplayHudOverlay) ================= */
     .hud-layer {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
       pointer-events: none;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      align-items: center;
+      padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
       z-index: 10;
     }
 
-    .hud-top {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    .hud-layer[hidden] {
+      display: none !important;
+    }
+
+    .gameplay-hud-bar {
       width: 100%;
-      max-width: 980px;
-      margin: 0 auto;
-    }
-
-    .hud-bar {
+      background: rgba(35, 37, 46, 0.90);
+      border: 1.5px solid rgba(247, 248, 242, 0.25);
+      border-radius: 18px;
+      padding: 8px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      background: rgba(20, 26, 23, 0.84);
-      border: 1.5px solid rgba(243, 239, 230, 0.22);
-      border-radius: 16px;
-      padding: 8px 14px;
-      backdrop-filter: blur(6px);
+      gap: 12px;
       pointer-events: auto;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     }
 
-    .level-badge-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-    }
-
-    .level-pill {
-      background: rgba(255, 213, 79, 0.16);
-      border: 1.5px solid var(--yellow);
-      color: var(--yellow);
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: 16px;
-      padding: 3px 10px;
-      border-radius: 999px;
-      white-space: nowrap;
-      letter-spacing: 0.5px;
-    }
-
-    .level-title-text {
-      font-weight: 700;
-      font-size: 17px;
-      color: var(--chalk);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .meters-group {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex: 1;
-      max-width: 440px;
-      justify-content: center;
-    }
-
-    .meter-box {
+    .level-indicator {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      min-width: fit-content;
+    }
+
+    .level-indicator-title {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 20px;
+      line-height: 26px;
+      letter-spacing: 1px;
+      color: var(--lava-flame-yellow);
+    }
+
+    .level-indicator-subtitle {
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 500;
+      color: var(--pencil-graphite);
+    }
+
+    .hud-meters-column {
       flex: 1;
-      min-width: 95px;
-    }
-
-    .meter-label-row {
+      padding: 0 12px;
       display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      color: var(--chalk-dim);
-      font-weight: 700;
-      letter-spacing: 0.4px;
-    }
-
-    .meter-track {
-      height: 9px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.16);
-    }
-
-    .meter-fill {
-      height: 100%;
-      border-radius: 999px;
-      transition: width 0.08s linear, background-color 0.2s ease;
-    }
-
-    .hud-actions {
-      display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 6px;
     }
 
-    .icon-btn {
-      pointer-events: auto;
-      width: 40px;
-      height: 40px;
-      border-radius: 11px;
-      border: 1.5px solid rgba(243, 239, 230, 0.24);
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--chalk);
+    .hud-meters-labels {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .progress-label-text {
+      color: var(--chalk-white);
+    }
+
+    .ink-label-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ink-recharge-tag {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--lava-flame-yellow);
+    }
+
+    .linear-progress-track {
+      width: 100%;
+      background: var(--sketch-charcoal-bg);
+      overflow: hidden;
+    }
+
+    .linear-progress-track.progress-track {
+      height: 8px;
+      border-radius: 4px;
+    }
+
+    .linear-progress-track.ink-track {
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    .linear-progress-fill {
+      height: 100%;
+      transition: width 0.06s linear, background-color 0.15s ease;
+    }
+
+    .hud-action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filled-icon-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: var(--sketch-paper-card);
+      color: var(--chalk-white);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
-      font-size: 17px;
+      transition: transform 0.1s ease, filter 0.15s ease;
+      padding: 0;
     }
 
-    .icon-btn:hover {
-      background: rgba(255, 255, 255, 0.14);
-      border-color: var(--chalk);
-      transform: translateY(-1px);
+    .filled-icon-btn.pause-orange {
+      background: var(--lava-orange);
     }
 
-    .icon-btn:active {
+    .filled-icon-btn:hover {
+      filter: brightness(1.12);
+    }
+
+    .filled-icon-btn:active {
       transform: scale(0.94);
     }
 
-    /* Tool Dock Row */
-    .tool-dock-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
+    .filled-icon-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
     }
 
-    .tool-selector {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(20, 26, 23, 0.84);
-      border: 1.5px solid rgba(243, 239, 230, 0.2);
-      padding: 5px 8px;
-      border-radius: 14px;
-      pointer-events: auto;
-      backdrop-filter: blur(6px);
-    }
-
-    .tool-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 11px;
-      border-radius: 10px;
-      border: 1.5px solid transparent;
-      background: rgba(255, 255, 255, 0.04);
-      color: var(--chalk-dim);
-      font-family: var(--font-body);
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.14s ease;
-    }
-
-    .tool-chip .swatch {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    .tool-chip .kbd-hint {
-      font-size: 11px;
-      opacity: 0.65;
-      padding: 1px 4px;
-      border-radius: 4px;
-      background: rgba(0, 0, 0, 0.35);
-    }
-
-    .tool-chip.active[data-tool="WHITE"] {
-      background: rgba(243, 239, 230, 0.18);
-      border-color: #f3efe6;
-      color: #ffffff;
-    }
-    .tool-chip.active[data-tool="SPRING"] {
-      background: rgba(77, 208, 225, 0.2);
-      border-color: #4dd0e1;
-      color: #80deea;
-    }
-    .tool-chip.active[data-tool="BOOST"] {
-      background: rgba(255, 213, 79, 0.22);
-      border-color: #ffd54f;
-      color: #ffe082;
-    }
-    .tool-chip.active[data-tool="CUTTER"] {
-      background: rgba(255, 110, 110, 0.22);
-      border-color: #ff6e6e;
-      color: #ff9e9e;
-    }
-
-    .status-pills {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .badge-pill {
-      background: rgba(20, 26, 23, 0.85);
-      border: 1.5px solid rgba(255, 213, 79, 0.45);
-      color: var(--yellow);
-      padding: 4px 11px;
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .instruction-toast {
-      align-self: center;
-      background: rgba(20, 26, 23, 0.86);
-      border: 1.5px dashed rgba(255, 213, 79, 0.65);
-      color: var(--chalk);
-      padding: 6px 16px;
-      border-radius: 999px;
-      font-size: 15px;
-      letter-spacing: 0.4px;
-      text-align: center;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
-      transition: opacity 0.3s ease;
-    }
-
-    /* Modal Overlays (Start, Pause, Game Over, Level Complete) */
-    .overlay-backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(14, 19, 17, 0.78);
-      backdrop-filter: blur(5px);
+    /* Multi-Chalk Tool Switcher & Chalk Bits Row */
+    .chalk-palette-bar {
+      margin-top: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .tool-chip {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      background: rgba(24, 25, 31, 0.85);
+      border: 1px solid rgba(247, 248, 242, 0.30);
+      color: rgba(247, 248, 242, 0.85);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .tool-chip.active[data-tool="WHITE"] {
+      background: rgba(247, 248, 242, 0.25);
+      border: 2px solid var(--chalk-white);
+      color: var(--chalk-white);
+    }
+
+    .tool-chip.active[data-tool="SPRING"] {
+      background: rgba(64, 196, 255, 0.25);
+      border: 2px solid var(--ink-cyan-accent);
+      color: var(--ink-cyan-accent);
+    }
+
+    .tool-chip.active[data-tool="BOOST"] {
+      background: rgba(255, 202, 40, 0.25);
+      border: 2px solid var(--lava-flame-yellow);
+      color: var(--lava-flame-yellow);
+    }
+
+    .tool-chip.active[data-tool="CUTTER"] {
+      background: rgba(255, 87, 34, 0.25);
+      border: 2px solid var(--lava-orange);
+      color: var(--lava-orange);
+    }
+
+    .bits-indicator-pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 600;
+      background: rgba(24, 25, 31, 0.88);
+      border: 1px solid rgba(255, 202, 40, 0.50);
+      color: var(--lava-flame-yellow);
+    }
+
+    /* Callout or Instruction Banner */
+    .floating-banner-wrap {
+      margin-top: 6px;
+      pointer-events: none;
+    }
+
+    .instruction-banner {
+      background: rgba(24, 25, 31, 0.86);
+      border: 1.5px solid rgba(255, 202, 40, 0.85);
+      border-radius: 999px;
+      padding: 8px 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+      color: var(--chalk-white);
+      transition: opacity 0.25s ease;
+    }
+
+    .instruction-banner svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--lava-flame-yellow);
+    }
+
+    .callout-banner {
+      background: rgba(24, 25, 31, 0.92);
+      border: 2px solid var(--lava-flame-yellow);
+      border-radius: 999px;
+      padding: 6px 18px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+      color: var(--lava-flame-yellow);
+    }
+
+    /* ================= MODAL OVERLAYS (Matches Start, Pause, Game Over, Complete) ================= */
+    .overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(24, 25, 31, 0.80);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
       z-index: 30;
     }
 
@@ -337,182 +330,236 @@
       display: none !important;
     }
 
-    .sketch-card {
+    .modal-card {
       width: 100%;
-      max-width: 500px;
-      background: #212e28;
-      border: 2.5px solid var(--chalk);
-      border-radius: 22px;
-      padding: 28px 26px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), inset 0 0 40px rgba(0, 0, 0, 0.25);
-      text-align: center;
+      background: rgba(35, 37, 46, 0.96);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       align-items: center;
+      text-align: center;
+    }
+
+    .start-card {
+      max-width: 520px;
+      border: 2.5px solid var(--chalk-white);
+      border-radius: 28px;
+      padding: 26px 28px;
+    }
+
+    .pause-card {
+      max-width: 460px;
+      border: 2px solid var(--chalk-white);
+      border-radius: 24px;
+      padding: 26px;
       gap: 14px;
-      position: relative;
     }
 
-    .eyebrow-tag {
-      font-family: var(--font-display);
-      font-size: 14px;
-      letter-spacing: 1.6px;
-      text-transform: uppercase;
-      color: var(--yellow);
-      background: rgba(255, 213, 79, 0.12);
-      border: 1px solid rgba(255, 213, 79, 0.4);
-      padding: 4px 12px;
-      border-radius: 999px;
+    .gameover-card {
+      max-width: 460px;
+      border: 2.5px solid var(--lava-orange);
+      border-radius: 26px;
+      padding: 28px;
+      gap: 14px;
     }
 
-    .card-title {
+    .complete-card {
+      max-width: 480px;
+      border: 2.5px solid var(--finish-banner-green);
+      border-radius: 26px;
+      padding: 28px;
+      gap: 14px;
+    }
+
+    .start-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .display-title {
       margin: 0;
-      font-family: var(--font-display);
-      font-size: clamp(32px, 6vw, 46px);
-      line-height: 1.02;
-      color: var(--chalk);
-      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+      font-family: var(--font-mono);
+      font-weight: 900;
+      font-size: clamp(26px, 5vw, 38px);
+      line-height: 1.15;
+      letter-spacing: 2px;
+      color: var(--chalk-white);
     }
 
-    .card-subtitle {
+    .headline-large {
       margin: 0;
-      font-size: 17px;
-      color: var(--chalk-dim);
-      max-width: 38ch;
-      line-height: 1.35;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 28px;
+      line-height: 34px;
+      letter-spacing: 1.5px;
     }
 
-    .feature-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+    .body-large {
+      margin: 0;
+      font-size: 16px;
+      line-height: 22px;
+      font-weight: 500;
+      color: var(--pencil-graphite);
+    }
+
+    .best-level-pill {
+      background: var(--sketch-paper-card);
+      border: 1px solid rgba(255, 202, 40, 0.50);
+      border-radius: 14px;
+      padding: 8px 16px;
+      display: inline-flex;
+      align-items: center;
       gap: 8px;
-      width: 100%;
-      text-align: left;
-      margin: 4px 0;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+      color: var(--lava-flame-yellow);
     }
 
-    .feature-item {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(243, 239, 230, 0.14);
-      border-radius: 12px;
-      padding: 8px 11px;
-      font-size: 14px;
-      line-height: 1.25;
-    }
-
-    .feature-item strong {
-      display: block;
-      font-size: 15px;
-      margin-bottom: 2px;
-    }
-
-    .level-picker-row {
+    .level-select-row {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
       flex-wrap: wrap;
-      width: 100%;
-      margin: 4px 0;
     }
 
-    .lvl-btn {
-      padding: 6px 13px;
-      border-radius: 10px;
-      border: 1.5px solid rgba(243, 239, 230, 0.25);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--chalk);
-      font-family: var(--font-display);
+    .lvl-outline-btn {
+      height: 48px;
+      padding: 0 16px;
+      border-radius: 24px;
+      border: 1px solid var(--pencil-graphite);
+      background: transparent;
+      color: var(--chalk-white);
+      font-family: var(--font-mono);
       font-weight: 700;
       font-size: 15px;
+      letter-spacing: 1px;
       cursor: pointer;
-      transition: all 0.14s ease;
+      transition: all 0.12s ease;
     }
 
-    .lvl-btn.selected, .lvl-btn:hover {
-      border-color: var(--yellow);
-      background: rgba(255, 213, 79, 0.2);
-      color: var(--yellow);
+    .lvl-outline-btn.selected {
+      background: rgba(255, 87, 34, 0.25);
+      border: 2px solid var(--lava-flame-yellow);
+      color: var(--lava-flame-yellow);
     }
 
-    .primary-btn {
+    .action-btn {
       width: 100%;
-      padding: 13px 24px;
-      border-radius: 14px;
-      border: 2px solid #fff3c4;
-      background: linear-gradient(180deg, #ffe066 0%, #f5b727 100%);
-      color: #18221e;
-      font-family: var(--font-display);
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.1s ease, filter 0.15s ease;
+    }
+
+    .action-btn:hover {
+      filter: brightness(1.08);
+    }
+
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+
+    .action-btn.play-orange {
+      height: 58px;
+      border-radius: 18px;
+      background: var(--lava-orange);
+      color: var(--chalk-white);
       font-size: 24px;
+      letter-spacing: 1.2px;
+    }
+
+    .action-btn.retry-orange {
+      height: 56px;
+      border-radius: 16px;
+      background: var(--lava-orange);
+      color: var(--chalk-white);
+      font-size: 22px;
+      letter-spacing: 1.2px;
+    }
+
+    .action-btn.green-primary {
+      height: 56px;
+      border-radius: 16px;
+      background: var(--finish-banner-green);
+      color: var(--sketch-charcoal-bg);
+      font-size: 22px;
+      letter-spacing: 1.2px;
+    }
+
+    .outlined-pill-btn {
+      height: 48px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(216, 219, 208, 0.6);
+      background: transparent;
+      color: var(--chalk-white);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .outlined-rect-btn {
+      width: 100%;
+      height: 50px;
+      border-radius: 16px;
+      border: 1.5px solid var(--pencil-graphite);
+      background: transparent;
+      color: var(--chalk-white);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: var(--font-mono);
       font-weight: 700;
+      font-size: 16px;
       letter-spacing: 0.8px;
       cursor: pointer;
-      box-shadow: 0 6px 18px rgba(245, 183, 39, 0.35);
-      transition: transform 0.12s ease, filter 0.12s ease;
     }
 
-    .primary-btn:hover {
-      transform: translateY(-2px);
-      filter: brightness(1.06);
-    }
-
-    .primary-btn:active {
-      transform: translateY(1px) scale(0.98);
-    }
-
-    .secondary-btn-row {
-      display: flex;
-      gap: 10px;
-      width: 100%;
-    }
-
-    .secondary-btn {
-      flex: 1;
-      padding: 10px 16px;
-      border-radius: 12px;
-      border: 1.5px solid rgba(243, 239, 230, 0.32);
+    .outlined-rect-btn:hover, .outlined-pill-btn:hover {
       background: rgba(255, 255, 255, 0.06);
-      color: var(--chalk);
-      font-family: var(--font-display);
-      font-size: 18px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background 0.14s ease;
     }
 
-    .secondary-btn:hover {
-      background: rgba(255, 255, 255, 0.14);
-    }
-
-    .stars-row {
+    .btn-row-split {
+      width: 100%;
       display: flex;
-      gap: 10px;
-      font-size: 36px;
-      margin: 4px 0;
+      gap: 12px;
     }
 
-    .star-glyph {
-      color: rgba(255, 255, 255, 0.2);
-      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    .btn-row-split .outlined-rect-btn {
+      flex: 1;
+      border-radius: 14px;
     }
 
-    .star-glyph.earned {
-      color: var(--yellow);
-      text-shadow: 0 0 16px rgba(255, 213, 79, 0.6);
-    }
-
-    @media (max-width: 640px) {
-      .hud-bar {
+    @media (max-width: 600px) {
+      .gameplay-hud-bar {
         padding: 6px 10px;
+        gap: 8px;
       }
-      .level-title-text {
-        display: none;
+      .level-indicator-title {
+        font-size: 16px;
       }
-      .tool-chip .kbd-hint {
-        display: none;
+      .level-indicator-subtitle {
+        font-size: 12px;
       }
-      .feature-grid {
-        grid-template-columns: 1fr;
+      .filled-icon-btn {
+        width: 40px;
+        height: 40px;
       }
     }
   </style>
@@ -521,167 +568,189 @@
   <div id="app">
     <canvas id="gameCanvas"></canvas>
 
-    <!-- HUD Layer -->
+    <!-- 1. TOP GAMEPLAY HUD OVERLAY -->
     <div class="hud-layer" id="hudLayer" hidden>
-      <div class="hud-top">
-        <div class="hud-bar">
-          <div class="level-badge-group">
-            <span class="level-pill" id="hudLevelPill">LVL 1</span>
-            <span class="level-title-text" id="hudLevelTitle">Homeroom Sketch</span>
-          </div>
+      <div class="gameplay-hud-bar">
+        <div class="level-indicator">
+          <span class="level-indicator-title" id="hudLevelText">LEVEL 1</span>
+          <span class="level-indicator-subtitle" id="hudLevelTitle">Homeroom Sketch</span>
+        </div>
 
-          <div class="meters-group">
-            <div class="meter-box">
-              <div class="meter-label-row">
-                <span>PROGRESS</span>
-                <span id="hudProgressPct">0%</span>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill" id="hudProgressFill" style="width: 0%; background: #81c784;"></div>
-              </div>
-            </div>
-
-            <div class="meter-box">
-              <div class="meter-label-row">
-                <span id="hudInkLabel">CHALK INK</span>
-                <span id="hudInkPct">100%</span>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill" id="hudInkFill" style="width: 100%; background: #4dd0e1;"></div>
-              </div>
+        <div class="hud-meters-column">
+          <div class="hud-meters-labels">
+            <span class="progress-label-text" id="hudProgressText">PROGRESS: 0%</span>
+            <div class="ink-label-group">
+              <span id="hudInkText" style="color: var(--ink-cyan-accent);">INK: 100%</span>
+              <span class="ink-recharge-tag" id="hudRechargeTag" hidden>(+⚡)</span>
             </div>
           </div>
 
-          <div class="hud-actions">
-            <button class="icon-btn" id="btnUndo" title="Clear Drawn Lines (C)">⌫</button>
-            <button class="icon-btn" id="btnSound" title="Toggle Sound (M)">🔊</button>
-            <button class="icon-btn" id="btnRetryQuick" title="Quick Retry (R)">↻</button>
-            <button class="icon-btn" id="btnPause" title="Pause Game (Space)">⏸</button>
+          <div class="linear-progress-track progress-track">
+            <div class="linear-progress-fill" id="hudProgressFill" style="width: 0%; background: var(--finish-banner-green);"></div>
+          </div>
+
+          <div class="linear-progress-track ink-track">
+            <div class="linear-progress-fill" id="hudInkFill" style="width: 100%; background: var(--ink-cyan-accent);"></div>
           </div>
         </div>
 
-        <div class="tool-dock-row">
-          <div class="tool-selector" id="toolSelector">
-            <button class="tool-chip active" data-tool="WHITE">
-              <span class="swatch" style="background:#f3efe6;"></span>
-              <span>Chalk</span>
-              <span class="kbd-hint">1</span>
-            </button>
-            <button class="tool-chip" data-tool="SPRING">
-              <span class="swatch" style="background:#4dd0e1;"></span>
-              <span>Bounce</span>
-              <span class="kbd-hint">2</span>
-            </button>
-            <button class="tool-chip" data-tool="BOOST">
-              <span class="swatch" style="background:#ffd54f;"></span>
-              <span>Turbo</span>
-              <span class="kbd-hint">3</span>
-            </button>
-            <button class="tool-chip" data-tool="CUTTER">
-              <span class="swatch" style="background:#ff6e6e;"></span>
-              <span>Cut/Erase</span>
-              <span class="kbd-hint">4</span>
-            </button>
-          </div>
-
-          <div class="status-pills">
-            <div class="badge-pill" id="hudBitsPill">✦ 0/7 Bits</div>
-            <div class="badge-pill" id="hudComboPill" hidden>🔥 x2 Magnet!</div>
-          </div>
+        <div class="hud-action-buttons">
+          <button class="filled-icon-btn" id="btnClearLines" title="CLEAR INK">
+            <svg viewBox="0 0 24 24"><path d="M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12z"/></svg>
+          </button>
+          <button class="filled-icon-btn" id="btnHudSound" title="Toggle Sound">
+            <svg id="hudSoundIcon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </button>
+          <button class="filled-icon-btn pause-orange" id="btnPause" title="Pause Game">
+            <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
         </div>
+      </div>
 
-        <div class="instruction-toast" id="instructionBanner">
-          ✏️ DRAW A PATH TO SURVIVE! Drag across gaps to build solid Matter.js bridges &amp; ramps.
+      <div class="chalk-palette-bar" id="toolSelector">
+        <button class="tool-chip active" data-tool="WHITE">Chalk</button>
+        <button class="tool-chip" data-tool="SPRING">Bounce</button>
+        <button class="tool-chip" data-tool="BOOST">Turbo</button>
+        <button class="tool-chip" data-tool="CUTTER">Cut/Erase</button>
+        <div class="bits-indicator-pill" id="hudBitsPill">✎ 0/7</div>
+      </div>
+
+      <div class="floating-banner-wrap">
+        <div class="callout-banner" id="calloutBanner" hidden>⚡ BLITZ! INCOMING!</div>
+        <div class="instruction-banner" id="instructionBanner">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+          <span>DRAW A PATH TO SURVIVE!</span>
         </div>
       </div>
     </div>
 
-    <!-- START SCREEN -->
+    <!-- 2. START MENU OVERLAY (Matches StartMenuOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="startOverlay">
-      <div class="sketch-card">
-        <span class="eyebrow-tag">MATTER.JS 2D PHYSICS EDITION</span>
-        <h1 class="card-title">DRAW TO SURVIVE</h1>
-        <p class="card-subtitle">
-          Sketch solid chalk bridges, bouncy trampolines, and turbo ramps in real time before the runner plummets into the lava abyss!
+      <div class="modal-card start-card">
+        <div class="start-title-row">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="#FF5722">
+            <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+          </svg>
+          <h1 class="display-title">DRAW TO SURVIVE</h1>
+        </div>
+
+        <div style="height: 10px;"></div>
+
+        <p class="body-large">
+          Sketch solid bridges in real-time before the stickman hits the molten lava!
         </p>
 
-        <div class="feature-grid">
-          <div class="feature-item">
-            <strong style="color:#f3efe6;">1 • White Chalk</strong>
-            Solid bridges &amp; ramps. Steep lines become vault hurdles!
-          </div>
-          <div class="feature-item">
-            <strong style="color:#4dd0e1;">2 • Bounce Chalk</strong>
-            High-restitution spring pad that launches the runner skyward.
-          </div>
-          <div class="feature-item">
-            <strong style="color:#ffd54f;">3 • Turbo Gold</strong>
-            Unbreakable steel line: boosts speed &amp; rams Red Scribblers!
-          </div>
-          <div class="feature-item">
-            <strong style="color:#ff6e6e;">4 • Tap Cutter</strong>
-            Snip any drawn line to refund 60% ink &amp; stun nearby enemies.
-          </div>
+        <div style="height: 14px;"></div>
+
+        <div class="best-level-pill">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFCA28">
+            <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
+          </svg>
+          <span id="bestLevelText">BEST LEVEL: 1</span>
         </div>
 
-        <div class="level-picker-row" id="levelPickerRow">
-          <button class="lvl-btn selected" data-level="1">Lvl 1</button>
-          <button class="lvl-btn" data-level="2">Lvl 2</button>
-          <button class="lvl-btn" data-level="3">Lvl 3</button>
-          <button class="lvl-btn" data-level="4">Lvl 4</button>
-          <button class="lvl-btn" data-level="5">Endless 5+</button>
+        <div style="height: 18px;"></div>
+
+        <div class="level-select-row" id="levelPickerRow">
+          <button class="lvl-outline-btn selected" data-level="1">LVL 1</button>
+          <button class="lvl-outline-btn" data-level="2">LVL 2</button>
+          <button class="lvl-outline-btn" data-level="3">LVL 3</button>
+          <button class="lvl-outline-btn" data-level="4">LVL 4</button>
         </div>
 
-        <button class="primary-btn" id="btnStartGame">▶ PLAY LEVEL 1</button>
+        <div style="height: 16px;"></div>
+
+        <button class="action-btn play-orange" id="btnStartGame">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>PLAY</span>
+        </button>
+
+        <div style="height: 12px;"></div>
+
+        <button class="outlined-pill-btn" id="btnStartSound">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <span id="startSoundText">SOUND: ON</span>
+        </button>
       </div>
     </div>
 
-    <!-- PAUSE OVERLAY -->
+    <!-- 3. PAUSE OVERLAY (Matches PauseModalOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="pauseOverlay" hidden>
-      <div class="sketch-card">
-        <span class="eyebrow-tag">GAME PAUSED</span>
-        <h2 class="card-title">TAKE A BREATHER</h2>
-        <p class="card-subtitle" id="pauseSubtitle">Level 1 • Homeroom Sketch</p>
-        <button class="primary-btn" id="btnResume">▶ RESUME</button>
-        <div class="secondary-btn-row">
-          <button class="secondary-btn" id="btnPauseRetry">↻ RETRY</button>
-          <button class="secondary-btn" id="btnPauseMenu">🏠 MENU</button>
-        </div>
+      <div class="modal-card pause-card">
+        <h2 class="headline-large" style="color: var(--lava-flame-yellow);">GAME PAUSED</h2>
+        <p class="body-large">Take a breather or redraw your strategy.</p>
+
+        <button class="action-btn green-primary" id="btnResume">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>RESUME</span>
+        </button>
+
+        <button class="action-btn retry-orange" id="btnPauseRetry">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          <span>RETRY</span>
+        </button>
+
+        <button class="outlined-rect-btn" id="btnPauseMenu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>MAIN MENU</span>
+        </button>
       </div>
     </div>
 
-    <!-- GAME OVER OVERLAY -->
+    <!-- 4. GAME OVER OVERLAY (Matches GameOverOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="gameOverOverlay" hidden>
-      <div class="sketch-card">
-        <span class="eyebrow-tag" style="color:var(--pink); border-color:var(--pink);">HAZARD COLLISION</span>
-        <h2 class="card-title" style="color:var(--pink);">GAME OVER</h2>
-        <p class="card-subtitle" id="gameOverReason">
-          The stickman fell into the molten lava pit! Draw a smoother bridge or use Bounce chalk.
+      <div class="modal-card gameover-card">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="#D50000">
+          <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+        </svg>
+
+        <h2 class="display-title" style="color: var(--lava-orange);">GAME OVER</h2>
+        <p class="body-large" style="color: var(--chalk-white);" id="gameOverReason">
+          Burned in the lava pit! Draw a sturdy bridge across the gap.
         </p>
-        <button class="primary-btn" id="btnGameOverRetry">↻ RETRY LEVEL</button>
-        <div class="secondary-btn-row">
-          <button class="secondary-btn" id="btnGameOverMenu">🏠 MAIN MENU</button>
+
+        <div style="font-family: var(--font-mono); font-weight: 700; font-size: 16px; color: var(--lava-flame-yellow);" id="gameOverProgressText">
+          PROGRESS: 0%
         </div>
+
+        <button class="action-btn retry-orange" id="btnGameOverRetry">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          <span>RETRY</span>
+        </button>
+
+        <button class="outlined-rect-btn" id="btnGameOverMenu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>MAIN MENU</span>
+        </button>
       </div>
     </div>
 
-    <!-- LEVEL COMPLETE OVERLAY -->
+    <!-- 5. LEVEL COMPLETE OVERLAY (Matches LevelCompleteOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="levelCompleteOverlay" hidden>
-      <div class="sketch-card">
-        <span class="eyebrow-tag">FINISH LINE CROSSED!</span>
-        <h2 class="card-title">LEVEL COMPLETE!</h2>
-        <div class="stars-row" id="completeStarsRow">
-          <span class="star-glyph earned">★</span>
-          <span class="star-glyph earned">★</span>
-          <span class="star-glyph earned">★</span>
-        </div>
-        <p class="card-subtitle" id="completeStatsText">
-          Chalk Bits: 6/6 • Ink Efficiency: 92%
+      <div class="modal-card complete-card">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="#FFCA28">
+          <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
+        </svg>
+
+        <h2 class="display-title" style="color: var(--finish-banner-green);">LEVEL COMPLETE!</h2>
+        <p class="body-large" style="color: var(--chalk-white);">
+          Awesome sketching! You survived the lava crossing.
         </p>
-        <button class="primary-btn" id="btnNextLevel">NEXT LEVEL ➔</button>
-        <div class="secondary-btn-row">
-          <button class="secondary-btn" id="btnCompleteReplay">↻ REPLAY</button>
-          <button class="secondary-btn" id="btnCompleteMenu">🏠 MENU</button>
+
+        <button class="action-btn green-primary" id="btnNextLevel">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span>NEXT LEVEL</span>
+        </button>
+
+        <div class="btn-row-split">
+          <button class="outlined-rect-btn" id="btnCompleteReplay">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            <span>RETRY</span>
+          </button>
+          <button class="outlined-rect-btn" id="btnCompleteMenu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            <span>MAIN MENU</span>
+          </button>
         </div>
       </div>
     </div>
@@ -689,20 +758,16 @@
 
   <script>
     /*************************************************************************
-     * DRAW TO SURVIVE (CHALK RUNNER EVOLVED) — STANDALONE MATTER.JS PORT
-     * Mirrors the native Android Kotlin + Jetpack Compose implementation:
-     * - Matter.js 2D rigid-body world (static platform bodies, chamfered
-     *   line-segment rigid bodies, stickman wheel/torso composite body)
-     * - Multi-substep collision safety so the stickman never tunnels
-     * - 4 Chalk Tools (White, Bounce Blue, Turbo Gold, Cutter)
-     * - 4 Curated Levels + Procedural Level 5+ Generator
-     * - Red Scribbler enemies, Thumbtack clusters, Callout moves, WebAudio
+     * DRAW TO SURVIVE — 1:1 EXACT PORT OF ANDROID JETPACK COMPOSE PREVIEW
+     * Matches SketchbookRenderer.kt, OverlayScreens.kt, PhysicsEngine.kt,
+     * LevelCatalog.kt, and Color.kt pixel-for-pixel.
      *************************************************************************/
 
     const WORLD_HEIGHT = 600;
     const LAVA_SURFACE_Y = 532;
     const DEFAULT_GROUND_Y = 420;
     const STICKMAN_HEIGHT = 58;
+    const STICKMAN_HEAD_RADIUS = 10;
     const GRAVITY = 960;
     const MAX_FALL_SPEED = 680;
     const CAMERA_LEAD_RATIO = 0.24;
@@ -711,11 +776,26 @@
     const DEFAULT_LINE_LIFETIME = 7.5;
     const MAX_CLIMBABLE_SLOPE_RADIANS = 1.18;
 
+    // Color.kt exact hex values
+    const COLORS = {
+      SketchCharcoalBg: '#18191F',
+      SketchPaperSurface: '#23252E',
+      SketchPaperCard: '#2C2F3B',
+      SketchGridLine: '#2A2D38',
+      ChalkWhite: '#F7F8F2',
+      PencilGraphite: '#D8DBD0',
+      LavaOrange: '#FF5722',
+      LavaDeepRed: '#D50000',
+      LavaFlameYellow: '#FFCA28',
+      FinishBannerGreen: '#00E676',
+      InkCyanAccent: '#40C4FF'
+    };
+
     const TOOLS = {
-      WHITE:  { id: 'WHITE',  name: 'Chalk',     cost: 1.0,  color: '#f3efe6' },
-      SPRING: { id: 'SPRING', name: 'Bounce',    cost: 1.25, color: '#4dd0e1' },
-      BOOST:  { id: 'BOOST',  name: 'Turbo',     cost: 1.5,  color: '#ffd54f' },
-      CUTTER: { id: 'CUTTER', name: 'Cut/Erase', cost: 0.0,  color: '#ff6e6e' }
+      WHITE:  { id: 'WHITE',  name: 'Chalk',     cost: 1.0,  core: COLORS.ChalkWhite,      halo: 'rgba(216, 219, 208, 0.55)' },
+      SPRING: { id: 'SPRING', name: 'Bounce',    cost: 1.25, core: COLORS.InkCyanAccent,   halo: 'rgba(64, 196, 255, 0.42)' },
+      BOOST:  { id: 'BOOST',  name: 'Turbo',     cost: 1.5,  core: COLORS.LavaFlameYellow, halo: 'rgba(255, 87, 34, 0.48)' },
+      CUTTER: { id: 'CUTTER', name: 'Cut/Erase', cost: 0.0,  core: COLORS.LavaOrange,      halo: 'rgba(213, 0, 0, 0.40)' }
     };
 
     /* ----------------------- WEB AUDIO SYNTHESIZER ----------------------- */
@@ -725,7 +805,7 @@
         this.ctx = null;
       }
 
-       ensureCtx() {
+      ensureCtx() {
         if (!this.enabled) return null;
         if (!this.ctx) {
           const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -746,48 +826,24 @@
         osc.type = type;
         osc.frequency.setValueAtTime(freqStart, now);
         osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + durationMs / 1000);
-
         gain.gain.setValueAtTime(gainVal, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + durationMs / 1000);
       }
 
-      playJump() {
-        this.playTone(260, 580, 140, 'triangle', 0.16);
-      }
-
-      playSpring() {
-        this.playTone(220, 880, 240, 'sine', 0.22);
-      }
-
-      playScratch() {
-        this.playTone(900 + Math.random() * 400, 700 + Math.random() * 300, 35, 'triangle', 0.04);
-      }
-
-      playLineLock() {
-        this.playTone(440, 660, 90, 'sine', 0.12);
-      }
-
+      playJump() { this.playTone(260, 580, 140, 'triangle', 0.16); }
+      playSpring() { this.playTone(220, 880, 240, 'sine', 0.22); }
+      playScratch() { this.playTone(900 + Math.random() * 400, 700 + Math.random() * 300, 35, 'triangle', 0.04); }
+      playLineLock() { this.playTone(440, 660, 90, 'sine', 0.12); }
       playPickup(isStar = false) {
-        if (isStar) {
-          this.playTone(587, 1174, 220, 'triangle', 0.2);
-        } else {
-          this.playTone(520, 780, 110, 'sine', 0.14);
-        }
+        if (isStar) this.playTone(587, 1174, 220, 'triangle', 0.2);
+        else this.playTone(520, 780, 110, 'sine', 0.14);
       }
-
-      playCut() {
-        this.playTone(620, 180, 160, 'sawtooth', 0.15);
-      }
-
-      playGameOver() {
-        this.playTone(340, 95, 420, 'sawtooth', 0.18);
-      }
-
+      playCut() { this.playTone(620, 180, 160, 'sawtooth', 0.15); }
+      playGameOver() { this.playTone(340, 95, 420, 'sawtooth', 0.18); }
       playLevelComplete() {
         this.playTone(440, 880, 320, 'triangle', 0.2);
         setTimeout(() => this.playTone(660, 1320, 360, 'triangle', 0.2), 140);
@@ -1079,7 +1135,6 @@
         this.platformBodies = [];
         this.lineBodies.clear();
 
-        // Create static rigid bodies for each platform in the level
         for (const p of level.platforms) {
           const width = p.endX - p.startX;
           const height = WORLD_HEIGHT - p.topY;
@@ -1095,7 +1150,6 @@
           this.platformBodies.push(body);
         }
 
-        // Create dynamic composite rigid body for the stickman (foot wheel + torso)
         this.runnerBody = Bodies.circle(
           level.spawnPosition.x,
           level.spawnPosition.y - 14,
@@ -1171,7 +1225,7 @@
     const ctx = canvas.getContext('2d');
 
     let state = {
-      screenState: 'START_MENU', // START_MENU, PLAYING, PAUSED, GAME_OVER, LEVEL_COMPLETE
+      screenState: 'START_MENU',
       currentLevel: 1,
       bestLevel: parseInt(localStorage.getItem('dts_best_level') || '1', 10),
       level: getLevelDefinition(1),
@@ -1192,9 +1246,8 @@
       lavaAnimTime: 0,
       embers: [],
       sketchParticles: [],
-      shockwaves: [],
       showInstructionBanner: true,
-      gameOverReason: ''
+      gameOverReason: 'Burned in the lava pit! Draw a sturdy bridge across the gap.'
     };
 
     function resetLevel(levelNum) {
@@ -1217,7 +1270,7 @@
         landingSquashTimer: 0,
         deathTimer: 0
       };
-      state.cameraX = Math.max(0, lvl.spawnPosition.x - getVisibleWorldWidth() * CAMERA_LEAD_RATIO);
+      state.cameraX = 0;
       state.completedLines = [];
       state.activeStrokePoints = [];
       state.currentInk = lvl.maxInkPerLevel;
@@ -1236,7 +1289,6 @@
       state.comboCount = 0;
       state.comboTimer = 0;
       state.sketchParticles = [];
-      state.shockwaves = [];
       state.showInstructionBanner = true;
 
       matterBridge.initWorld(lvl);
@@ -1445,7 +1497,6 @@
         }
       }
 
-      // Check thumbtacks
       if (updatedBoost <= 0 && nextBlitzTimer <= 0) {
         for (const cluster of level.thumbtacks) {
           for (let i = 0; i < cluster.count; i++) {
@@ -1453,7 +1504,7 @@
             const tx = cluster.x + offset;
             const ty = cluster.y;
             if (Math.abs(newX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
-              state.gameOverReason = "The stickman stepped on sharp thumbtacks! Bridge over them or shield with Gold Turbo chalk.";
+              state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
               return {
                 ...st,
                 footX: newX,
@@ -1470,9 +1521,8 @@
         }
       }
 
-      // Check lava pit
       if (resolvedY >= LAVA_SURFACE_Y) {
-        state.gameOverReason = "The stickman fell into the molten lava pit! Draw a bridge across the gap before he reaches the edge.";
+        state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
         return {
           ...st,
           footX: newX,
@@ -1522,16 +1572,22 @@
     }
 
     function updatePhysics(dt) {
-      const clampedDt = Math.min(0.06, Math.max(0, dt));
+      const clampedDt = Math.min(0.05, Math.max(0, dt));
       if (clampedDt <= 0) return;
 
-      // Age & crumble completed lines (except BOOST)
+      // 1. Age lines that the stickman has reached or passed
       const survivingLines = [];
       for (const line of state.completedLines) {
         if (line.tool === 'BOOST') {
           survivingLines.push(line);
         } else {
-          line.ageSeconds += clampedDt;
+          let minLineX = 0;
+          if (line.points.length > 0) {
+            minLineX = Math.min(...line.points.map(p => p.x));
+          }
+          if (state.stickman.footX >= minLineX - 90) {
+            line.ageSeconds += clampedDt;
+          }
           if (line.ageSeconds < line.maxLifetime) {
             survivingLines.push(line);
           } else {
@@ -1541,21 +1597,61 @@
       }
       state.completedLines = survivingLines;
 
-      // Recharge ink when not actively drawing
-      if (state.activeStrokePoints.length === 0 && state.currentInk < state.level.maxInkPerLevel) {
-        state.currentInk = Math.min(
-          state.level.maxInkPerLevel,
-          state.currentInk + state.level.inkRechargeRate * clampedDt
-        );
+      // 2. Check & advance scripted Callout Move bubbles
+      if (!state.activeCallout) {
+        state.level.calloutScript.forEach((sc, idx) => {
+          if (!state.triggeredCallouts.has(idx) && state.stickman.footX >= sc.triggerX) {
+            state.triggeredCallouts.add(idx);
+            const landingX = sc.type === 'JUMP'
+              ? state.stickman.footX + state.level.runSpeed * 1.45
+              : null;
+            state.activeCallout = {
+              type: sc.type,
+              remainingSeconds: 0.95,
+              totalSeconds: 0.95,
+              landingTargetX: landingX,
+              landingTargetY: state.stickman.footY
+            };
+          }
+        });
+      } else {
+        state.activeCallout.remainingSeconds -= clampedDt;
+        if (state.activeCallout.remainingSeconds <= 0) {
+          const moveType = state.activeCallout.type;
+          state.activeCallout = null;
+          if (moveType === 'JUMP' && state.stickman.isGrounded) {
+            state.stickman.velocityY = -430;
+            state.stickman.isGrounded = false;
+            sound.playJump();
+          } else if (moveType === 'BLITZ') {
+            state.stickman.blitzTimer = 1.35;
+          } else if (moveType === 'GRAVITY') {
+            state.stickman.lowGravityTimer = 2.6;
+          }
+        }
       }
 
-      // Substeps for stickman movement
+      // 3. Step stickman physics (including active stroke in progress, just like GameViewModel.kt!)
+      const activeLines = state.activeStrokePoints.length >= 2
+        ? [
+            ...state.completedLines,
+            {
+              id: -1,
+              points: smoothStrokePoints(state.activeStrokePoints),
+              segments: makeSegments(smoothStrokePoints(state.activeStrokePoints)),
+              tool: state.selectedTool,
+              ageSeconds: 0,
+              maxLifetime: DEFAULT_LINE_LIFETIME
+            }
+          ]
+        : state.completedLines;
+
       const steps = Math.max(1, Math.floor(clampedDt / (1 / 120)) + 1);
       const subDt = clampedDt / steps;
       const prevGrounded = state.stickman.isGrounded;
 
       for (let s = 0; s < steps; s++) {
-        state.stickman = stepSingleSubstep(state.stickman, state.level, state.completedLines, subDt);
+        state.stickman = stepSingleSubstep(state.stickman, state.level, activeLines, subDt);
         if (!state.stickman.isAlive || state.stickman.hasReachedFinish) break;
       }
 
@@ -1566,46 +1662,7 @@
         spawnLandingParticles(state.stickman.footX, state.stickman.footY);
       }
 
-      // Check scripted callout triggers
-      state.level.calloutScript.forEach((sc, idx) => {
-        if (!state.triggeredCallouts.has(idx) && state.stickman.footX >= sc.triggerX) {
-          state.triggeredCallouts.add(idx);
-          state.activeCallout = {
-            type: sc.type,
-            remainingSeconds: 1.5,
-            totalSeconds: 1.5
-          };
-        }
-      });
-
-      if (state.activeCallout) {
-        state.activeCallout.remainingSeconds -= clampedDt;
-        if (state.activeCallout.remainingSeconds <= 0) {
-          const moveType = state.activeCallout.type;
-          state.activeCallout = null;
-          if (moveType === 'JUMP' && state.stickman.isGrounded) {
-            state.stickman.velocityY = -430;
-            state.stickman.isGrounded = false;
-            sound.playJump();
-          } else if (moveType === 'BLITZ') {
-            state.stickman.blitzTimer = 2.6;
-            sound.playSpring();
-          } else if (moveType === 'GRAVITY') {
-            state.stickman.lowGravityTimer = 3.4;
-            sound.playPickup(true);
-          } else if (moveType === 'WIPEOUT') {
-            // Erase oldest non-gold line
-            const idx = state.completedLines.findIndex(l => l.tool !== 'BOOST');
-            if (idx >= 0) {
-              matterBridge.removeDrawnLineBodies(state.completedLines[idx].id);
-              state.completedLines.splice(idx, 1);
-              sound.playCut();
-            }
-          }
-        }
-      }
-
-      // Step Red Scribblers
+      // 4. Step Red Scribbler enemies
       const nextScribblers = [];
       for (const enemy of state.scribblers) {
         if (!enemy.isAlive) continue;
@@ -1621,7 +1678,7 @@
           const moveVx = active ? dir * enemy.speed : 0;
           const nextX = enemy.x + moveVx * clampedDt;
 
-          const wallHit = findVaultWallHeight(enemy.x, nextX + dir * 10, enemy.y, state.completedLines);
+          const wallHit = findVaultWallHeight(enemy.x, nextX + dir * 10, enemy.y, activeLines);
           if (wallHit !== null) {
             enemy.isTumbling = true;
             enemy.tumbleVy = -380;
@@ -1631,7 +1688,7 @@
             continue;
           }
 
-          const supports = collectSupportingSurfaces(nextX, state.level.platforms, state.completedLines)
+          const supports = collectSupportingSurfaces(nextX, state.level.platforms, activeLines)
             .filter(h => h.y >= enemy.y - 20 && h.y <= enemy.y + 20);
           supports.sort((a, b) => a.y - b.y);
           const support = supports[0];
@@ -1679,14 +1736,11 @@
       }
       state.scribblers = nextScribblers;
 
-      // Collect Chalk Bits & Gold Stars
-      if (state.comboTimer > 0) {
-        state.comboTimer -= clampedDt;
-        if (state.comboTimer <= 0) state.comboCount = 0;
-      }
+      // 5. Update Chalk Bits & Magnet Combo collection
       const magnetRadius = (state.comboCount >= 2 || state.stickman.blitzTimer > 0) ? 135 : 52;
       const bodyCenterX = state.stickman.footX;
       const bodyCenterY = state.stickman.footY - STICKMAN_HEIGHT * 0.5;
+      let collectedBonus = 0;
 
       for (const bit of state.chalkBits) {
         if (bit.collected) continue;
@@ -1695,9 +1749,8 @@
         const d = Math.hypot(dx, dy);
         if (d <= 38) {
           bit.collected = true;
-          state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + bit.inkAmount);
+          collectedBonus += bit.inkAmount;
           state.comboCount += 1;
-          state.comboTimer = 3.2;
           sound.playPickup(bit.isStar);
           spawnLineSparks([{ x: bit.x, y: bit.y }]);
         } else if (d <= magnetRadius && d > 1) {
@@ -1707,22 +1760,30 @@
         }
       }
 
-      // Camera follow
-      const targetCamX = Math.max(0, state.stickman.footX - getVisibleWorldWidth() * CAMERA_LEAD_RATIO);
-      state.cameraX += (targetCamX - state.cameraX) * Math.min(1, clampedDt * 12);
+      // 6. Ink recharges slowly over time while not actively drawing
+      const comboBonusMult = 1 + Math.min(state.comboCount, 5) * 0.08;
+      const inkRecharge = (state.activeStrokePoints.length === 0 && state.currentInk < state.level.maxInkPerLevel)
+        ? state.level.inkRechargeRate * comboBonusMult * clampedDt
+        : 0;
+      state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + inkRecharge + collectedBonus);
 
-      // Update particles & embers
+      // Camera follow matching GameViewModel.kt
+      const visW = getVisibleWorldWidth();
+      const maxCam = Math.max(0, state.level.levelEndX - visW * 0.5);
+      const desiredCamX = Math.max(0, Math.min(maxCam, state.stickman.footX - visW * CAMERA_LEAD_RATIO));
+      state.cameraX += (desiredCamX - state.cameraX) * 0.25;
+
       updateParticlesAndEmbers(clampedDt);
 
-      // Check terminal states
       if (!state.stickman.isAlive) {
         state.screenState = 'GAME_OVER';
         sound.playGameOver();
         syncOverlays();
       } else if (state.stickman.hasReachedFinish) {
         state.screenState = 'LEVEL_COMPLETE';
-        if (state.currentLevel >= state.bestLevel) {
-          state.bestLevel = state.currentLevel + 1;
+        const unlockedNext = state.currentLevel + 1;
+        if (unlockedNext > state.bestLevel) {
+          state.bestLevel = unlockedNext;
           localStorage.setItem('dts_best_level', String(state.bestLevel));
         }
         sound.playLevelComplete();
@@ -1745,25 +1806,23 @@
           alpha: 0.88,
           rotation: Math.random() * 6.28,
           angularVel: (Math.random() - 0.5) * 8,
-          type: 'PUFF'
+          type: 'FOOTSTEP_CHALK_PUFF'
         });
       }
     }
 
     function spawnPencilShavings(pt) {
-      for (let i = 0; i < 2; i++) {
-        state.sketchParticles.push({
-          worldX: pt.x + (Math.random() - 0.5) * 8,
-          worldY: pt.y + (Math.random() - 0.5) * 8,
-          velocityX: (Math.random() - 0.5) * 70,
-          velocityY: -(10 + Math.random() * 45),
-          size: 3.0 + Math.random() * 3.0,
-          alpha: 0.85,
-          rotation: Math.random() * 6.28,
-          angularVel: (Math.random() - 0.5) * 10,
-          type: 'SHAVING'
-        });
-      }
+      state.sketchParticles.push({
+        worldX: pt.x + (Math.random() - 0.5) * 8,
+        worldY: pt.y + (Math.random() - 0.5) * 8,
+        velocityX: (Math.random() - 0.5) * 70,
+        velocityY: -(10 + Math.random() * 45),
+        size: 3.0 + Math.random() * 3.0,
+        alpha: 0.85,
+        rotation: Math.random() * 6.28,
+        angularVel: (Math.random() - 0.5) * 10,
+        type: 'PENCIL_SHAVING'
+      });
     }
 
     function spawnLineSparks(points) {
@@ -1778,7 +1837,7 @@
             alpha: 0.95,
             rotation: Math.random() * 3.14,
             angularVel: (Math.random() - 0.5) * 9,
-            type: 'SPARK'
+            type: 'LINE_LOCK_SPARK'
           });
         }
       }
@@ -1787,7 +1846,6 @@
     function updateParticlesAndEmbers(dt) {
       state.lavaAnimTime += dt;
 
-      // Embers
       const nextEmbers = [];
       for (const e of state.embers) {
         e.worldX += e.velocityX * dt;
@@ -1798,7 +1856,7 @@
         }
       }
       const visW = getVisibleWorldWidth();
-      while (nextEmbers.length < 14) {
+      while (nextEmbers.length < 12) {
         nextEmbers.push({
           worldX: state.cameraX - 60 + Math.random() * (visW + 180),
           worldY: LAVA_SURFACE_Y - Math.random() * 14,
@@ -1811,25 +1869,24 @@
       }
       state.embers = nextEmbers;
 
-      // Footstep puffs while running
-      if (state.screenState === 'PLAYING' && state.stickman.isGrounded && Math.random() < 0.28) {
+      if (state.screenState === 'PLAYING' && state.stickman.isGrounded && state.stickman.velocityX > 20 && Math.random() < 0.22) {
         state.sketchParticles.push({
           worldX: state.stickman.footX - 6 - Math.random() * 8,
           worldY: state.stickman.footY - 2 - Math.random() * 4,
           velocityX: -(35 + Math.random() * 55),
           velocityY: -(12 + Math.random() * 34),
           size: 2.6 + Math.random() * 3.2,
-          alpha: 0.72,
+          alpha: 0.72 + Math.random() * 0.22,
           rotation: Math.random() * 6.28,
           angularVel: (Math.random() - 0.5) * 6,
-          type: 'PUFF'
+          type: 'FOOTSTEP_CHALK_PUFF'
         });
       }
 
       const nextParticles = [];
       for (const p of state.sketchParticles) {
-        const fade = p.type === 'PUFF' ? 2.2 : (p.type === 'SHAVING' ? 1.9 : 2.4);
-        const grav = p.type === 'PUFF' ? -18 : (p.type === 'SHAVING' ? 140 : 45);
+        const fade = p.type === 'FOOTSTEP_CHALK_PUFF' ? 2.2 : (p.type === 'PENCIL_SHAVING' ? 1.9 : 2.4);
+        const grav = p.type === 'FOOTSTEP_CHALK_PUFF' ? -18 : (p.type === 'PENCIL_SHAVING' ? 140 : 45);
         p.alpha -= dt * fade;
         if (p.alpha > 0.04) {
           p.worldX += p.velocityX * dt;
@@ -1840,19 +1897,12 @@
         }
       }
       state.sketchParticles = nextParticles.slice(-120);
-
-      // Shockwaves from Cutter
-      state.shockwaves = state.shockwaves.filter(sw => {
-        sw.radius += dt * 320;
-        sw.alpha -= dt * 2.2;
-        return sw.alpha > 0.02;
-      });
     }
 
     /* ----------------------- TOUCH & MOUSE DRAWING ----------------------- */
     let isDrawing = false;
 
-    function handleCutTap(worldPt) {
+    function performCutAndShockwave(worldPt) {
       let bestLineIdx = -1;
       let bestPtIdx = -1;
       let bestDist = 42;
@@ -1873,12 +1923,13 @@
       const targetLine = state.completedLines[bestLineIdx];
       const removedPts = targetLine.points.slice(bestPtIdx);
       const removedLen = Math.max(24, calculatePolylineLength(removedPts));
-      const refund = removedLen * TOOLS[targetLine.tool].cost * 0.6;
+      const refund = removedLen * 0.6;
       state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + refund);
 
       matterBridge.removeDrawnLineBodies(targetLine.id);
 
-      const keptPts = targetLine.points.slice(0, bestPtIdx);
+      const keepCount = (bestPtIdx > 0 && bestPtIdx < targetLine.points.length - 1) ? bestPtIdx + 1 : bestPtIdx;
+      const keptPts = targetLine.points.slice(0, keepCount);
       if (keptPts.length < 2) {
         state.completedLines.splice(bestLineIdx, 1);
       } else {
@@ -1887,15 +1938,14 @@
         matterBridge.addDrawnLineBodies(targetLine);
       }
 
-      // Emit enemy-stunning shockwave
-      state.shockwaves.push({ x: worldPt.x, y: worldPt.y, radius: 10, alpha: 0.95 });
       for (const enemy of state.scribblers) {
-        if (!enemy.isTumbling && Math.hypot(enemy.x - worldPt.x, enemy.y - worldPt.y) <= 135) {
+        if (!enemy.isTumbling && Math.hypot(enemy.x - worldPt.x, enemy.y - worldPt.y) <= 140) {
           enemy.isTumbling = true;
-          enemy.tumbleVy = -390;
+          enemy.tumbleVy = -380;
         }
       }
-      sound.playCut();
+      spawnLineSparks([worldPt]);
+      sound.playLineLock();
       updateHudDOM();
       return true;
     }
@@ -1907,26 +1957,31 @@
       const worldPt = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
       worldPt.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, worldPt.y));
 
-      state.showInstructionBanner = false;
-
       if (state.selectedTool === 'CUTTER') {
-        handleCutTap(worldPt);
+        performCutAndShockwave(worldPt);
         return;
       }
 
-      if (state.currentInk <= 2) return;
+      if (state.currentInk <= MIN_POINT_DISTANCE) return;
       isDrawing = true;
       state.activeStrokePoints = [worldPt];
       spawnPencilShavings(worldPt);
       sound.playScratch();
+      updateHudDOM();
     });
 
     canvas.addEventListener('pointermove', (e) => {
-      if (!isDrawing || state.screenState !== 'PLAYING') return;
+      if (state.screenState !== 'PLAYING') return;
       const rect = canvas.getBoundingClientRect();
       const candidate = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
       candidate.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, candidate.y));
 
+      if (state.selectedTool === 'CUTTER') {
+        if (e.buttons > 0) performCutAndShockwave(candidate);
+        return;
+      }
+
+      if (!isDrawing) return;
       const pts = state.activeStrokePoints;
       if (pts.length === 0) return;
 
@@ -1934,10 +1989,10 @@
       const d = distance(last, candidate);
       if (d < MIN_POINT_DISTANCE) return;
 
-      const toolCost = TOOLS[state.selectedTool].cost;
+      const toolCost = Math.max(1, TOOLS[state.selectedTool].cost);
       const currentStrokeLen = calculatePolylineLength(pts);
       const maxRemainingStroke = Math.max(0, state.level.maxStrokeLength - currentStrokeLen);
-      const maxInkLength = toolCost > 0 ? state.currentInk / toolCost : maxRemainingStroke;
+      const maxInkLength = state.currentInk / toolCost;
       const budget = Math.min(maxRemainingStroke, maxInkLength);
 
       if (budget <= 1) {
@@ -1961,13 +2016,23 @@
       state.currentInk = Math.max(0, state.currentInk - inkSpent);
       state.totalInkDrawn += inkSpent;
       spawnPencilShavings(addedPt);
-      if (Math.random() < 0.45) sound.playScratch();
+      sound.playScratch();
       updateHudDOM();
+
+      if ((currentStrokeLen + usedDist >= state.level.maxStrokeLength - 1 || state.currentInk <= 1) && pts.length >= 2) {
+        finishActiveStroke();
+      }
     });
 
     function finishActiveStroke() {
       if (!isDrawing) return;
       isDrawing = false;
+      if (state.activeStrokePoints.length === 1) {
+        const tapPt = state.activeStrokePoints[0];
+        state.activeStrokePoints = [];
+        performCutAndShockwave(tapPt);
+        return;
+      }
       if (state.activeStrokePoints.length >= 2) {
         const smoothed = smoothStrokePoints(state.activeStrokePoints);
         const newLine = {
@@ -1982,6 +2047,7 @@
         matterBridge.addDrawnLineBodies(newLine);
         spawnLineSparks(smoothed);
         sound.playLineLock();
+        state.showInstructionBanner = false;
       }
       state.activeStrokePoints = [];
       updateHudDOM();
@@ -1990,305 +2056,540 @@
     canvas.addEventListener('pointerup', finishActiveStroke);
     canvas.addEventListener('pointercancel', finishActiveStroke);
 
-    /* ------------------------ CANVAS RENDERING --------------------------- */
+    /* ---------- 1:1 CANVAS RENDERER (Matches SketchbookRenderer.kt) ------- */
     function renderScene() {
       const w = canvas.width;
       const h = canvas.height;
-      const scale = h / WORLD_HEIGHT;
+      const worldScale = Math.max(0.1, h / WORLD_HEIGHT);
       const camX = state.cameraX;
-      const visW = w / scale;
+      const visW = w / worldScale;
+
+      const toScreenX = (wx) => (wx - camX) * worldScale;
+      const toScreenY = (wy) => wy * worldScale;
 
       ctx.save();
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Sketchbook ruled grid lines in world space
-      ctx.scale(scale, scale);
-      ctx.translate(-camX, 0);
+      // 1. Dark Slate Chalkboard Background + Subtle Parallax Graph Grid
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, COLORS.SketchCharcoalBg);
+      bgGrad.addColorStop(0.5, COLORS.SketchPaperSurface);
+      bgGrad.addColorStop(1, '#1E1718');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = 'rgba(243, 239, 230, 0.04)';
+      const gridStepPx = Math.max(32, 100 * worldScale);
+      const parallaxOffset = (camX * 0.35 * worldScale) % gridStepPx;
+      ctx.strokeStyle = COLORS.SketchGridLine;
       ctx.lineWidth = 1;
-      const firstGridX = Math.floor(camX / 60) * 60;
-      for (let gx = firstGridX; gx < camX + visW + 60; gx += 60) {
-        ctx.beginPath();
-        ctx.moveTo(gx, 0);
-        ctx.lineTo(gx, WORLD_HEIGHT);
-        ctx.stroke();
+      for (let x = -parallaxOffset; x < w; x += gridStepPx) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
-      for (let gy = 60; gy < WORLD_HEIGHT; gy += 60) {
-        ctx.beginPath();
-        ctx.moveTo(camX, gy);
-        ctx.lineTo(camX + visW, gy);
-        ctx.stroke();
+      for (let y = 0; y < h; y += gridStepPx) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
 
-      // 2. Guide Strokes (Level 1 & 2 tutorials)
-      for (const guide of state.level.guideStrokes) {
-        if (guide.points.length < 2) continue;
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 213, 79, 0.34)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 8]);
-        ctx.beginPath();
-        ctx.moveTo(guide.points[0].x, guide.points[0].y);
-        for (let i = 1; i < guide.points.length; i++) {
-          ctx.lineTo(guide.points[i].x, guide.points[i].y);
-        }
-        ctx.stroke();
-        const mid = guide.points[Math.floor(guide.points.length / 2)];
-        ctx.fillStyle = 'rgba(255, 213, 79, 0.72)';
-        ctx.font = '700 13px "Cabin Sketch", cursive';
-        ctx.textAlign = 'center';
-        ctx.fillText(guide.caption, mid.x, mid.y - 12);
-        ctx.restore();
-      }
-
-      // 3. Lava Pit Waves & Glow
-      drawLavaLayer(camX, visW);
-
-      // 4. Platforms
-      for (const p of state.level.platforms) {
-        if (p.endX < camX - 50 || p.startX > camX + visW + 50) continue;
-        const pw = p.endX - p.startX;
-        const ph = WORLD_HEIGHT - p.topY;
-
-        ctx.fillStyle = '#1b2520';
-        ctx.fillRect(p.startX, p.topY, pw, ph);
-
-        // Hatching lines along top edge
-        ctx.strokeStyle = 'rgba(243, 239, 230, 0.22)';
-        ctx.lineWidth = 1.5;
-        for (let hx = p.startX + 8; hx < p.endX - 6; hx += 16) {
+      // 2. Faint Guide Strokes on Early Levels when completedLines is empty
+      if (state.completedLines.length === 0) {
+        for (const guide of state.level.guideStrokes) {
+          if (guide.points.length < 2) continue;
+          const pulseAlpha = 0.25 + 0.15 * Math.sin(state.lavaAnimTime * 4);
+          ctx.save();
+          ctx.strokeStyle = `rgba(64, 196, 255, ${pulseAlpha})`;
+          ctx.lineWidth = 4.5 * worldScale;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([18 * worldScale, 14 * worldScale]);
+          ctx.lineDashOffset = -state.lavaAnimTime * 40 * worldScale;
           ctx.beginPath();
-          ctx.moveTo(hx, p.topY + 2);
-          ctx.lineTo(hx - 8, p.topY + 16);
+          ctx.moveTo(toScreenX(guide.points[0].x), toScreenY(guide.points[0].y));
+          for (let i = 1; i < guide.points.length; i++) {
+            ctx.lineTo(toScreenX(guide.points[i].x), toScreenY(guide.points[i].y));
+          }
           ctx.stroke();
-        }
-
-        // Top chalk crust
-        ctx.strokeStyle = '#f3efe6';
-        ctx.lineWidth = 4.5;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(p.startX, p.topY);
-        ctx.lineTo(p.endX, p.topY);
-        ctx.stroke();
-
-        if (p.label) {
-          ctx.fillStyle = 'rgba(243, 239, 230, 0.55)';
-          ctx.font = '700 14px "Cabin Sketch", cursive';
-          ctx.textAlign = 'left';
-          ctx.fillText(p.label, p.startX + 14, p.topY + 28);
+          ctx.restore();
         }
       }
 
-      // 5. Finish Line Banner
-      const fx = state.level.finishLineX;
-      const finishPlat = state.level.platforms[state.level.platforms.length - 1];
-      const fy = finishPlat ? finishPlat.topY : DEFAULT_GROUND_Y;
-      ctx.strokeStyle = '#ffd54f';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy);
-      ctx.lineTo(fx, fy - 95);
-      ctx.stroke();
+      // 3. Animated Lava Pit & Rising Flames Underneath Gaps
+      drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h);
 
-      // Checkered flag
-      ctx.fillStyle = '#ffd54f';
-      ctx.fillRect(fx, fy - 95, 48, 28);
-      ctx.fillStyle = '#18221e';
-      ctx.font = '700 12px "Cabin Sketch", cursive';
-      ctx.textAlign = 'center';
-      ctx.fillText('FINISH', fx + 24, fy - 76);
+      // 4. Sketchbook Platforms
+      for (const platform of state.level.platforms) {
+        if (platform.endX >= camX - 100 && platform.startX <= camX + visW + 100) {
+          drawSketchPlatform(platform, toScreenX, toScreenY, worldScale, h);
+        }
+      }
+
+      // 5. Finish Line Banner & Posts
+      const finishPlat = state.level.platforms[state.level.platforms.length - 1];
+      const finishGroundY = finishPlat ? finishPlat.topY : DEFAULT_GROUND_Y;
+      drawFinishLine(state.level.finishLineX, finishGroundY, toScreenX, toScreenY, worldScale, w);
 
       // 6. Thumbtack Hazards
       for (const cluster of state.level.thumbtacks) {
-        for (let i = 0; i < cluster.count; i++) {
-          const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
-          const tx = cluster.x + offset;
-          const ty = cluster.y;
-          ctx.fillStyle = '#ff6e6e';
-          ctx.beginPath();
-          ctx.moveTo(tx - 8, ty + 6);
-          ctx.lineTo(tx + 8, ty + 6);
-          ctx.lineTo(tx, ty - 14);
-          ctx.closePath();
-          ctx.fill();
-        }
+        drawThumbtackCluster(cluster, toScreenX, toScreenY, worldScale, w);
       }
 
-      // 7. Chalk Bits & Gold Stars
+      // 7. Collectible Chalk Bits & Gold Stars
       for (const bit of state.chalkBits) {
-        if (bit.collected) continue;
-        const bob = Math.sin(state.lavaAnimTime * 4 + bit.id) * 4;
-        ctx.save();
-        ctx.translate(bit.x, bit.y + bob);
-        if (bit.isStar) {
-          ctx.fillStyle = '#ffd54f';
-          ctx.strokeStyle = '#fff8e1';
-          ctx.lineWidth = 1.5;
-          drawStarPolygon(ctx, 0, 0, 5, 14, 6);
-          ctx.fill();
-          ctx.stroke();
-        } else {
-          ctx.rotate(-0.35);
-          ctx.fillStyle = '#4dd0e1';
-          ctx.strokeStyle = '#e0f7fa';
-          ctx.lineWidth = 1.5;
-          ctx.fillRect(-9, -4, 18, 8);
-          ctx.strokeRect(-9, -4, 18, 8);
+        if (!bit.collected) {
+          drawChalkBitOrStar(bit, toScreenX, toScreenY, worldScale, w);
         }
-        ctx.restore();
       }
 
-      // 8. Completed Player-Drawn Lines
+      // 8. Completed Player-Drawn Chalk Platforms
       for (const line of state.completedLines) {
         const alpha = line.tool === 'BOOST'
           ? 1
-          : Math.max(0.18, Math.min(1, (line.maxLifetime - line.ageSeconds) / 1.5));
-        drawChalkPolyline(line.points, TOOLS[line.tool].color, alpha, false);
+          : Math.max(0.15, Math.min(1, (line.maxLifetime - line.ageSeconds) / 1.5));
+        drawPencilLine(line.points, line.tool, alpha, true, toScreenX, toScreenY, worldScale);
       }
 
-      // 9. Active In-Progress Stroke
-      if (state.activeStrokePoints.length >= 2) {
-        drawChalkPolyline(state.activeStrokePoints, TOOLS[state.selectedTool].color, 0.9, true);
+      // 9. Active Finger-Drawn Line in Progress
+      if (state.activeStrokePoints.length > 0) {
+        drawPencilLine(state.activeStrokePoints, state.selectedTool, 1, false, toScreenX, toScreenY, worldScale);
       }
 
-      // 10. Cutter Shockwaves
-      for (const sw of state.shockwaves) {
-        ctx.strokeStyle = `rgba(255, 110, 110, ${sw.alpha})`;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // 11. Red Scribbler Enemies
+      // 10. Red Scribbler Enemies
       for (const enemy of state.scribblers) {
-        drawScribbler(enemy);
+        if (enemy.isAlive) {
+          drawScribblerEnemy(enemy, toScreenX, toScreenY, worldScale, w);
+        }
       }
 
-      // 12. Stickman Runner
+      // 11. Hand-drawn Chalk Dust & Pencil Spark Particles
+      drawSketchParticles(toScreenX, toScreenY, worldScale, w, h);
+
+      // 12. Animated Goku God Stickman
       if (state.stickman) {
-        drawStickman(state.stickman);
+        drawAnimatedStickman(state.stickman, toScreenX, toScreenY, worldScale);
       }
 
-      // 13. Sketch Particles & Embers
-      for (const e of state.embers) {
-        ctx.fillStyle = e.isYellow
-          ? `rgba(255, 213, 79, ${e.alpha})`
-          : `rgba(255, 109, 0, ${e.alpha})`;
-        ctx.beginPath();
-        ctx.arc(e.worldX, e.worldY, e.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      for (const p of state.sketchParticles) {
-        ctx.save();
-        ctx.translate(p.worldX, p.worldY);
-        ctx.rotate(p.rotation);
-        ctx.fillStyle = p.type === 'SPARK'
-          ? `rgba(255, 213, 79, ${p.alpha})`
-          : `rgba(243, 239, 230, ${p.alpha})`;
-        ctx.fillRect(-p.size * 0.5, -p.size * 0.5, p.size, p.size);
-        ctx.restore();
+      // 13. Callout Move Speech Bubble & Landing X Telegraph
+      if (state.activeCallout && state.stickman) {
+        drawCalloutBubbleAndTelegraph(state.activeCallout, state.stickman, toScreenX, toScreenY, worldScale);
       }
 
       ctx.restore();
     }
 
-    function drawLavaLayer(camX, visW) {
-      const startX = camX - 20;
-      const endX = camX + visW + 20;
+    function drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h) {
+      const lavaTopY = LAVA_SURFACE_Y;
+      const startWX = camX - 60;
+      const endWX = camX + visW + 60;
 
-      // Back glow wave
-      ctx.fillStyle = 'rgba(213, 0, 0, 0.45)';
+      // Ambient orange glow above lava
+      const glowTop = toScreenY(lavaTopY - 75);
+      const glowGrad = ctx.createLinearGradient(0, glowTop, 0, h);
+      glowGrad.addColorStop(0, 'rgba(255, 87, 34, 0)');
+      glowGrad.addColorStop(0.5, 'rgba(255, 87, 34, 0.18)');
+      glowGrad.addColorStop(1, 'rgba(213, 0, 0, 0.55)');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(0, glowTop, w, h - glowTop);
+
+      // Back wave (LavaDeepRed)
+      ctx.fillStyle = COLORS.LavaDeepRed;
       ctx.beginPath();
-      ctx.moveTo(startX, WORLD_HEIGHT);
-      for (let x = startX; x <= endX; x += 28) {
-        const y = LAVA_SURFACE_Y - 6 + Math.sin(x * 0.025 + state.lavaAnimTime * 3.2) * 7;
-        ctx.lineTo(x, y);
+      ctx.moveTo(0, h);
+      for (let wx = startWX; wx <= endWX; wx += 20) {
+        const wave = Math.sin(wx * 0.045 + state.lavaAnimTime * 3.8) * 7 +
+                     Math.cos(wx * 0.09 - state.lavaAnimTime * 2.4) * 4;
+        ctx.lineTo(toScreenX(wx), toScreenY(lavaTopY + wave - 4));
       }
-      ctx.lineTo(endX, WORLD_HEIGHT);
+      ctx.lineTo(w, h);
       ctx.closePath();
       ctx.fill();
 
-      // Core bright orange-red wave
-      const grad = ctx.createLinearGradient(0, LAVA_SURFACE_Y - 10, 0, WORLD_HEIGHT);
-      grad.addColorStop(0, '#ff9100');
-      grad.addColorStop(0.35, '#ff3d00');
-      grad.addColorStop(1, '#b71c1c');
-      ctx.fillStyle = grad;
-
+      // Middle flame tongues (LavaOrange)
+      ctx.fillStyle = COLORS.LavaOrange;
       ctx.beginPath();
-      ctx.moveTo(startX, WORLD_HEIGHT);
-      for (let x = startX; x <= endX; x += 22) {
-        const y = LAVA_SURFACE_Y + Math.sin(x * 0.035 - state.lavaAnimTime * 4.5) * 5.5;
-        ctx.lineTo(x, y);
+      ctx.moveTo(0, h);
+      let idx = 0;
+      for (let wx = startWX; wx <= endWX; wx += 16) {
+        const tongue = Math.sin(wx * 0.07 - state.lavaAnimTime * 5.2) * 9 + (idx % 2 === 0 ? -6 : 4);
+        ctx.lineTo(toScreenX(wx), toScreenY(lavaTopY + tongue + 2));
+        idx++;
       }
-      ctx.lineTo(endX, WORLD_HEIGHT);
+      ctx.lineTo(w, h);
       ctx.closePath();
       ctx.fill();
+
+      // Front hot yellow core wave (LavaFlameYellow)
+      ctx.fillStyle = 'rgba(255, 202, 40, 0.88)';
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let wx = startWX; wx <= endWX; wx += 18) {
+        const crest = Math.cos(wx * 0.06 + state.lavaAnimTime * 6.5) * 5.5;
+        ctx.lineTo(toScreenX(wx), toScreenY(lavaTopY + 14 + crest));
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rising embers
+      for (const ember of state.embers) {
+        const sx = toScreenX(ember.worldX);
+        const sy = toScreenY(ember.worldY);
+        if (sx >= -20 && sx <= w + 20) {
+          ctx.fillStyle = ember.isYellow
+            ? `rgba(255, 202, 40, ${ember.alpha})`
+            : `rgba(255, 87, 34, ${ember.alpha})`;
+          ctx.beginPath();
+          ctx.arc(sx, sy, ember.radius * worldScale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     }
 
-    function drawChalkPolyline(points, colorHex, alpha, isDashed) {
-      if (points.length < 2) return;
+    function drawSketchPlatform(platform, toScreenX, toScreenY, worldScale, h) {
+      const left = toScreenX(platform.startX);
+      const right = toScreenX(platform.endX);
+      const top = toScreenY(platform.topY);
+      const bottom = h;
+
+      ctx.fillStyle = '#252832';
+      ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
+
+      // Diagonal graphite hatching inside platform
+      ctx.strokeStyle = 'rgba(216, 219, 208, 0.16)';
+      ctx.lineWidth = 2 * worldScale;
+      for (let hx = platform.startX; hx < platform.endX + 120; hx += 24) {
+        const sx1 = toScreenX(Math.max(platform.startX, Math.min(platform.endX, hx)));
+        const sy1 = top + 4 * worldScale;
+        const sx2 = toScreenX(Math.max(platform.startX, Math.min(platform.endX, hx - 90)));
+        const sy2 = Math.min(bottom, top + 110 * worldScale);
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.lineTo(sx2, sy2);
+        ctx.stroke();
+      }
+
+      // Double-sketched chalk outline along top and sides
+      ctx.strokeStyle = COLORS.ChalkWhite;
+      ctx.lineWidth = 4.2 * worldScale;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(left, bottom);
+      ctx.lineTo(left, top);
+      let cx = platform.startX;
+      let idx = 0;
+      while (cx < platform.endX) {
+        const nextX = Math.min(platform.endX, cx + 35);
+        const jitterY = idx % 2 === 0 ? -1.4 : 1.4;
+        ctx.lineTo(toScreenX(nextX), toScreenY(platform.topY + jitterY));
+        cx = nextX;
+        idx++;
+      }
+      ctx.lineTo(right, bottom);
+      ctx.stroke();
+
+      // Secondary sketchy pencil pass
+      ctx.strokeStyle = 'rgba(216, 219, 208, 0.65)';
+      ctx.lineWidth = 2 * worldScale;
+      ctx.beginPath();
+      ctx.moveTo(left + 2 * worldScale, top + 3.5 * worldScale);
+      ctx.lineTo(right - 2 * worldScale, top + 2.5 * worldScale);
+      ctx.stroke();
+    }
+
+    function drawFinishLine(finishX, groundY, toScreenX, toScreenY, worldScale, w) {
+      const postLeftX = toScreenX(finishX);
+      const postRightX = toScreenX(finishX + 64);
+      const bottomY = toScreenY(groundY);
+      const topY = toScreenY(groundY - 125);
+
+      if (postRightX < -50 || postLeftX > w + 50) return;
+
+      ctx.strokeStyle = COLORS.ChalkWhite;
+      ctx.lineWidth = 4.5 * worldScale;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(postLeftX, bottomY); ctx.lineTo(postLeftX, topY);
+      ctx.moveTo(postRightX, bottomY); ctx.lineTo(postRightX, topY);
+      ctx.stroke();
+
+      const bannerHeight = 28 * worldScale;
+      const cols = 6;
+      const rows = 2;
+      const cellW = (postRightX - postLeftX) / cols;
+      const cellH = bannerHeight / rows;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const waveY = Math.sin(state.lavaAnimTime * 5 + c * 0.8) * 2.5 * worldScale;
+          ctx.fillStyle = (r + c) % 2 === 0 ? COLORS.ChalkWhite : COLORS.SketchCharcoalBg;
+          ctx.fillRect(postLeftX + c * cellW, topY + r * cellH + waveY, cellW + 0.5, cellH + 0.5);
+        }
+      }
+
+      ctx.strokeStyle = COLORS.FinishBannerGreen;
+      ctx.lineWidth = 2.5 * worldScale;
+      ctx.strokeRect(postLeftX, topY, postRightX - postLeftX, bannerHeight);
+    }
+
+    function drawPencilLine(points, toolId, alpha, isCompleted, toScreenX, toScreenY, worldScale) {
+      if (points.length === 0) return;
+      const toolInfo = TOOLS[toolId] || TOOLS.WHITE;
+
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = colorHex;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      if (isDashed) ctx.setLineDash([10, 6]);
+      if (points.length === 1) {
+        ctx.fillStyle = toolInfo.core;
+        ctx.beginPath();
+        ctx.arc(toScreenX(points[0].x), toScreenY(points[0].y), 4.5 * worldScale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return;
+      }
 
-      // Primary thick chalk stroke
-      ctx.lineWidth = 6.5;
+      // Secondary halo pass
+      ctx.strokeStyle = toolInfo.halo;
+      ctx.lineWidth = 9.0 * worldScale;
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
+      ctx.moveTo(toScreenX(points[0].x + 1.2), toScreenY(points[0].y + 1.8));
       for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
+        const jitter = i % 2 === 0 ? 1.8 : -1.6;
+        ctx.lineTo(
+          toScreenX(points[i].x) + jitter * 0.5 * worldScale,
+          toScreenY(points[i].y) + jitter * worldScale
+        );
       }
       ctx.stroke();
 
-      // Secondary sketch double-line highlight
-      ctx.lineWidth = 2.2;
-      ctx.globalAlpha = alpha * 0.55;
+      // Primary core pass
+      ctx.strokeStyle = toolInfo.core;
+      ctx.lineWidth = 5.5 * worldScale;
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y - 2.2);
+      ctx.moveTo(toScreenX(points[0].x), toScreenY(points[0].y));
       for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y - 2.2);
+        ctx.lineTo(toScreenX(points[i].x), toScreenY(points[i].y));
       }
       ctx.stroke();
+
+      if (!isCompleted) {
+        const tip = points[points.length - 1];
+        ctx.fillStyle = COLORS.LavaFlameYellow;
+        ctx.beginPath();
+        ctx.arc(toScreenX(tip.x), toScreenY(tip.y), 6.5 * worldScale, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
 
-    function drawStickman(st) {
-      const phase = st.runCyclePhase || 0;
-      const outlineColor = '#1c0b0b';
-      const bodyWhite = '#fdfbf7';
-      const backLimbGrey = '#c5c8ce';
-      const hairCrimson = '#d50000';
-      const hairHighlight = '#ff3d00';
+    function drawChalkBitOrStar(bit, toScreenX, toScreenY, worldScale, w) {
+      const bob = Math.sin(state.lavaAnimTime * 3.2 + bit.id) * 3.5;
+      const cx = toScreenX(bit.x);
+      const cy = toScreenY(bit.y + bob);
+      if (cx < -40 || cx > w + 40) return;
 
-      function drawOutlinedLimb(x1, y1, x2, y2, fillColor, thickness) {
+      if (bit.isStar) {
+        ctx.fillStyle = 'rgba(255, 202, 40, 0.25)';
+        ctx.beginPath(); ctx.arc(cx, cy, 22 * worldScale, 0, Math.PI * 2); ctx.fill();
+
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const r = (i % 2 === 0 ? 14 : 6.5) * worldScale;
+          const ang = -Math.PI / 2 + i * Math.PI / 5 + Math.sin(state.lavaAnimTime * 2) * 0.1;
+          const px = cx + Math.cos(ang) * r;
+          const py = cy + Math.sin(ang) * r;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = COLORS.LavaFlameYellow;
+        ctx.fill();
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 1.8 * worldScale;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = 'rgba(247, 248, 242, 0.2)';
+        ctx.beginPath(); ctx.arc(cx, cy, 15 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 6.5 * worldScale;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 8 * worldScale, cy + 4 * worldScale);
+        ctx.lineTo(cx + 8 * worldScale, cy - 4 * worldScale);
+        ctx.stroke();
+      }
+    }
+
+    function drawThumbtackCluster(cluster, toScreenX, toScreenY, worldScale, w) {
+      for (let i = 0; i < cluster.count; i++) {
+        const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
+        const tx = toScreenX(cluster.x + offset);
+        const ty = toScreenY(cluster.y);
+        if (tx < -30 || tx > w + 30) continue;
+
+        ctx.fillStyle = 'rgba(243, 156, 171, 0.25)';
+        ctx.beginPath(); ctx.arc(tx, ty - 4 * worldScale, 13 * worldScale, 0, Math.PI * 2); ctx.fill();
+
+        ctx.strokeStyle = '#F39CAB';
+        ctx.lineWidth = 5 * worldScale;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tx - 8 * worldScale, ty);
+        ctx.lineTo(tx + 8 * worldScale, ty);
+        ctx.stroke();
+
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 2.6 * worldScale;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty - 2 * worldScale);
+        ctx.lineTo(tx, ty - 14 * worldScale);
+        ctx.stroke();
+      }
+    }
+
+    function drawScribblerEnemy(enemy, toScreenX, toScreenY, worldScale, w) {
+      const fx = toScreenX(enemy.x);
+      const fy = toScreenY(enemy.y);
+      if (fx < -60 || fx > w + 60) return;
+
+      const redColor = '#EE7D72';
+      const strokeW = 3.8 * worldScale;
+      const hipY = fy - 22 * worldScale;
+      const shoulderY = hipY - 18 * worldScale;
+      const headY = shoulderY - 10 * worldScale;
+      const swing = Math.sin(enemy.runPhase) * 9 * worldScale;
+
+      ctx.fillStyle = 'rgba(238, 125, 114, 0.22)';
+      ctx.beginPath(); ctx.arc(fx, hipY, 28 * worldScale, 0, Math.PI * 2); ctx.fill();
+
+      ctx.strokeStyle = redColor;
+      ctx.lineWidth = strokeW;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(fx, hipY); ctx.lineTo(fx + swing, fy);
+      ctx.moveTo(fx, hipY); ctx.lineTo(fx - swing, fy);
+      ctx.moveTo(fx, hipY); ctx.lineTo(fx, shoulderY);
+      ctx.stroke();
+
+      ctx.lineWidth = strokeW * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(fx, shoulderY); ctx.lineTo(fx - swing, hipY - 4 * worldScale);
+      ctx.moveTo(fx, shoulderY); ctx.lineTo(fx + swing, hipY - 4 * worldScale);
+      ctx.stroke();
+
+      ctx.fillStyle = COLORS.SketchCharcoalBg;
+      ctx.beginPath(); ctx.arc(fx, headY, 9.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = redColor;
+      ctx.lineWidth = strokeW;
+      ctx.stroke();
+
+      ctx.strokeStyle = COLORS.ChalkWhite;
+      ctx.lineWidth = 2 * worldScale;
+      ctx.beginPath();
+      ctx.moveTo(fx - 5 * worldScale, headY - 3 * worldScale); ctx.lineTo(fx, headY);
+      ctx.moveTo(fx + 5 * worldScale, headY - 3 * worldScale); ctx.lineTo(fx, headY);
+      ctx.stroke();
+    }
+
+    function drawCalloutBubbleAndTelegraph(callout, stickman, toScreenX, toScreenY, worldScale) {
+      const bx = toScreenX(stickman.footX);
+      const by = toScreenY(stickman.footY - STICKMAN_HEIGHT - 28);
+      const bw = 96 * worldScale;
+      const bh = 28 * worldScale;
+      const fuseProgress = callout.totalSeconds > 0
+        ? Math.max(0, Math.min(1, callout.remainingSeconds / callout.totalSeconds))
+        : 0;
+
+      ctx.fillStyle = 'rgba(24, 25, 31, 0.92)';
+      ctx.fillRect(bx - bw * 0.5, by - bh, bw, bh);
+      ctx.strokeStyle = COLORS.LavaFlameYellow;
+      ctx.lineWidth = 2.4 * worldScale;
+      ctx.strokeRect(bx - bw * 0.5, by - bh, bw, bh);
+
+      ctx.lineWidth = 3.5 * worldScale;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bx - bw * 0.42, by - 5 * worldScale);
+      ctx.lineTo(bx - bw * 0.42 + bw * 0.84 * fuseProgress, by - 5 * worldScale);
+      ctx.stroke();
+
+      if (callout.landingTargetX != null && callout.landingTargetY != null) {
+        const tx = toScreenX(callout.landingTargetX);
+        const ty = toScreenY(callout.landingTargetY) - 6 * worldScale;
+        const sz = 11 * worldScale;
+        ctx.lineWidth = 3.2 * worldScale;
+        ctx.beginPath();
+        ctx.moveTo(tx - sz, ty - sz); ctx.lineTo(tx + sz, ty + sz);
+        ctx.moveTo(tx + sz, ty - sz); ctx.lineTo(tx - sz, ty + sz);
+        ctx.stroke();
+      }
+    }
+
+    function drawSketchParticles(toScreenX, toScreenY, worldScale, w, h) {
+      for (const p of state.sketchParticles) {
+        const sx = toScreenX(p.worldX);
+        const sy = toScreenY(p.worldY);
+        if (sx < -30 || sx > w + 30 || sy < -30 || sy > h + 30) continue;
+        const radiusPx = Math.max(1.5, p.size * worldScale);
+        const alpha = Math.max(0, Math.min(1, p.alpha));
+
+        if (p.type === 'FOOTSTEP_CHALK_PUFF') {
+          ctx.strokeStyle = `rgba(247, 248, 242, ${alpha * 0.78})`;
+          ctx.lineWidth = Math.max(1, 1.8 * worldScale);
+          ctx.beginPath(); ctx.arc(sx, sy, radiusPx, 0, Math.PI * 2); ctx.stroke();
+
+          const dx = Math.cos(p.rotation) * radiusPx * 0.65;
+          const dy = Math.sin(p.rotation) * radiusPx * 0.65;
+          ctx.strokeStyle = `rgba(216, 219, 208, ${alpha * 0.85})`;
+          ctx.lineWidth = Math.max(1, 1.6 * worldScale);
+          ctx.beginPath(); ctx.moveTo(sx - dx, sy - dy); ctx.lineTo(sx + dx, sy + dy); ctx.stroke();
+        } else if (p.type === 'PENCIL_SHAVING') {
+          const dx = Math.cos(p.rotation) * radiusPx * 1.15;
+          const dy = Math.sin(p.rotation) * radiusPx * 1.15;
+          ctx.strokeStyle = `rgba(255, 202, 40, ${alpha})`;
+          ctx.lineWidth = Math.max(1.2, 2.2 * worldScale);
+          ctx.beginPath(); ctx.moveTo(sx - dx, sy - dy); ctx.lineTo(sx + dx, sy + dy); ctx.stroke();
+        } else {
+          const arm = radiusPx * 1.35;
+          const cosA = Math.cos(p.rotation);
+          const sinA = Math.sin(p.rotation);
+          ctx.strokeStyle = Math.floor(p.size * 10) % 2 === 0
+            ? `rgba(247, 248, 242, ${alpha})`
+            : `rgba(64, 196, 255, ${alpha})`;
+          ctx.lineWidth = Math.max(1.2, 2.0 * worldScale);
+          ctx.beginPath();
+          ctx.moveTo(sx - cosA * arm, sy - sinA * arm);
+          ctx.lineTo(sx + cosA * arm, sy + sinA * arm);
+          ctx.moveTo(sx + sinA * arm * 0.75, sy - cosA * arm * 0.75);
+          ctx.lineTo(sx - sinA * arm * 0.75, sy + cosA * arm * 0.75);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function drawAnimatedStickman(stickman, toScreenX, toScreenY, worldScale) {
+      const phase = stickman.runCyclePhase || 0;
+      const outlineColor = '#1C0B0B';
+      const bodyWhite = '#FDFBF7';
+      const backLimbGrey = '#C5C8CE';
+      const hairCrimson = '#D50000';
+
+      function drawOutlinedLimb(x1, y1, x2, y2, fillColor, thicknessWorld) {
+        const sx1 = toScreenX(x1), sy1 = toScreenY(y1);
+        const sx2 = toScreenX(x2), sy2 = toScreenY(y2);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = thickness + 3.4;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+        ctx.lineWidth = (thicknessWorld + 3.4) * worldScale;
+        ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
 
         ctx.strokeStyle = fillColor;
-        ctx.lineWidth = thickness;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+        ctx.lineWidth = thicknessWorld * worldScale;
+        ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
       }
 
-      function drawSpikyCrimsonHair(hx, hy, headAngleOffset, windDrag) {
-        const r = 10;
+      function drawSpikyCrimsonHair(headWX, headWY, headAngleOffset, windDrag) {
+        const hx = toScreenX(headWX);
+        const hy = toScreenY(headWY);
+        const r = STICKMAN_HEAD_RADIUS * worldScale;
         const spikeAngles = [-2.75, -2.35, -1.95, -1.55, -1.15, -0.78, -0.42];
         const spikeLengths = [17, 23, 28, 26, 24, 19, 14];
 
@@ -2296,7 +2597,7 @@
         ctx.moveTo(hx - r * 0.85, hy + r * 0.1);
         for (let i = 0; i < spikeAngles.length; i++) {
           const ang = spikeAngles[i] + headAngleOffset + windDrag * 0.18;
-          const len = spikeLengths[i];
+          const len = spikeLengths[i] * worldScale;
           const tipX = hx + Math.cos(ang) * len;
           const tipY = hy + Math.sin(ang) * len;
           const valAng = ang + 0.22;
@@ -2305,93 +2606,83 @@
           ctx.lineTo(hx + Math.cos(valAng) * valLen, hy + Math.sin(valAng) * valLen);
         }
         ctx.closePath();
-
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 3.2;
+        ctx.lineWidth = 3.2 * worldScale;
         ctx.stroke();
         ctx.fillStyle = hairCrimson;
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 61, 0, 0.55)';
-        ctx.lineWidth = 1.4;
+        ctx.lineWidth = 1.4 * worldScale;
         ctx.stroke();
       }
 
-      function drawKiAuraAndLightning(cx, footY, intensity, isBoosted) {
+      function drawKiAuraAndLightning(centerWX, footWY, intensity, isBoosted) {
         if (intensity <= 0.05) return;
-        const auraH = 74 + intensity * 22;
-        const auraHalfW = 26 + intensity * 14;
+        const baseSX = toScreenX(centerWX);
+        const baseSY = toScreenY(footWY);
+        const auraH = (74 + intensity * 22) * worldScale;
+        const auraHalfW = (26 + intensity * 14) * worldScale;
 
-        ctx.save();
         ctx.fillStyle = isBoosted
           ? `rgba(255, 213, 79, ${Math.min(0.32, 0.24 * intensity)})`
           : `rgba(229, 57, 53, ${Math.min(0.32, 0.24 * intensity)})`;
         ctx.beginPath();
-        ctx.arc(cx, footY - auraH * 0.45, auraHalfW * 1.45, 0, Math.PI * 2);
+        ctx.arc(baseSX, baseSY - auraH * 0.45, auraHalfW * 1.45, 0, Math.PI * 2);
         ctx.fill();
 
-        // Outer crimson flame crown
         ctx.fillStyle = isBoosted
           ? `rgba(255, 109, 0, ${Math.min(0.85, 0.52 * intensity)})`
           : `rgba(229, 57, 53, ${Math.min(0.85, 0.52 * intensity)})`;
         ctx.beginPath();
-        ctx.moveTo(cx - auraHalfW * 0.85, footY);
-        const spikes = 9;
-        for (let i = 0; i <= spikes; i++) {
-          const t = i / spikes;
+        ctx.moveTo(baseSX - auraHalfW * 0.85, baseSY);
+        for (let i = 0; i <= 9; i++) {
+          const t = i / 9;
           const ang = Math.PI + t * Math.PI;
-          const jitter = Math.sin(phase * 4.5 + i * 1.7) * 6.5;
+          const jitter = Math.sin(phase * 4.5 + i * 1.7) * 6.5 * worldScale;
           const rx = Math.cos(ang) * auraHalfW + jitter * 0.35;
-          const ry = Math.sin(ang) * auraH - Math.abs(Math.cos(i * 1.3 + phase * 3)) * 12;
-          ctx.lineTo(cx + rx, footY + ry * 0.92);
+          const ry = Math.sin(ang) * auraH - Math.abs(Math.cos(i * 1.3 + phase * 3)) * 12 * worldScale;
+          ctx.lineTo(baseSX + rx, baseSY + ry * 0.92);
         }
-        ctx.lineTo(cx + auraHalfW * 0.85, footY);
+        ctx.lineTo(baseSX + auraHalfW * 0.85, baseSY);
         ctx.closePath();
         ctx.fill();
 
-        // Inner fiery orange-gold flame core
         ctx.fillStyle = isBoosted
           ? `rgba(255, 213, 79, ${Math.min(0.9, 0.62 * intensity)})`
           : `rgba(255, 109, 0, ${Math.min(0.9, 0.62 * intensity)})`;
         ctx.beginPath();
-        ctx.moveTo(cx - auraHalfW * 0.58, footY);
+        ctx.moveTo(baseSX - auraHalfW * 0.58, baseSY);
         for (let i = 0; i <= 7; i++) {
           const t = i / 7;
           const ang = Math.PI + t * Math.PI;
-          const jitter = Math.cos(phase * 5.5 + i * 2.1) * 4.5;
+          const jitter = Math.cos(phase * 5.5 + i * 2.1) * 4.5 * worldScale;
           const rx = Math.cos(ang) * (auraHalfW * 0.65) + jitter * 0.3;
           const ry = Math.sin(ang) * (auraH * 0.78);
-          ctx.lineTo(cx + rx, footY + ry);
+          ctx.lineTo(baseSX + rx, baseSY + ry);
         }
-        ctx.lineTo(cx + auraHalfW * 0.58, footY);
+        ctx.lineTo(baseSX + auraHalfW * 0.58, baseSY);
         ctx.closePath();
         ctx.fill();
 
-        // Crackling white bio-lightning arcs
-        ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1, 0.85 * intensity)})`;
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = `rgba(247, 248, 242, ${Math.min(1, 0.85 * intensity)})`;
+        ctx.lineWidth = 1.8 * worldScale;
         const boltSeed = Math.floor(phase * 3.5);
         for (let b = 0; b <= 1; b++) {
           const side = (boltSeed + b) % 2 === 0 ? -1 : 1;
-          const sx = cx + side * 8;
-          const sy = footY - (18 + b * 20);
-          const mx = sx + side * (10 + Math.sin(phase * 7 + b) * 5);
-          const my = sy - 12;
-          const ex = sx - side * 4;
-          const ey = my - 11;
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(mx, my);
-          ctx.lineTo(ex, ey);
-          ctx.stroke();
+          const sx = baseSX + side * 8 * worldScale;
+          const sy = baseSY - (18 + b * 20) * worldScale;
+          const mx = sx + side * (10 + Math.sin(phase * 7 + b) * 5) * worldScale;
+          const my = sy - 12 * worldScale;
+          const ex = sx - side * 4 * worldScale;
+          const ey = my - 11 * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(mx, my); ctx.lineTo(ex, ey); ctx.stroke();
         }
-        ctx.restore();
       }
 
-      // 3-Stage Death Animation (Matches Frames 1–6 of Goku God Sprite Sheet)
-      if (!st.isAlive) {
-        const dt = Math.min(1.25, st.deathTimer || 0);
-        const bx = st.footX;
-        const by = st.footY;
+      if (!stickman.isAlive) {
+        const dt = Math.min(1.25, stickman.deathTimer || 0);
+        const bx = stickman.footX;
+        const by = stickman.footY;
 
         if (dt < 0.36) {
           const collapseT = dt / 0.36;
@@ -2412,19 +2703,14 @@
           drawOutlinedLimb(shX, shY, shX - 9, shY + 11, bodyWhite, 4.2);
 
           drawSpikyCrimsonHair(hdX, hdY, 0.15, -0.3);
-          ctx.fillStyle = outlineColor;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+          const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
+          const hr = STICKMAN_HEAD_RADIUS * worldScale;
+          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
         } else if (dt < 0.72) {
           const burstT = (dt - 0.36) / 0.36;
           drawKiAuraAndLightning(bx, by, 1.5 * (1 - burstT * 0.5), true);
-          const hipX = bx;
-          const hipY = by - 6;
-          const shX = hipX - 20;
-          const shY = by - 7;
-          const hdX = shX - 11;
-          const hdY = by - 9;
+          const hipX = bx, hipY = by - 6, shX = hipX - 20, shY = by - 7, hdX = shX - 11, hdY = by - 9;
 
           drawOutlinedLimb(hipX, hipY, hipX + 20, by - 4, backLimbGrey, 4.5);
           drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
@@ -2432,27 +2718,21 @@
           drawOutlinedLimb(shX, shY, shX + 10, by - 2, bodyWhite, 4.0);
 
           drawSpikyCrimsonHair(hdX, hdY, -1.1, -0.8);
-          ctx.fillStyle = outlineColor;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+          const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
+          const hr = STICKMAN_HEAD_RADIUS * worldScale;
+          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
 
           const shardAngles = [-2.5, -2.0, -1.4, -0.9, -0.5];
           shardAngles.forEach((ang, i) => {
-            const dist = 18 + burstT * 48 + i * 5;
-            const rx = bx + Math.cos(ang) * dist;
-            const ry = by + Math.sin(ang) * dist;
-            ctx.fillStyle = '#3e2f28';
-            ctx.beginPath(); ctx.arc(rx, ry, 4.5, 0, Math.PI * 2); ctx.fill();
+            const dist = (18 + burstT * 48 + i * 5) * worldScale;
+            const rx = toScreenX(bx) + Math.cos(ang) * dist;
+            const ry = toScreenY(by) + Math.sin(ang) * dist;
+            ctx.fillStyle = '#3E2F28';
+            ctx.beginPath(); ctx.arc(rx, ry, 4.5 * worldScale, 0, Math.PI * 2); ctx.fill();
           });
         } else {
-          const hipX = bx;
-          const hipY = by - 5;
-          const shX = hipX - 22;
-          const shY = by - 5;
-          const hdX = shX - 12;
-          const hdY = by - 8;
-
+          const hipX = bx, hipY = by - 5, shX = hipX - 22, shY = by - 5, hdX = shX - 12, hdY = by - 8;
           drawOutlinedLimb(hipX, hipY, hipX + 16, by - 9, backLimbGrey, 4.4);
           drawOutlinedLimb(hipX + 16, by - 9, hipX + 25, by - 3, backLimbGrey, 4.2);
           drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
@@ -2460,39 +2740,38 @@
           drawOutlinedLimb(shX, shY, shX + 12, by - 2, bodyWhite, 4.0);
 
           drawSpikyCrimsonHair(hdX, hdY, -1.25, -1.0);
-          ctx.fillStyle = outlineColor;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite;
-          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+          const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
+          const hr = STICKMAN_HEAD_RADIUS * worldScale;
+          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
         }
         return;
       }
 
-      // Active Gameplay States: Running, Jumping, Falling, Landing Squash
-      const isBoosted = st.boostTimer > 0 || st.blitzTimer > 0;
-      const isLanding = st.isGrounded && (st.landingSquashTimer || 0) > 0;
-      const isJumping = !st.isGrounded && st.velocityY < -50;
-      const isFalling = !st.isGrounded && st.velocityY >= -50;
+      const isBoosted = stickman.boostTimer > 0 || stickman.blitzTimer > 0;
+      const isLanding = stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0;
+      const isJumping = !stickman.isGrounded && stickman.velocityY < -50;
+      const isFalling = !stickman.isGrounded && stickman.velocityY >= -50;
 
-      const squashProgress = isLanding ? Math.min(1, st.landingSquashTimer / 0.26) : 0;
+      const squashProgress = isLanding ? Math.min(1, stickman.landingSquashTimer / 0.26) : 0;
       const squashDrop = Math.sin(squashProgress * Math.PI) * 10;
-      const runBounce = (st.isGrounded && !isLanding) ? Math.abs(Math.sin(phase * 2)) * 4.2 : 0;
+      const runBounce = (stickman.isGrounded && !isLanding) ? Math.abs(Math.sin(phase * 2)) * 4.2 : 0;
 
-      const pitchAngle = st.isGrounded
-        ? Math.max(-0.45, Math.min(0.45, st.slopeRadians * 0.65))
-        : Math.max(-0.38, Math.min(0.42, st.velocityY / 900));
-      const speedLean = Math.max(0.6, Math.min(1.45, st.velocityX / 180)) * 6.5 + squashDrop * 0.4;
+      const pitchAngle = stickman.isGrounded
+        ? Math.max(-0.45, Math.min(0.45, stickman.slopeRadians * 0.65))
+        : Math.max(-0.38, Math.min(0.42, stickman.velocityY / 900));
+      const speedLean = Math.max(0.6, Math.min(1.45, stickman.velocityX / 180)) * 6.5 + squashDrop * 0.4;
 
-      const hipX = st.footX - 2;
-      const hipY = st.footY - 24 - runBounce + squashDrop;
+      const hipWX = stickman.footX - 2;
+      const hipWY = stickman.footY - 24 - runBounce + squashDrop;
       const torsoLen = 21 - squashDrop * 0.25;
-      const shX = hipX + speedLean + Math.sin(pitchAngle) * torsoLen;
-      const shY = hipY - Math.cos(pitchAngle) * torsoLen;
-      const hdX = shX + 2.8 + Math.sin(pitchAngle) * 4;
-      const hdY = shY - 11;
+      const shWX = hipWX + speedLean + Math.sin(pitchAngle) * torsoLen;
+      const shWY = hipWY - Math.cos(pitchAngle) * torsoLen;
+      const hdWX = shWX + 2.8 + Math.sin(pitchAngle) * 4;
+      const hdWY = shWY - 11;
 
       const auraIntensity = isBoosted ? 1.35 : (isLanding ? 1.25 : (isJumping || isFalling ? 1.05 : 0.85));
-      drawKiAuraAndLightning(st.footX, st.footY, auraIntensity, isBoosted);
+      drawKiAuraAndLightning(stickman.footX, stickman.footY, auraIntensity, isBoosted);
 
       function getLegJoints(legIdx) {
         const legPhase = phase + legIdx * Math.PI;
@@ -2511,8 +2790,8 @@
           thighAngle = Math.sin(legPhase) * 0.82 + 0.16 + pitchAngle * 0.5;
           kneeBend = Math.min(-0.08, -Math.cos(legPhase) * 0.58 - 0.48);
         }
-        const kx = hipX + Math.sin(thighAngle) * 13.5;
-        const ky = hipY + Math.cos(thighAngle) * 13.5;
+        const kx = hipWX + Math.sin(thighAngle) * 13.5;
+        const ky = hipWY + Math.cos(thighAngle) * 13.5;
         const sa = thighAngle + kneeBend;
         return { kx, ky, ax: kx + Math.sin(sa) * 13.5, ay: ky + Math.cos(sa) * 13.5 };
       }
@@ -2534,114 +2813,48 @@
           upperAngle = Math.sin(armPhase) * 0.78 + 0.08;
           elbowBend = 0.82 + Math.cos(armPhase) * 0.25;
         }
-        const ex = shX + Math.sin(upperAngle) * 11.5;
-        const ey = shY + Math.cos(upperAngle) * 11.5;
+        const ex = shWX + Math.sin(upperAngle) * 11.5;
+        const ey = shWY + Math.cos(upperAngle) * 11.5;
         const fa = upperAngle + elbowBend;
         return { ex, ey, hx: ex + Math.sin(fa) * 11.5, hy: ey + Math.cos(fa) * 11.5 };
       }
 
-      // Rear Arm & Rear Leg (shaded grey for depth)
       const backArm = getArmJoints(1);
-      drawOutlinedLimb(shX, shY, backArm.ex, backArm.ey, backLimbGrey, 3.8);
+      drawOutlinedLimb(shWX, shWY, backArm.ex, backArm.ey, backLimbGrey, 3.8);
       drawOutlinedLimb(backArm.ex, backArm.ey, backArm.hx, backArm.hy, backLimbGrey, 3.6);
 
       const backLeg = getLegJoints(1);
-      drawOutlinedLimb(hipX, hipY, backLeg.kx, backLeg.ky, backLimbGrey, 4.4);
+      drawOutlinedLimb(hipWX, hipWY, backLeg.kx, backLeg.ky, backLimbGrey, 4.4);
       drawOutlinedLimb(backLeg.kx, backLeg.ky, backLeg.ax, backLeg.ay, backLimbGrey, 4.2);
 
-      // Torso & Front Leg
-      drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
+      drawOutlinedLimb(hipWX, hipWY, shWX, shWY, bodyWhite, 5.2);
+
       const frontLeg = getLegJoints(0);
-      drawOutlinedLimb(hipX, hipY, frontLeg.kx, frontLeg.ky, bodyWhite, 4.5);
+      drawOutlinedLimb(hipWX, hipWY, frontLeg.kx, frontLeg.ky, bodyWhite, 4.5);
       drawOutlinedLimb(frontLeg.kx, frontLeg.ky, frontLeg.ax, frontLeg.ay, bodyWhite, 4.3);
 
-      // Spiky Crimson Hair + Outlined Head + Fierce Eyes
-      const windDrag = Math.max(-1.2, Math.min(0, -st.velocityX / 220)) + Math.max(-0.5, Math.min(0.6, st.velocityY / 600));
-      drawSpikyCrimsonHair(hdX, hdY, pitchAngle * 0.5, windDrag);
+      const windDrag = Math.max(-1.2, Math.min(0, -stickman.velocityX / 220)) + Math.max(-0.5, Math.min(0.6, stickman.velocityY / 600));
+      drawSpikyCrimsonHair(hdWX, hdWY, pitchAngle * 0.5, windDrag);
 
-      ctx.fillStyle = outlineColor;
-      ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = bodyWhite;
-      ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+      const hcx = toScreenX(hdWX), hcy = toScreenY(hdWY);
+      const hr = STICKMAN_HEAD_RADIUS * worldScale;
+      ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
 
-      // Intense V-brow & crimson eye
-      const eyeX = hdX + 3.6;
-      const eyeY = hdY - 0.5;
+      const eyeX = hcx + 3.6 * worldScale;
+      const eyeY = hcy - 0.5 * worldScale;
       ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2.0;
+      ctx.lineWidth = 2.0 * worldScale;
       ctx.beginPath();
-      ctx.moveTo(eyeX - 3.5, eyeY - 3.2);
-      ctx.lineTo(eyeX + 2.2, eyeY - 1.0);
+      ctx.moveTo(eyeX - 3.5 * worldScale, eyeY - 3.2 * worldScale);
+      ctx.lineTo(eyeX + 2.2 * worldScale, eyeY - 1.0 * worldScale);
       ctx.stroke();
       ctx.fillStyle = hairCrimson;
-      ctx.beginPath(); ctx.arc(eyeX, eyeY + 0.6, 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(eyeX, eyeY + 0.6 * worldScale, 1.9 * worldScale, 0, Math.PI * 2); ctx.fill();
 
-      // Front Arm
       const frontArm = getArmJoints(0);
-      drawOutlinedLimb(shX, shY, frontArm.ex, frontArm.ey, bodyWhite, 4.0);
+      drawOutlinedLimb(shWX, shWY, frontArm.ex, frontArm.ey, bodyWhite, 4.0);
       drawOutlinedLimb(frontArm.ex, frontArm.ey, frontArm.hx, frontArm.hy, bodyWhite, 3.8);
-
-      // Active Callout Speech Bubble
-      if (state.activeCallout) {
-        ctx.save();
-        ctx.translate(st.footX, st.footY);
-        ctx.fillStyle = '#ffd54f';
-        ctx.strokeStyle = '#18221e';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(-38, -108, 76, 24, 8);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#18221e';
-        ctx.font = '700 13px "Cabin Sketch", cursive';
-        ctx.textAlign = 'center';
-        ctx.fillText(state.activeCallout.type + '!', 0, -92);
-        ctx.restore();
-      }
-    }
-
-    function drawScribbler(enemy) {
-      ctx.save();
-      ctx.translate(enemy.x, enemy.y);
-      if (enemy.isTumbling) {
-        ctx.rotate(enemy.runPhase);
-      }
-      ctx.strokeStyle = '#ff6e6e';
-      ctx.lineWidth = 3.6;
-      ctx.lineCap = 'round';
-
-      const s = Math.sin(enemy.runPhase) * 8;
-      // Legs
-      ctx.beginPath();
-      ctx.moveTo(0, -16);
-      ctx.lineTo(-s, 0);
-      ctx.moveTo(0, -16);
-      ctx.lineTo(s, 0);
-      // Body & jagged head
-      ctx.moveTo(0, -16);
-      ctx.lineTo(0, -34);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(0, -41, 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawStarPolygon(ctx, cx, cy, spikes, outerR, innerR) {
-      let rot = (Math.PI / 2) * 3;
-      const step = Math.PI / spikes;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - outerR);
-      for (let i = 0; i < spikes; i++) {
-        ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
-        rot += step;
-        ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
-        rot += step;
-      }
-      ctx.lineTo(cx, cy - outerR);
-      ctx.closePath();
     }
 
     /* ------------------------- UI & HUD BINDINGS ------------------------- */
@@ -2652,7 +2865,7 @@
     const levelCompleteOverlay = document.getElementById('levelCompleteOverlay');
 
     function updateHudDOM() {
-      document.getElementById('hudLevelPill').textContent = `LVL ${state.currentLevel}`;
+      document.getElementById('hudLevelText').textContent = `LEVEL ${state.currentLevel}`;
       document.getElementById('hudLevelTitle').textContent = state.level.title;
 
       const prog = Math.max(0, Math.min(1,
@@ -2660,59 +2873,63 @@
         Math.max(1, state.level.finishLineX - state.level.spawnPosition.x)
       ));
       const progPct = Math.round(prog * 100);
-      document.getElementById('hudProgressPct').textContent = `${progPct}%`;
+      document.getElementById('hudProgressText').textContent = `PROGRESS: ${progPct}%`;
       document.getElementById('hudProgressFill').style.width = `${progPct}%`;
 
       const inkRatio = Math.max(0, Math.min(1, state.currentInk / state.level.maxInkPerLevel));
       const inkPct = Math.round(inkRatio * 100);
-      document.getElementById('hudInkPct').textContent = `${inkPct}%`;
+      const inkColor = inkRatio <= 0.15
+        ? COLORS.LavaDeepRed
+        : (inkRatio <= 0.35 ? COLORS.LavaOrange : (inkRatio <= 0.60 ? COLORS.LavaFlameYellow : COLORS.InkCyanAccent));
+
+      const inkTextEl = document.getElementById('hudInkText');
+      inkTextEl.textContent = `INK: ${inkPct}%`;
+      inkTextEl.style.color = inkColor;
+
       const inkFill = document.getElementById('hudInkFill');
       inkFill.style.width = `${inkPct}%`;
-      inkFill.style.background = inkRatio < 0.25 ? '#ff6e6e' : (inkRatio < 0.5 ? '#ffd54f' : '#4dd0e1');
+      inkFill.style.background = inkColor;
+
+      const isRecharging = state.activeStrokePoints.length === 0 && inkRatio < 0.98 && state.screenState === 'PLAYING';
+      document.getElementById('hudRechargeTag').hidden = !isRecharging;
 
       const totalBits = state.chalkBits.filter(b => !b.isStar).length;
       const gotBits = state.chalkBits.filter(b => !b.isStar && b.collected).length;
-      document.getElementById('hudBitsPill').textContent = `✦ ${gotBits}/${totalBits} Bits`;
-
-      const comboPill = document.getElementById('hudComboPill');
-      if (state.comboCount >= 2) {
-        comboPill.hidden = false;
-        comboPill.textContent = `🔥 x${state.comboCount} Magnet!`;
+      const bitsPill = document.getElementById('hudBitsPill');
+      if (totalBits > 0) {
+        bitsPill.hidden = false;
+        bitsPill.textContent = `✎ ${gotBits}/${totalBits}` + (state.comboCount >= 2 ? ` (x${state.comboCount} MAGNET)` : '');
       } else {
-        comboPill.hidden = true;
+        bitsPill.hidden = true;
       }
 
-      const banner = document.getElementById('instructionBanner');
-      banner.style.opacity = state.showInstructionBanner ? '1' : '0';
+      const calloutBanner = document.getElementById('calloutBanner');
+      const instructionBanner = document.getElementById('instructionBanner');
+      if (state.activeCallout) {
+        calloutBanner.hidden = false;
+        calloutBanner.textContent = `⚡ ${state.activeCallout.type}! INCOMING!`;
+        instructionBanner.style.display = 'none';
+      } else {
+        calloutBanner.hidden = true;
+        instructionBanner.style.display = (state.showInstructionBanner || state.completedLines.length === 0) ? 'inline-flex' : 'none';
+      }
     }
 
     function syncOverlays() {
-      hudLayer.hidden = (state.screenState === 'START_MENU');
+      hudLayer.hidden = !(state.screenState === 'PLAYING' || state.screenState === 'PAUSED');
       startOverlay.hidden = (state.screenState !== 'START_MENU');
       pauseOverlay.hidden = (state.screenState !== 'PAUSED');
       gameOverOverlay.hidden = (state.screenState !== 'GAME_OVER');
       levelCompleteOverlay.hidden = (state.screenState !== 'LEVEL_COMPLETE');
 
-      if (state.screenState === 'PAUSED') {
-        document.getElementById('pauseSubtitle').textContent =
-          `Level ${state.currentLevel} • ${state.level.title}`;
-      } else if (state.screenState === 'GAME_OVER') {
-        document.getElementById('gameOverReason').textContent = state.gameOverReason;
-      } else if (state.screenState === 'LEVEL_COMPLETE') {
-        const totalBits = state.chalkBits.filter(b => !b.isStar).length;
-        const gotBits = state.chalkBits.filter(b => !b.isStar && b.collected).length;
-        const gotStar = state.chalkBits.some(b => b.isStar && b.collected);
-        let stars = 1;
-        if (gotBits >= Math.ceil(totalBits * 0.6)) stars++;
-        if (gotStar || state.totalInkDrawn <= state.level.parInkUsage) stars++;
-        state.starsEarned = stars;
+      document.getElementById('bestLevelText').textContent = `BEST LEVEL: ${state.bestLevel}`;
 
-        const glyphs = document.querySelectorAll('#completeStarsRow .star-glyph');
-        glyphs.forEach((el, idx) => {
-          el.classList.toggle('earned', idx < stars);
-        });
-        document.getElementById('completeStatsText').textContent =
-          `Chalk Bits: ${gotBits}/${totalBits} • Ink Used: ${Math.round(state.totalInkDrawn)} pts`;
+      if (state.screenState === 'GAME_OVER') {
+        const prog = Math.max(0, Math.min(1,
+          (state.stickman.footX - state.level.spawnPosition.x) /
+          Math.max(1, state.level.finishLineX - state.level.spawnPosition.x)
+        ));
+        document.getElementById('gameOverProgressText').textContent = `PROGRESS: ${Math.round(prog * 100)}%`;
       }
     }
 
@@ -2723,19 +2940,16 @@
       });
     }
 
-    // Tool selector clicks
     document.querySelectorAll('#toolSelector .tool-chip').forEach(btn => {
       btn.addEventListener('click', () => selectTool(btn.dataset.tool));
     });
 
-    // Level picker on Start Screen
     let pickedStartLevel = 1;
-    document.querySelectorAll('#levelPickerRow .lvl-btn').forEach(btn => {
+    document.querySelectorAll('#levelPickerRow .lvl-outline-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         pickedStartLevel = parseInt(btn.dataset.level, 10);
-        document.querySelectorAll('#levelPickerRow .lvl-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('#levelPickerRow .lvl-outline-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        document.getElementById('btnStartGame').textContent = `▶ PLAY LEVEL ${pickedStartLevel}`;
       });
     });
 
@@ -2745,6 +2959,17 @@
       state.screenState = 'PLAYING';
       syncOverlays();
     });
+
+    function toggleSoundState() {
+      sound.enabled = !sound.enabled;
+      document.getElementById('startSoundText').textContent = sound.enabled ? 'SOUND: ON' : 'SOUND: OFF';
+      document.getElementById('hudSoundIcon').innerHTML = sound.enabled
+        ? '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>'
+        : '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+    }
+
+    document.getElementById('btnStartSound').addEventListener('click', toggleSoundState);
+    document.getElementById('btnHudSound').addEventListener('click', toggleSoundState);
 
     document.getElementById('btnPause').addEventListener('click', () => {
       if (state.screenState === 'PLAYING') {
@@ -2758,23 +2983,15 @@
       syncOverlays();
     });
 
-    document.getElementById('btnRetryQuick').addEventListener('click', () => {
-      resetLevel(state.currentLevel);
-      state.screenState = 'PLAYING';
-      syncOverlays();
-    });
-
-    document.getElementById('btnUndo').addEventListener('click', () => {
+    document.getElementById('btnClearLines').addEventListener('click', () => {
       for (const l of state.completedLines) {
         matterBridge.removeDrawnLineBodies(l.id);
       }
       state.completedLines = [];
-      sound.playCut();
-    });
-
-    document.getElementById('btnSound').addEventListener('click', (e) => {
-      sound.enabled = !sound.enabled;
-      e.currentTarget.textContent = sound.enabled ? '🔊' : '🔇';
+      state.activeStrokePoints = [];
+      state.currentInk = state.level.maxInkPerLevel;
+      state.sketchParticles = [];
+      updateHudDOM();
     });
 
     document.getElementById('btnPauseRetry').addEventListener('click', () => {
@@ -2802,6 +3019,7 @@
     });
 
     function goToMainMenu() {
+      resetLevel(state.currentLevel);
       state.screenState = 'START_MENU';
       syncOverlays();
     }
@@ -2809,7 +3027,6 @@
     document.getElementById('btnGameOverMenu').addEventListener('click', goToMainMenu);
     document.getElementById('btnCompleteMenu').addEventListener('click', goToMainMenu);
 
-    // Keyboard Hotkeys (1-4 tools, Space pause, R retry, C clear)
     window.addEventListener('keydown', (e) => {
       if (e.key === '1') selectTool('WHITE');
       else if (e.key === '2') selectTool('SPRING');
@@ -2829,15 +3046,9 @@
           state.screenState = 'PLAYING';
           syncOverlays();
         }
-      } else if (e.key === 'c' || e.key === 'C') {
-        for (const l of state.completedLines) {
-          matterBridge.removeDrawnLineBodies(l.id);
-        }
-        state.completedLines = [];
       }
     });
 
-    // Resize handling
     function resizeCanvas() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.floor(window.innerWidth * dpr);
@@ -2848,7 +3059,6 @@
     resetLevel(1);
     syncOverlays();
 
-    // Main 60 FPS Animation Loop
     let lastTimestamp = performance.now();
     function frameLoop(now) {
       const dt = (now - lastTimestamp) / 1000;
