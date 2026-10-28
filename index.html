@@ -1301,11 +1301,16 @@
       return scale > 0 ? canvas.width / scale : 1000;
     }
 
-    function screenToWorld(screenX, screenY) {
-      const scale = canvas.height / WORLD_HEIGHT;
+    function screenToWorld(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+      const canvasX = ((clientX - rect.left) / cssW) * canvas.width;
+      const canvasY = ((clientY - rect.top) / cssH) * canvas.height;
+      const scale = Math.max(0.1, canvas.height / WORLD_HEIGHT);
       return {
-        x: state.cameraX + screenX / scale,
-        y: screenY / scale
+        x: state.cameraX + canvasX / scale,
+        y: canvasY / scale
       };
     }
 
@@ -1954,9 +1959,8 @@
     canvas.addEventListener('pointerdown', (e) => {
       if (state.screenState !== 'PLAYING') return;
       canvas.setPointerCapture(e.pointerId);
-      const rect = canvas.getBoundingClientRect();
-      const worldPt = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-      worldPt.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, worldPt.y));
+      const worldPt = screenToWorld(e.clientX, e.clientY);
+      worldPt.y = Math.max(4, Math.min(WORLD_HEIGHT - 4, worldPt.y));
 
       if (state.selectedTool === 'CUTTER') {
         performCutAndShockwave(worldPt);
@@ -1973,9 +1977,8 @@
 
     canvas.addEventListener('pointermove', (e) => {
       if (state.screenState !== 'PLAYING') return;
-      const rect = canvas.getBoundingClientRect();
-      const candidate = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-      candidate.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, candidate.y));
+      const candidate = screenToWorld(e.clientX, e.clientY);
+      candidate.y = Math.max(4, Math.min(WORLD_HEIGHT - 4, candidate.y));
 
       if (state.selectedTool === 'CUTTER') {
         if (e.buttons > 0) performCutAndShockwave(candidate);

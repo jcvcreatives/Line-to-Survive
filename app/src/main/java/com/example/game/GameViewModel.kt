@@ -278,7 +278,7 @@ class GameViewModel(
 
     val clamped = Vec2(
       x = worldPoint.x,
-      y = worldPoint.y.coerceIn(24f, WorldConstants.LAVA_SURFACE_Y - 6f)
+      y = worldPoint.y.coerceIn(4f, WorldConstants.WORLD_HEIGHT - 4f)
     )
 
     soundManager.playDrawingScratch()

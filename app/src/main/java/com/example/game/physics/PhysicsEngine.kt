@@ -109,7 +109,7 @@ object PhysicsEngine {
   ): List<Vec2> {
     val clampedCandidate = Vec2(
       x = candidatePoint.x,
-      y = candidatePoint.y.coerceIn(24f, WorldConstants.LAVA_SURFACE_Y - 6f)
+      y = candidatePoint.y.coerceIn(4f, WorldConstants.WORLD_HEIGHT - 4f)
     )
 
     if (existingPoints.isEmpty()) {

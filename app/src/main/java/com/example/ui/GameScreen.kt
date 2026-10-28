@@ -44,8 +44,8 @@ fun DrawToSurviveScreen(
   val screenState by viewModel.screenState.collectAsStateWithLifecycle()
   val hudState by viewModel.hudState.collectAsStateWithLifecycle()
 
-  var canvasWidthPx by remember { mutableFloatStateOf(1080f) }
-  var canvasHeightPx by remember { mutableFloatStateOf(1920f) }
+  var canvasWidthPx by remember { mutableFloatStateOf(1920f) }
+  var canvasHeightPx by remember { mutableFloatStateOf(1080f) }
 
   val worldScale = (canvasHeightPx / WorldConstants.WORLD_HEIGHT).coerceAtLeast(0.1f)
   val visibleWorldWidth = (canvasWidthPx / worldScale).coerceAtLeast(320f)
@@ -98,10 +98,16 @@ fun DrawToSurviveScreen(
           if (screenState != ScreenState.PLAYING) return@pointerInput
           awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            val scale = latestWorldScale
-            val camX = viewModel.currentCameraX()
-
+            fun currentScale(): Float {
+              return if (size.height > 0) {
+                (size.height.toFloat() / WorldConstants.WORLD_HEIGHT).coerceAtLeast(0.1f)
+              } else {
+                latestWorldScale
+              }
+            }
             fun screenToWorld(screenX: Float, screenY: Float): Vec2 {
+              val scale = currentScale()
+              val camX = viewModel.currentCameraX()
               return Vec2(
                 x = camX + screenX / scale,
                 y = screenY / scale
@@ -116,14 +122,7 @@ fun DrawToSurviveScreen(
               val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
               if (change != null && change.pressed) {
                 change.consume()
-                val currentCamX = viewModel.currentCameraX()
-                val currentScale = latestWorldScale
-                viewModel.onDrawMove(
-                  Vec2(
-                    x = currentCamX + change.position.x / currentScale,
-                    y = change.position.y / currentScale
-                  )
-                )
+                viewModel.onDrawMove(screenToWorld(change.position.x, change.position.y))
               }
             } while (event.changes.any { it.pressed })
 
