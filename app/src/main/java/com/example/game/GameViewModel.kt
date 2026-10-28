@@ -476,7 +476,7 @@ class GameViewModel(
         emitFootsteps = false
       )
       val updatedStickman = if (!state.stickman.isAlive) {
-        state.stickman.copy(deathTimer = (state.stickman.deathTimer + clampedDt).coerceAtMost(1.25f))
+        state.stickman.copy(deathTimer = (state.stickman.deathTimer + clampedDt).coerceAtMost(1.45f))
       } else {
         state.stickman
       }

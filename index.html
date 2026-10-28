@@ -1554,7 +1554,7 @@
         };
       }
 
-      const phaseAdvance = grounded ? dt * (vx / 16) : dt * 5.5;
+      const phaseAdvance = grounded ? dt * (vx / 9.5) : dt * 7.5;
       return {
         ...st,
         footX: newX,
@@ -2565,296 +2565,557 @@
       }
     }
 
+    const SPRINT_KEYFRAMES = [
+      // Frame 0: Power Drive Contact A (Front foot strikes & drives, Back knee rockets up)
+      { torsoLean: 0.64, hipOffsetY: -21.0, frontThigh: 0.28, frontKnee: -0.32, backThigh: 1.36, backKnee: -1.22, frontArm: -0.98, frontElbow: 0.82, backArm: 0.96, backElbow: 1.12 },
+      // Frame 1: Explosive Push-Off A (Front leg blasts far behind, Back leg extends forward)
+      { torsoLean: 0.68, hipOffsetY: -25.0, frontThigh: -0.92, frontKnee: -0.14, backThigh: 1.16, backKnee: -0.58, frontArm: -1.28, frontElbow: 0.96, backArm: 1.22, backElbow: 0.92 },
+      // Frame 2: Airborne Dash Flight A (Wide mid-air split stride, peak flight)
+      { torsoLean: 0.62, hipOffsetY: -27.2, frontThigh: -1.18, frontKnee: -1.28, backThigh: 0.82, backKnee: -0.26, frontArm: -0.35, frontElbow: 1.05, backArm: 0.45, backElbow: 0.95 },
+      // Frame 3: Power Drive Contact B (Back foot strikes & drives, Front knee rockets up)
+      { torsoLean: 0.64, hipOffsetY: -21.0, frontThigh: 1.36, frontKnee: -1.22, backThigh: 0.28, backKnee: -0.32, frontArm: 0.96, frontElbow: 1.12, backArm: -0.98, backElbow: 0.82 },
+      // Frame 4: Explosive Push-Off B (Back leg blasts far behind, Front leg extends forward)
+      { torsoLean: 0.68, hipOffsetY: -25.0, frontThigh: 1.16, frontKnee: -0.58, backThigh: -0.92, backKnee: -0.14, frontArm: 1.22, frontElbow: 0.92, backArm: -1.28, backElbow: 0.96 },
+      // Frame 5: Airborne Dash Flight B (Wide mid-air split stride, peak flight)
+      { torsoLean: 0.62, hipOffsetY: -27.2, frontThigh: 0.82, frontKnee: -0.26, backThigh: -1.18, backKnee: -1.28, frontArm: 0.45, frontElbow: 0.95, backArm: -0.35, backElbow: 1.05 }
+    ];
+
     function drawAnimatedStickman(stickman, toScreenX, toScreenY, worldScale) {
       const phase = stickman.runCyclePhase || 0;
-      const outlineColor = '#1C0B0B';
-      const bodyWhite = '#FDFBF7';
-      const backLimbGrey = '#C5C8CE';
+      const outlineBlack = '#140707';
+      const bodyWhite = '#FFFFFF';
+      const backLimbGrey = '#BEC4CE';
       const hairCrimson = '#D50000';
+      const hairDarkShadow = '#7F0000';
+      const auraOrange = '#FF6D00';
+      const auraYellow = '#FFEA00';
+      const rockDarkBrown = '#4E342E';
 
-      function drawOutlinedLimb(x1, y1, x2, y2, fillColor, thicknessWorld) {
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      function drawCartoonSegment(x1, y1, x2, y2, fillColor, thicknessWorld, pass, endCapRadiusWorld = 0) {
         const sx1 = toScreenX(x1), sy1 = toScreenY(y1);
         const sx2 = toScreenX(x2), sy2 = toScreenY(y2);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = (thicknessWorld + 3.4) * worldScale;
-        ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
-
-        ctx.strokeStyle = fillColor;
-        ctx.lineWidth = thicknessWorld * worldScale;
-        ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+        if (pass === 0) {
+          ctx.strokeStyle = 'rgba(183, 28, 28, 0.28)';
+          ctx.lineWidth = (thicknessWorld + 7.2) * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+          if (endCapRadiusWorld > 0) {
+            ctx.fillStyle = 'rgba(183, 28, 28, 0.28)';
+            ctx.beginPath(); ctx.arc(sx2, sy2, (endCapRadiusWorld + 3.6) * worldScale, 0, Math.PI * 2); ctx.fill();
+          }
+        } else if (pass === 1) {
+          ctx.strokeStyle = outlineBlack;
+          ctx.lineWidth = (thicknessWorld + 4.6) * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+          if (endCapRadiusWorld > 0) {
+            ctx.fillStyle = outlineBlack;
+            ctx.beginPath(); ctx.arc(sx2, sy2, (endCapRadiusWorld + 2.3) * worldScale, 0, Math.PI * 2); ctx.fill();
+          }
+        } else {
+          ctx.strokeStyle = fillColor;
+          ctx.lineWidth = thicknessWorld * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+          if (endCapRadiusWorld > 0) {
+            ctx.fillStyle = fillColor;
+            ctx.beginPath(); ctx.arc(sx2, sy2, endCapRadiusWorld * worldScale, 0, Math.PI * 2); ctx.fill();
+          }
+        }
       }
 
-      function drawSpikyCrimsonHair(headWX, headWY, headAngleOffset, windDrag) {
+      function drawFightingGameHair(headWX, headWY, headTilt, windDrag) {
         const hx = toScreenX(headWX);
         const hy = toScreenY(headWY);
-        const r = STICKMAN_HEAD_RADIUS * worldScale;
-        const spikeAngles = [-2.75, -2.35, -1.95, -1.55, -1.15, -0.78, -0.42];
-        const spikeLengths = [17, 23, 28, 26, 24, 19, 14];
+        const r = (STICKMAN_HEAD_RADIUS + 0.8) * worldScale;
+        const spikeAngles = [-2.88, -2.52, -2.14, -1.76, -1.42, -1.08, -0.74, -0.38];
+        const spikeLengths = [18, 25, 31, 34, 30, 26, 21, 15];
 
         ctx.beginPath();
-        ctx.moveTo(hx - r * 0.85, hy + r * 0.1);
+        ctx.moveTo(hx - r * 0.92, hy + r * 0.15);
         for (let i = 0; i < spikeAngles.length; i++) {
-          const ang = spikeAngles[i] + headAngleOffset + windDrag * 0.18;
+          const flutter = Math.sin(phase * 3.2 + i * 0.9) * 0.05;
+          const ang = spikeAngles[i] + headTilt + windDrag * 0.22 + flutter;
           const len = spikeLengths[i] * worldScale;
-          const tipX = hx + Math.cos(ang) * len;
-          const tipY = hy + Math.sin(ang) * len;
-          const valAng = ang + 0.22;
-          const valLen = len * 0.48;
-          ctx.lineTo(tipX, tipY);
+          const midAng = ang - 0.08;
+          const midLen = len * 0.68;
+          ctx.lineTo(hx + Math.cos(midAng) * midLen, hy + Math.sin(midAng) * midLen);
+          ctx.lineTo(hx + Math.cos(ang) * len, hy + Math.sin(ang) * len);
+          const valAng = ang + 0.20;
+          const valLen = len * 0.46;
           ctx.lineTo(hx + Math.cos(valAng) * valLen, hy + Math.sin(valAng) * valLen);
         }
         ctx.closePath();
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 3.2 * worldScale;
+        ctx.strokeStyle = outlineBlack;
+        ctx.lineWidth = 4.4 * worldScale;
+        ctx.lineJoin = 'round';
         ctx.stroke();
         ctx.fillStyle = hairCrimson;
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 61, 0, 0.55)';
-        ctx.lineWidth = 1.4 * worldScale;
+        ctx.strokeStyle = 'rgba(255, 61, 0, 0.65)';
+        ctx.lineWidth = 1.8 * worldScale;
         ctx.stroke();
+
+        ctx.strokeStyle = hairDarkShadow;
+        ctx.lineWidth = 2.0 * worldScale;
+        for (let i = 1; i <= 5; i++) {
+          const ang = spikeAngles[i] + headTilt + windDrag * 0.22;
+          ctx.beginPath();
+          ctx.moveTo(hx + Math.cos(ang) * (r * 0.85), hy + Math.sin(ang) * (r * 0.85));
+          ctx.lineTo(hx + Math.cos(ang) * (spikeLengths[i] * 0.68 * worldScale), hy + Math.sin(ang) * (spikeLengths[i] * 0.68 * worldScale));
+          ctx.stroke();
+        }
       }
 
-      function drawKiAuraAndLightning(centerWX, footWY, intensity, isBoosted) {
+      function drawCartoonHeadAndFace(headWX, headWY, faceDirX, expression, hasHair, headTilt, windDrag) {
+        if (hasHair) {
+          drawFightingGameHair(headWX, headWY, headTilt, windDrag);
+        }
+        const hcx = toScreenX(headWX);
+        const hcy = toScreenY(headWY);
+        const hr = (STICKMAN_HEAD_RADIUS + 0.8) * worldScale;
+
+        ctx.fillStyle = 'rgba(183, 28, 28, 0.30)';
+        ctx.beginPath(); ctx.arc(hcx, hcy, hr + 4.2 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = outlineBlack;
+        ctx.beginPath(); ctx.arc(hcx, hcy, hr + 2.4 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = expression === 2 ? '#FFCDD2' : bodyWhite;
+        ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
+
+        if (expression === 2) {
+          ctx.fillStyle = 'rgba(213, 0, 0, 0.42)';
+          ctx.beginPath(); ctx.arc(hcx, hcy - hr * 0.12, hr * 0.92, 0, Math.PI * 2); ctx.fill();
+        }
+
+        const fx = hcx + faceDirX * 2.8 * worldScale;
+        const fy = hcy + 0.5 * worldScale;
+
+        if (expression === 1) {
+          // Expression 1 (Reference Frame 1): '> <' power scream eyes + wide shouting mouth
+          const leftEyeX = fx - 3.2 * worldScale;
+          const rightEyeX = fx + 3.4 * worldScale;
+          const eyeY = fy - 1.8 * worldScale;
+          ctx.strokeStyle = outlineBlack;
+          ctx.lineWidth = 2.2 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftEyeX - 2.6 * worldScale, eyeY - 2.2 * worldScale);
+          ctx.lineTo(leftEyeX + 0.8 * worldScale, eyeY);
+          ctx.lineTo(leftEyeX - 2.6 * worldScale, eyeY + 2.0 * worldScale);
+          ctx.moveTo(rightEyeX + 2.6 * worldScale, eyeY - 2.2 * worldScale);
+          ctx.lineTo(rightEyeX - 0.8 * worldScale, eyeY);
+          ctx.lineTo(rightEyeX + 2.6 * worldScale, eyeY + 2.0 * worldScale);
+          ctx.stroke();
+
+          const mx = fx + 0.4 * worldScale, my = fy + 4.2 * worldScale;
+          ctx.fillStyle = outlineBlack;
+          ctx.beginPath(); ctx.arc(mx, my, 3.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#7F0000';
+          ctx.beginPath(); ctx.arc(mx, my, 2.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = bodyWhite;
+          ctx.lineWidth = 1.6 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(mx - 2.2 * worldScale, my - 1.6 * worldScale);
+          ctx.lineTo(mx + 2.2 * worldScale, my - 1.6 * worldScale);
+          ctx.stroke();
+        } else if (expression === 0 || expression === 2) {
+          // Expression 0 & 2 (Reference Frames 2 & 3): Fierce V-brows (\ /), sharp pupils, clenched teeth
+          const leftEyeX = fx - 2.8 * worldScale;
+          const rightEyeX = fx + 3.6 * worldScale;
+          const eyeY = fy - 1.2 * worldScale;
+
+          ctx.fillStyle = bodyWhite;
+          ctx.beginPath();
+          ctx.arc(leftEyeX, eyeY + 0.6 * worldScale, 2.1 * worldScale, 0, Math.PI * 2);
+          ctx.arc(rightEyeX, eyeY + 0.6 * worldScale, 2.1 * worldScale, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = hairCrimson;
+          ctx.beginPath();
+          ctx.arc(leftEyeX + 0.5 * worldScale, eyeY + 0.8 * worldScale, 1.3 * worldScale, 0, Math.PI * 2);
+          ctx.arc(rightEyeX + 0.5 * worldScale, eyeY + 0.8 * worldScale, 1.3 * worldScale, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = outlineBlack;
+          ctx.beginPath();
+          ctx.arc(leftEyeX + 0.5 * worldScale, eyeY + 0.8 * worldScale, 0.7 * worldScale, 0, Math.PI * 2);
+          ctx.arc(rightEyeX + 0.5 * worldScale, eyeY + 0.8 * worldScale, 0.7 * worldScale, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = outlineBlack;
+          ctx.lineWidth = 2.3 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftEyeX - 3.2 * worldScale, eyeY - 3.0 * worldScale);
+          ctx.lineTo(leftEyeX + 1.8 * worldScale, eyeY + 0.2 * worldScale);
+          ctx.moveTo(rightEyeX + 3.0 * worldScale, eyeY - 3.0 * worldScale);
+          ctx.lineTo(rightEyeX - 1.8 * worldScale, eyeY + 0.2 * worldScale);
+          ctx.stroke();
+
+          ctx.lineWidth = 2.0 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(fx - 2.0 * worldScale, fy + 4.2 * worldScale);
+          ctx.lineTo(fx + 2.8 * worldScale, fy + 3.6 * worldScale);
+          ctx.stroke();
+        } else {
+          // Expression 3 (Reference Frames 4 & 6): Knocked-out closed eye line
+          ctx.strokeStyle = outlineBlack;
+          ctx.lineWidth = 2.0 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(fx - 2.5 * worldScale, fy);
+          ctx.lineTo(fx + 2.5 * worldScale, fy - 1.2 * worldScale);
+          ctx.stroke();
+        }
+      }
+
+      function drawFieryFightingAura(centerWX, footWY, intensity, leanBackX, isBoosted) {
         if (intensity <= 0.05) return;
         const baseSX = toScreenX(centerWX);
         const baseSY = toScreenY(footWY);
-        const auraH = (74 + intensity * 22) * worldScale;
-        const auraHalfW = (26 + intensity * 14) * worldScale;
+        const auraH = (86 + intensity * 26) * worldScale;
+        const auraHalfW = (32 + intensity * 15) * worldScale;
+        const windTilt = leanBackX * worldScale;
 
-        ctx.fillStyle = isBoosted
-          ? `rgba(255, 213, 79, ${Math.min(0.32, 0.24 * intensity)})`
-          : `rgba(229, 57, 53, ${Math.min(0.32, 0.24 * intensity)})`;
+        // 1. Soft crimson outer glow halo
+        ctx.fillStyle = `rgba(229, 28, 35, ${Math.min(0.42, 0.26 * intensity)})`;
         ctx.beginPath();
-        ctx.arc(baseSX, baseSY - auraH * 0.45, auraHalfW * 1.45, 0, Math.PI * 2);
+        ctx.arc(baseSX + windTilt * 0.35, baseSY - auraH * 0.45, auraHalfW * 1.55, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = isBoosted
-          ? `rgba(255, 109, 0, ${Math.min(0.85, 0.52 * intensity)})`
-          : `rgba(229, 57, 53, ${Math.min(0.85, 0.52 * intensity)})`;
+        // 2. Tall jagged crimson-red outer flame crown (11 sharp flickering flame tongues)
         ctx.beginPath();
-        ctx.moveTo(baseSX - auraHalfW * 0.85, baseSY);
+        ctx.moveTo(baseSX - auraHalfW * 0.92, baseSY + 2 * worldScale);
+        for (let i = 0; i <= 11; i++) {
+          const t = i / 11;
+          const ang = Math.PI + t * Math.PI;
+          const wave = Math.sin(phase * 3.8 + i * 1.9) * 7.5 * worldScale;
+          const spikeBoost = i % 2 === 1 ? 1.24 : 0.72;
+          const rx = Math.cos(ang) * auraHalfW * spikeBoost + windTilt * (1 - Math.abs(t - 0.5)) + wave * 0.35;
+          const ry = Math.sin(ang) * auraH * spikeBoost - Math.abs(Math.cos(i * 1.4 + phase * 2.5)) * 14 * worldScale;
+          ctx.lineTo(baseSX + rx, baseSY + ry * 0.94);
+        }
+        ctx.lineTo(baseSX + auraHalfW * 0.92, baseSY + 2 * worldScale);
+        ctx.closePath();
+        ctx.strokeStyle = `rgba(142, 0, 0, ${Math.min(0.75, 0.45 * intensity)})`;
+        ctx.lineWidth = 3.5 * worldScale;
+        ctx.stroke();
+        ctx.fillStyle = `rgba(229, 28, 35, ${Math.min(0.88, 0.68 * intensity)})`;
+        ctx.fill();
+
+        // 3. Blazing red-orange middle flame layer (9 sharp inner tongues)
+        ctx.beginPath();
+        ctx.moveTo(baseSX - auraHalfW * 0.66, baseSY + 1 * worldScale);
         for (let i = 0; i <= 9; i++) {
           const t = i / 9;
           const ang = Math.PI + t * Math.PI;
-          const jitter = Math.sin(phase * 4.5 + i * 1.7) * 6.5 * worldScale;
-          const rx = Math.cos(ang) * auraHalfW + jitter * 0.35;
-          const ry = Math.sin(ang) * auraH - Math.abs(Math.cos(i * 1.3 + phase * 3)) * 12 * worldScale;
-          ctx.lineTo(baseSX + rx, baseSY + ry * 0.92);
-        }
-        ctx.lineTo(baseSX + auraHalfW * 0.85, baseSY);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = isBoosted
-          ? `rgba(255, 213, 79, ${Math.min(0.9, 0.62 * intensity)})`
-          : `rgba(255, 109, 0, ${Math.min(0.9, 0.62 * intensity)})`;
-        ctx.beginPath();
-        ctx.moveTo(baseSX - auraHalfW * 0.58, baseSY);
-        for (let i = 0; i <= 7; i++) {
-          const t = i / 7;
-          const ang = Math.PI + t * Math.PI;
-          const jitter = Math.cos(phase * 5.5 + i * 2.1) * 4.5 * worldScale;
-          const rx = Math.cos(ang) * (auraHalfW * 0.65) + jitter * 0.3;
-          const ry = Math.sin(ang) * (auraH * 0.78);
+          const wave = Math.cos(phase * 4.6 + i * 2.3) * 5.5 * worldScale;
+          const spikeBoost = i % 2 === 0 ? 1.18 : 0.74;
+          const rx = Math.cos(ang) * (auraHalfW * 0.72 * spikeBoost) + windTilt * 0.65 + wave * 0.3;
+          const ry = Math.sin(ang) * (auraH * 0.78 * spikeBoost);
           ctx.lineTo(baseSX + rx, baseSY + ry);
         }
-        ctx.lineTo(baseSX + auraHalfW * 0.58, baseSY);
+        ctx.lineTo(baseSX + auraHalfW * 0.66, baseSY + 1 * worldScale);
         ctx.closePath();
+        ctx.fillStyle = isBoosted
+          ? `rgba(255, 234, 0, ${Math.min(0.92, 0.76 * intensity)})`
+          : `rgba(255, 109, 0, ${Math.min(0.92, 0.76 * intensity)})`;
         ctx.fill();
 
-        ctx.strokeStyle = `rgba(247, 248, 242, ${Math.min(1, 0.85 * intensity)})`;
-        ctx.lineWidth = 1.8 * worldScale;
-        const boltSeed = Math.floor(phase * 3.5);
-        for (let b = 0; b <= 1; b++) {
+        // 4. Detached rising flame tongues / embers around the crown
+        for (let f = 0; f <= 3; f++) {
+          const cycle = (phase * 1.8 + f * 1.57) % (Math.PI * 2);
+          const rise = cycle / (Math.PI * 2);
+          const side = f % 2 === 0 ? -1 : 1;
+          const fx = baseSX + side * (auraHalfW * (0.65 + 0.25 * (f % 3))) + windTilt * 0.5;
+          const fy = baseSY - auraH * (0.35 + rise * 0.65);
+          const flameH = 11 * (1 - rise * 0.5) * worldScale;
+          ctx.strokeStyle = f % 2 === 0 ? '#E51C23' : auraOrange;
+          ctx.lineWidth = 3.8 * (1 - rise * 0.4) * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(fx, fy);
+          ctx.lineTo(fx + windTilt * 0.15, fy - flameH);
+          ctx.stroke();
+        }
+
+        // 5. Golden-white foot flare & crackling bio-lightning bolts across torso
+        ctx.fillStyle = `rgba(255, 234, 0, ${Math.min(0.85, 0.55 * intensity)})`;
+        ctx.beginPath(); ctx.arc(baseSX, baseSY - 4 * worldScale, 12 * worldScale, 0, Math.PI * 2); ctx.fill();
+
+        const boltSeed = Math.floor(phase * 2.8);
+        for (let b = 0; b <= 2; b++) {
           const side = (boltSeed + b) % 2 === 0 ? -1 : 1;
-          const sx = baseSX + side * 8 * worldScale;
-          const sy = baseSY - (18 + b * 20) * worldScale;
-          const mx = sx + side * (10 + Math.sin(phase * 7 + b) * 5) * worldScale;
-          const my = sy - 12 * worldScale;
-          const ex = sx - side * 4 * worldScale;
-          const ey = my - 11 * worldScale;
-          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(mx, my); ctx.lineTo(ex, ey); ctx.stroke();
+          const sx = baseSX + side * (6 + b * 4) * worldScale;
+          const sy = baseSY - (14 + b * 18) * worldScale;
+          const m1x = sx + side * (11 + Math.sin(phase * 6 + b) * 5) * worldScale;
+          const m1y = sy - 10 * worldScale;
+          const m2x = sx - side * 3 * worldScale;
+          const m2y = m1y - 9 * worldScale;
+          const ex = m2x + side * 8 * worldScale;
+          const ey = m2y - 10 * worldScale;
+
+          ctx.strokeStyle = `rgba(229, 28, 35, ${Math.min(1, 0.7 * intensity)})`;
+          ctx.lineWidth = 3.8 * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(m1x, m1y); ctx.lineTo(m2x, m2y); ctx.lineTo(ex, ey); ctx.stroke();
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1, 0.95 * intensity)})`;
+          ctx.lineWidth = 1.8 * worldScale;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(m1x, m1y); ctx.lineTo(m2x, m2y); ctx.lineTo(ex, ey); ctx.stroke();
         }
       }
 
+      function renderCartoonBodyPose(
+        hipWX, hipWY, shWX, shWY, hdWX, hdWY,
+        frontKnee, frontAnkle, backKnee, backAnkle,
+        frontElbow, frontHand, backElbow, backHand,
+        faceDirX, expression, hasHair, headTilt, windDrag
+      ) {
+        for (let pass = 0; pass <= 2; pass++) {
+          drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.8, pass);
+          drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.4, pass, 3.0);
+          drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.6, pass);
+          drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 5.0, pass, 3.2);
+        }
+        for (let pass = 0; pass <= 2; pass++) {
+          drawCartoonSegment(hipWX, hipWY, shWX, shWY, bodyWhite, 7.2, pass);
+          drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.8, pass);
+          drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 5.2, pass, 3.4);
+        }
+        drawCartoonHeadAndFace(hdWX, hdWY, faceDirX, expression, hasHair, headTilt, windDrag);
+        for (let pass = 0; pass <= 2; pass++) {
+          drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 5.0, pass);
+          drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.6, pass, 3.2);
+        }
+      }
+
+      // =======================================================================
+      // 6-FRAME KNOCKDOWN & EXPLOSION SEQUENCE (Matches Reference Poses 1 -> 6)
+      // =======================================================================
       if (!stickman.isAlive) {
-        const dt = Math.min(1.25, stickman.deathTimer || 0);
+        const dt = Math.min(1.45, stickman.deathTimer || 0);
         const bx = stickman.footX;
         const by = stickman.footY;
 
-        if (dt < 0.36) {
-          const collapseT = dt / 0.36;
-          drawKiAuraAndLightning(bx, by, 1.35, false);
-          const hipX = bx - 4 * collapseT;
-          const hipY = by - 22 + 8 * collapseT;
-          const shX = hipX + 6 + 4 * collapseT;
-          const shY = hipY - 19 + 6 * collapseT;
-          const hdX = shX + 3;
-          const hdY = shY - 11;
-
-          drawOutlinedLimb(hipX, hipY, hipX - 10, by - 2, backLimbGrey, 4.6);
-          drawOutlinedLimb(hipX - 10, by - 2, hipX - 22, by - 2, backLimbGrey, 4.4);
-          drawOutlinedLimb(shX, shY, shX - 13, shY + 6, backLimbGrey, 4.0);
-          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
-          drawOutlinedLimb(hipX, hipY, hipX + 11, hipY + 4, bodyWhite, 4.6);
-          drawOutlinedLimb(hipX + 11, hipY + 4, hipX + 13, by, bodyWhite, 4.4);
-          drawOutlinedLimb(shX, shY, shX - 9, shY + 11, bodyWhite, 4.2);
-
-          drawSpikyCrimsonHair(hdX, hdY, 0.15, -0.3);
-          const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
-          const hr = STICKMAN_HEAD_RADIUS * worldScale;
-          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
-        } else if (dt < 0.72) {
-          const burstT = (dt - 0.36) / 0.36;
-          drawKiAuraAndLightning(bx, by, 1.5 * (1 - burstT * 0.5), true);
-          const hipX = bx, hipY = by - 6, shX = hipX - 20, shY = by - 7, hdX = shX - 11, hdY = by - 9;
-
-          drawOutlinedLimb(hipX, hipY, hipX + 20, by - 4, backLimbGrey, 4.5);
-          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
-          drawOutlinedLimb(hipX, hipY, hipX + 22, by - 2, bodyWhite, 4.6);
-          drawOutlinedLimb(shX, shY, shX + 10, by - 2, bodyWhite, 4.0);
-
-          drawSpikyCrimsonHair(hdX, hdY, -1.1, -0.8);
-          const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
-          const hr = STICKMAN_HEAD_RADIUS * worldScale;
-          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
-
-          const shardAngles = [-2.5, -2.0, -1.4, -0.9, -0.5];
-          shardAngles.forEach((ang, i) => {
-            const dist = (18 + burstT * 48 + i * 5) * worldScale;
-            const rx = toScreenX(bx) + Math.cos(ang) * dist;
-            const ry = toScreenY(by) + Math.sin(ang) * dist;
-            ctx.fillStyle = '#3E2F28';
-            ctx.beginPath(); ctx.arc(rx, ry, 4.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+        if (dt < 0.22) {
+          // Reference Frame 1: Standing leaned forward in agony, '> <' roar face, towering aura, dust & pebbles
+          drawFieryFightingAura(bx, by, 1.35, -4, false);
+          [-1, 1].forEach(d => {
+            ctx.fillStyle = 'rgba(141, 123, 104, 0.75)';
+            ctx.beginPath(); ctx.arc(toScreenX(bx + d * 18), toScreenY(by - 4), 6.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = rockDarkBrown;
+            ctx.beginPath(); ctx.arc(toScreenX(bx + d * 24), toScreenY(by - 14), 2.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+          });
+          const hipX = bx - 3, hipY = by - 25, shX = hipX + 7, shY = hipY - 21, hdX = shX + 4, hdY = shY - 12;
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX + 6, y: hipY + 13 }, { x: bx + 7, y: by },
+            { x: hipX - 5, y: hipY + 13 }, { x: bx - 9, y: by },
+            { x: shX - 11, y: shY + 6 }, { x: shX - 16, y: shY + 18 },
+            { x: shX + 6, y: shY + 11 }, { x: shX + 9, y: shY + 22 },
+            1, 1, true, 0.12, -0.15
+          );
+        } else if (dt < 0.44) {
+          // Reference Frame 2: Dropping to one knee, front foot sparking, fierce '\ /' glare
+          drawFieryFightingAura(bx, by, 1.45, -6, false);
+          const hipX = bx - 4, hipY = by - 16, shX = hipX + 8, shY = hipY - 19, hdX = shX + 4, hdY = shY - 11;
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX + 12, y: hipY + 2 }, { x: bx + 12, y: by },
+            { x: hipX - 6, y: by - 2 }, { x: hipX - 20, y: by - 2 },
+            { x: shX - 12, y: shY + 3 }, { x: shX - 19, y: shY + 13 },
+            { x: shX + 5, y: shY + 10 }, { x: shX + 7, y: by - 2 },
+            1, 0, true, 0.22, -0.25
+          );
+          ctx.fillStyle = auraYellow;
+          ctx.beginPath(); ctx.arc(toScreenX(bx + 12), toScreenY(by - 2), 6.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+        } else if (dt < 0.68) {
+          // Reference Frame 3: Driven down onto stomach/elbows, red-flushed face, huge spiky flame burst
+          drawFieryFightingAura(bx, by, 1.60, -10, true);
+          const hipX = bx - 8, hipY = by - 9, shX = bx + 10, shY = by - 11, hdX = shX + 8, hdY = shY - 9;
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX - 12, y: by - 3 }, { x: hipX - 24, y: by - 6 },
+            { x: hipX - 10, y: by - 7 }, { x: hipX - 22, y: by - 12 },
+            { x: shX - 3, y: by - 2 }, { x: shX + 6, y: by - 2 },
+            { x: shX + 5, y: by - 2 }, { x: shX + 12, y: by - 2 },
+            1, 2, true, 0.35, -0.35
+          );
+        } else if (dt < 0.90) {
+          // Reference Frame 4: Lying flat horizontally on stomach, aura extinguished, red spiky hair to the left
+          const hipX = bx + 4, hipY = by - 5, shX = bx - 16, shY = by - 5, hdX = shX - 12, hdY = by - 8;
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX + 14, y: by - 4 }, { x: hipX + 26, y: by - 3 },
+            { x: hipX + 14, y: by - 10 }, { x: hipX + 25, y: by - 4 },
+            { x: shX + 8, y: by - 2 }, { x: shX + 18, y: by - 2 },
+            { x: shX + 6, y: by - 5 }, { x: shX + 14, y: by - 5 },
+            -1, 3, true, -1.2, -1.1
+          );
+        } else if (dt < 1.15) {
+          // Reference Frame 5: Prone overload detonation with lightning ribbons & 5 flying rock boulders
+          const burstT = (dt - 0.90) / 0.25;
+          const hipX = bx + 4, hipY = by - 5, shX = bx - 16, shY = by - 5, hdX = shX - 12, hdY = by - 8;
+          drawFieryFightingAura(bx - 10, by, 1.4 * (1 - burstT * 0.4), 0, true);
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX + 14, y: by - 4 }, { x: hipX + 26, y: by - 3 },
+            { x: hipX + 14, y: by - 10 }, { x: hipX + 25, y: by - 4 },
+            { x: shX + 8, y: by - 2 }, { x: shX + 18, y: by - 2 },
+            { x: shX + 6, y: by - 5 }, { x: shX + 14, y: by - 5 },
+            -1, 3, true, -1.2, -1.1
+          );
+          [-2.65, -2.15, -1.55, -0.95, -0.45].forEach((ang, i) => {
+            const dist = (22 + burstT * 52 + i * 4) * worldScale;
+            const rx = toScreenX(bx - 8) + Math.cos(ang) * dist;
+            const ry = toScreenY(by - 6) + Math.sin(ang) * dist;
+            const rSize = (6.5 - (i % 2) * 1.5) * worldScale;
+            ctx.fillStyle = outlineBlack;
+            ctx.beginPath(); ctx.arc(rx, ry, rSize + 2.0 * worldScale, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = rockDarkBrown;
+            ctx.beginPath(); ctx.arc(rx, ry, rSize, 0, Math.PI * 2); ctx.fill();
           });
         } else {
-          const hipX = bx, hipY = by - 5, shX = hipX - 22, shY = by - 5, hdX = shX - 12, hdY = by - 8;
-          drawOutlinedLimb(hipX, hipY, hipX + 16, by - 9, backLimbGrey, 4.4);
-          drawOutlinedLimb(hipX + 16, by - 9, hipX + 25, by - 3, backLimbGrey, 4.2);
-          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
-          drawOutlinedLimb(hipX, hipY, hipX + 24, by - 3, bodyWhite, 4.6);
-          drawOutlinedLimb(shX, shY, shX + 12, by - 2, bodyWhite, 4.0);
-
-          drawSpikyCrimsonHair(hdX, hdY, -1.25, -1.0);
+          // Reference Frame 6: Knocked out flat on stomach, hair blown completely off (bald white head), soot & smoke
+          const hipX = bx + 4, hipY = by - 5, shX = bx - 16, shY = by - 5, hdX = shX - 12, hdY = by - 8;
+          renderCartoonBodyPose(
+            hipX, hipY, shX, shY, hdX, hdY,
+            { x: hipX + 14, y: by - 4 }, { x: hipX + 26, y: by - 3 },
+            { x: hipX + 14, y: by - 8 }, { x: hipX + 25, y: by - 3 },
+            { x: shX + 8, y: by - 2 }, { x: shX + 18, y: by - 2 },
+            { x: shX + 6, y: by - 4 }, { x: shX + 14, y: by - 4 },
+            -1, 3, false, 0, 0
+          );
           const hcx = toScreenX(hdX), hcy = toScreenY(hdY);
-          const hr = STICKMAN_HEAD_RADIUS * worldScale;
-          ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
+          for (let s = -1; s <= 1; s++) {
+            const sx = hcx + s * 5.5 * worldScale;
+            const sy = hcy - (11 + ((dt * 18 + s * 3) % 9)) * worldScale;
+            ctx.fillStyle = rockDarkBrown;
+            ctx.beginPath(); ctx.arc(sx, sy, 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(78, 52, 46, 0.65)';
+            ctx.lineWidth = 1.5 * worldScale;
+            ctx.beginPath(); ctx.moveTo(sx, hcy - 7 * worldScale); ctx.lineTo(sx, sy - 5 * worldScale); ctx.stroke();
+          }
         }
         return;
       }
 
+      // =======================================================================
+      // ACTIVE GAMEPLAY FRAMES: EXPLOSIVE 6-FRAME SPRINT, JUMP, FALL, LANDING
+      // =======================================================================
       const isBoosted = stickman.boostTimer > 0 || stickman.blitzTimer > 0;
       const isLanding = stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0;
       const isJumping = !stickman.isGrounded && stickman.velocityY < -50;
       const isFalling = !stickman.isGrounded && stickman.velocityY >= -50;
 
-      const squashProgress = isLanding ? Math.min(1, stickman.landingSquashTimer / 0.26) : 0;
-      const squashDrop = Math.sin(squashProgress * Math.PI) * 10;
-      const runBounce = (stickman.isGrounded && !isLanding) ? Math.abs(Math.sin(phase * 2)) * 4.2 : 0;
-
-      const pitchAngle = stickman.isGrounded
-        ? Math.max(-0.45, Math.min(0.45, stickman.slopeRadians * 0.65))
-        : Math.max(-0.38, Math.min(0.42, stickman.velocityY / 900));
-      const speedLean = Math.max(0.6, Math.min(1.45, stickman.velocityX / 180)) * 6.5 + squashDrop * 0.4;
-
-      const hipWX = stickman.footX - 2;
-      const hipWY = stickman.footY - 24 - runBounce + squashDrop;
-      const torsoLen = 21 - squashDrop * 0.25;
-      const shWX = hipWX + speedLean + Math.sin(pitchAngle) * torsoLen;
-      const shWY = hipWY - Math.cos(pitchAngle) * torsoLen;
-      const hdWX = shWX + 2.8 + Math.sin(pitchAngle) * 4;
-      const hdWY = shWY - 11;
-
-      const auraIntensity = isBoosted ? 1.35 : (isLanding ? 1.25 : (isJumping || isFalling ? 1.05 : 0.85));
-      drawKiAuraAndLightning(stickman.footX, stickman.footY, auraIntensity, isBoosted);
-
-      function getLegJoints(legIdx) {
-        const legPhase = phase + legIdx * Math.PI;
-        let thighAngle, kneeBend;
-        if (isLanding) {
-          thighAngle = legIdx === 0 ? 0.78 : -0.45;
-          kneeBend = legIdx === 0 ? -0.95 : -1.15;
-        } else if (isJumping) {
-          thighAngle = legIdx === 0 ? 0.95 : -0.42;
-          kneeBend = legIdx === 0 ? -1.1 : -0.25;
-        } else if (isFalling) {
-          const flutter = Math.sin(phase * 1.8 + legIdx * Math.PI) * 0.18;
-          thighAngle = (legIdx === 0 ? 0.48 : -0.32) + flutter;
-          kneeBend = -0.68;
-        } else {
-          thighAngle = Math.sin(legPhase) * 0.82 + 0.16 + pitchAngle * 0.5;
-          kneeBend = Math.min(-0.08, -Math.cos(legPhase) * 0.58 - 0.48);
-        }
-        const kx = hipWX + Math.sin(thighAngle) * 13.5;
-        const ky = hipWY + Math.cos(thighAngle) * 13.5;
-        const sa = thighAngle + kneeBend;
-        return { kx, ky, ax: kx + Math.sin(sa) * 13.5, ay: ky + Math.cos(sa) * 13.5 };
+      let pose;
+      let expression;
+      if (isLanding) {
+        pose = { torsoLean: 0.58, hipOffsetY: -16.5, frontThigh: 0.95, frontKnee: -1.05, backThigh: -0.52, backKnee: -1.25, frontArm: -0.95, frontElbow: 0.85, backArm: 0.55, backElbow: 0.95 };
+        expression = 0;
+      } else if (isJumping) {
+        pose = { torsoLean: 0.42, hipOffsetY: -26.5, frontThigh: 1.35, frontKnee: -1.25, backThigh: -0.78, backKnee: -0.22, frontArm: 1.25, frontElbow: 0.95, backArm: -1.15, backElbow: 0.85 };
+        expression = isBoosted ? 1 : 0;
+      } else if (isFalling) {
+        const airWave = Math.sin(phase * 2.4) * 0.14;
+        pose = { torsoLean: 0.48, hipOffsetY: -24.5, frontThigh: 0.72 + airWave, frontKnee: -0.88, backThigh: -0.55 - airWave, backKnee: -0.95, frontArm: -1.35 + airWave, frontElbow: 0.65, backArm: 1.15 - airWave, backElbow: 0.75 };
+        expression = 0;
+      } else {
+        const framePos = ((phase / (Math.PI / 3)) % 6 + 6) % 6;
+        const frameIdx = Math.floor(framePos) % 6;
+        const nextIdx = (frameIdx + 1) % 6;
+        const rawFrac = framePos - Math.floor(framePos);
+        const snapT = Math.max(0, Math.min(1, (rawFrac - 0.25) / 0.75));
+        const kfA = SPRINT_KEYFRAMES[frameIdx];
+        const kfB = SPRINT_KEYFRAMES[nextIdx];
+        pose = {
+          torsoLean: lerp(kfA.torsoLean, kfB.torsoLean, snapT),
+          hipOffsetY: lerp(kfA.hipOffsetY, kfB.hipOffsetY, snapT),
+          frontThigh: lerp(kfA.frontThigh, kfB.frontThigh, snapT),
+          frontKnee: lerp(kfA.frontKnee, kfB.frontKnee, snapT),
+          backThigh: lerp(kfA.backThigh, kfB.backThigh, snapT),
+          backKnee: lerp(kfA.backKnee, kfB.backKnee, snapT),
+          frontArm: lerp(kfA.frontArm, kfB.frontArm, snapT),
+          frontElbow: lerp(kfA.frontElbow, kfB.frontElbow, snapT),
+          backArm: lerp(kfA.backArm, kfB.backArm, snapT),
+          backElbow: lerp(kfA.backElbow, kfB.backElbow, snapT)
+        };
+        expression = isBoosted ? 1 : 0;
       }
 
-      function getArmJoints(armIdx) {
-        const armPhase = phase + (armIdx + 1) * Math.PI;
-        let upperAngle, elbowBend;
-        if (isLanding) {
-          upperAngle = armIdx === 0 ? 0.45 : -0.85;
-          elbowBend = 0.85;
-        } else if (isJumping) {
-          upperAngle = armIdx === 0 ? 0.85 : -0.95;
-          elbowBend = 0.95;
-        } else if (isFalling) {
-          const wave = Math.cos(phase * 2.2 + armIdx) * 0.22;
-          upperAngle = (armIdx === 0 ? 1.85 : -1.65) + wave;
-          elbowBend = 0.45;
-        } else {
-          upperAngle = Math.sin(armPhase) * 0.78 + 0.08;
-          elbowBend = 0.82 + Math.cos(armPhase) * 0.25;
+      const slopePitch = stickman.isGrounded
+        ? Math.max(-0.42, Math.min(0.42, stickman.slopeRadians * 0.55))
+        : Math.max(-0.32, Math.min(0.38, stickman.velocityY / 950));
+
+      const totalTorsoAngle = pose.torsoLean + slopePitch;
+      const torsoLen = 21.5;
+      const hipWX = stickman.footX - 3.5;
+      const hipWY = stickman.footY + pose.hipOffsetY;
+      const shWX = hipWX + Math.sin(totalTorsoAngle) * torsoLen;
+      const shWY = hipWY - Math.cos(totalTorsoAngle) * torsoLen;
+      const hdWX = shWX + Math.sin(totalTorsoAngle) * 7.5 + 2.0;
+      const hdWY = shWY - Math.cos(totalTorsoAngle) * 9.5 - 2.5;
+
+      const auraIntensity = isBoosted ? 1.45 : (isLanding ? 1.35 : (isJumping || isFalling ? 1.15 : 1.02));
+      drawFieryFightingAura(stickman.footX, stickman.footY, auraIntensity, -11, isBoosted);
+
+      if (stickman.isGrounded) {
+        for (let s = 0; s <= 2; s++) {
+          const streakPhase = (phase * 1.9 + s * 0.8) % 1;
+          const sx = toScreenX(stickman.footX - 18 - streakPhase * 34 - s * 9);
+          const sy = toScreenY(stickman.footY - 12 - s * 16);
+          ctx.strokeStyle = s % 2 === 0
+            ? `rgba(255, 109, 0, ${0.55 * (1 - streakPhase)})`
+            : `rgba(255, 255, 255, ${0.55 * (1 - streakPhase)})`;
+          ctx.lineWidth = 2.2 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx - (18 + s * 6) * worldScale, sy);
+          ctx.stroke();
         }
-        const ex = shWX + Math.sin(upperAngle) * 11.5;
-        const ey = shWY + Math.cos(upperAngle) * 11.5;
-        const fa = upperAngle + elbowBend;
-        return { ex, ey, hx: ex + Math.sin(fa) * 11.5, hy: ey + Math.cos(fa) * 11.5 };
+        const puffAlpha = Math.max(0, Math.min(1, 1 - ((phase % Math.PI) / Math.PI)));
+        const dustX = toScreenX(stickman.footX - 14 - (1 - puffAlpha) * 22);
+        const dustY = toScreenY(stickman.footY - 4);
+        ctx.fillStyle = `rgba(141, 123, 104, ${0.65 * puffAlpha})`;
+        ctx.beginPath(); ctx.arc(dustX, dustY, (4.5 + (1 - puffAlpha) * 5) * worldScale, 0, Math.PI * 2); ctx.fill();
+        if (isLanding) {
+          ctx.fillStyle = auraYellow;
+          ctx.beginPath(); ctx.arc(toScreenX(stickman.footX + 8), toScreenY(stickman.footY - 2), 7.0 * worldScale, 0, Math.PI * 2); ctx.fill();
+        }
       }
 
-      const backArm = getArmJoints(1);
-      drawOutlinedLimb(shWX, shWY, backArm.ex, backArm.ey, backLimbGrey, 3.8);
-      drawOutlinedLimb(backArm.ex, backArm.ey, backArm.hx, backArm.hy, backLimbGrey, 3.6);
+      const thighLen = 13.8, shinLen = 13.8, upperArmLen = 11.8, foreArmLen = 11.8;
+      const fKneX = hipWX + Math.sin(pose.frontThigh) * thighLen;
+      const fKneY = hipWY + Math.cos(pose.frontThigh) * thighLen;
+      const fShnAng = pose.frontThigh + pose.frontKnee;
+      const fAnkX = fKneX + Math.sin(fShnAng) * shinLen;
+      const fAnkY = fKneY + Math.cos(fShnAng) * shinLen;
 
-      const backLeg = getLegJoints(1);
-      drawOutlinedLimb(hipWX, hipWY, backLeg.kx, backLeg.ky, backLimbGrey, 4.4);
-      drawOutlinedLimb(backLeg.kx, backLeg.ky, backLeg.ax, backLeg.ay, backLimbGrey, 4.2);
+      const bKneX = hipWX + Math.sin(pose.backThigh) * thighLen;
+      const bKneY = hipWY + Math.cos(pose.backThigh) * thighLen;
+      const bShnAng = pose.backThigh + pose.backKnee;
+      const bAnkX = bKneX + Math.sin(bShnAng) * shinLen;
+      const bAnkY = bKneY + Math.cos(bShnAng) * shinLen;
 
-      drawOutlinedLimb(hipWX, hipWY, shWX, shWY, bodyWhite, 5.2);
+      const fElbX = shWX + Math.sin(pose.frontArm) * upperArmLen;
+      const fElbY = shWY + Math.cos(pose.frontArm) * upperArmLen;
+      const fForAng = pose.frontArm + pose.frontElbow;
+      const fHndX = fElbX + Math.sin(fForAng) * foreArmLen;
+      const fHndY = fElbY + Math.cos(fForAng) * foreArmLen;
 
-      const frontLeg = getLegJoints(0);
-      drawOutlinedLimb(hipWX, hipWY, frontLeg.kx, frontLeg.ky, bodyWhite, 4.5);
-      drawOutlinedLimb(frontLeg.kx, frontLeg.ky, frontLeg.ax, frontLeg.ay, bodyWhite, 4.3);
+      const bElbX = shWX + Math.sin(pose.backArm) * upperArmLen;
+      const bElbY = shWY + Math.cos(pose.backArm) * upperArmLen;
+      const bForAng = pose.backArm + pose.backElbow;
+      const bHndX = bElbX + Math.sin(bForAng) * foreArmLen;
+      const bHndY = bElbY + Math.cos(bForAng) * foreArmLen;
 
-      const windDrag = Math.max(-1.2, Math.min(0, -stickman.velocityX / 220)) + Math.max(-0.5, Math.min(0.6, stickman.velocityY / 600));
-      drawSpikyCrimsonHair(hdWX, hdWY, pitchAngle * 0.5, windDrag);
+      const windDrag = Math.max(-1.45, Math.min(-0.35, -stickman.velocityX / 170)) + Math.max(-0.4, Math.min(0.5, stickman.velocityY / 600));
 
-      const hcx = toScreenX(hdWX), hcy = toScreenY(hdWY);
-      const hr = STICKMAN_HEAD_RADIUS * worldScale;
-      ctx.fillStyle = outlineColor; ctx.beginPath(); ctx.arc(hcx, hcy, hr + 1.8 * worldScale, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = bodyWhite; ctx.beginPath(); ctx.arc(hcx, hcy, hr, 0, Math.PI * 2); ctx.fill();
-
-      const eyeX = hcx + 3.6 * worldScale;
-      const eyeY = hcy - 0.5 * worldScale;
-      ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 2.0 * worldScale;
-      ctx.beginPath();
-      ctx.moveTo(eyeX - 3.5 * worldScale, eyeY - 3.2 * worldScale);
-      ctx.lineTo(eyeX + 2.2 * worldScale, eyeY - 1.0 * worldScale);
-      ctx.stroke();
-      ctx.fillStyle = hairCrimson;
-      ctx.beginPath(); ctx.arc(eyeX, eyeY + 0.6 * worldScale, 1.9 * worldScale, 0, Math.PI * 2); ctx.fill();
-
-      const frontArm = getArmJoints(0);
-      drawOutlinedLimb(shWX, shWY, frontArm.ex, frontArm.ey, bodyWhite, 4.0);
-      drawOutlinedLimb(frontArm.ex, frontArm.ey, frontArm.hx, frontArm.hy, bodyWhite, 3.8);
+      renderCartoonBodyPose(
+        hipWX, hipWY, shWX, shWY, hdWX, hdWY,
+        { x: fKneX, y: fKneY }, { x: fAnkX, y: fAnkY },
+        { x: bKneX, y: bKneY }, { x: bAnkX, y: bAnkY },
+        { x: fElbX, y: fElbY }, { x: fHndX, y: fHndY },
+        { x: bElbX, y: bElbY }, { x: bHndX, y: bHndY },
+        1, expression, true, totalTorsoAngle * 0.42, windDrag
+      );
     }
 
     /* ------------------------- UI & HUD BINDINGS ------------------------- */
@@ -3068,7 +3329,7 @@
         updatePhysics(dt);
       } else {
         if (state.stickman && !state.stickman.isAlive) {
-          state.stickman.deathTimer = Math.min(1.25, (state.stickman.deathTimer || 0) + Math.min(0.033, dt));
+          state.stickman.deathTimer = Math.min(1.45, (state.stickman.deathTimer || 0) + Math.min(0.033, dt));
         }
         updateParticlesAndEmbers(Math.min(0.033, dt));
       }
