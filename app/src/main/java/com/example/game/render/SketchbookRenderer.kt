@@ -201,6 +201,7 @@ object SketchbookRenderer {
     // 12. Animated White Stickman + Flowing Scarf + Active Aura
     drawAnimatedStickman(
       stickman = stickman,
+      animTime = lavaAnimTime,
       toScreenX = ::toScreenX,
       toScreenY = ::toScreenY,
       worldScale = worldScale
@@ -773,73 +774,9 @@ object SketchbookRenderer {
     }
   }
 
-  private data class SprintKeyframe(
-    val torsoLean: Float,
-    val hipOffsetY: Float,
-    val frontThigh: Float,
-    val frontKnee: Float,
-    val backThigh: Float,
-    val backKnee: Float,
-    val frontArm: Float,
-    val frontElbow: Float,
-    val backArm: Float,
-    val backElbow: Float
-  )
-
-  // 6 separated fighting-game sprint frames (deep forward dash lean, high knee drive, explosive push-off)
-  private val SPRINT_KEYFRAMES = arrayOf(
-    // Frame 0: Power Drive Contact A (Right/Front foot strikes & drives, Left/Back knee rockets up)
-    SprintKeyframe(
-      torsoLean = 0.64f, hipOffsetY = -21.0f,
-      frontThigh = 0.28f, frontKnee = -0.32f,
-      backThigh = 1.36f, backKnee = -1.22f,
-      frontArm = -0.98f, frontElbow = 0.82f,
-      backArm = 0.96f, backElbow = 1.12f
-    ),
-    // Frame 1: Explosive Push-Off A (Front leg blasts far behind, Back leg extends forward)
-    SprintKeyframe(
-      torsoLean = 0.68f, hipOffsetY = -25.0f,
-      frontThigh = -0.92f, frontKnee = -0.14f,
-      backThigh = 1.16f, backKnee = -0.58f,
-      frontArm = -1.28f, frontElbow = 0.96f,
-      backArm = 1.22f, backElbow = 0.92f
-    ),
-    // Frame 2: Airborne Dash Flight A (Wide mid-air split stride, peak flight)
-    SprintKeyframe(
-      torsoLean = 0.62f, hipOffsetY = -27.2f,
-      frontThigh = -1.18f, frontKnee = -1.28f,
-      backThigh = 0.82f, backKnee = -0.26f,
-      frontArm = -0.35f, frontElbow = 1.05f,
-      backArm = 0.45f, backElbow = 0.95f
-    ),
-    // Frame 3: Power Drive Contact B (Back foot strikes & drives, Front knee rockets up)
-    SprintKeyframe(
-      torsoLean = 0.64f, hipOffsetY = -21.0f,
-      frontThigh = 1.36f, frontKnee = -1.22f,
-      backThigh = 0.28f, backKnee = -0.32f,
-      frontArm = 0.96f, frontElbow = 1.12f,
-      backArm = -0.98f, backElbow = 0.82f
-    ),
-    // Frame 4: Explosive Push-Off B (Back leg blasts far behind, Front leg extends forward)
-    SprintKeyframe(
-      torsoLean = 0.68f, hipOffsetY = -25.0f,
-      frontThigh = 1.16f, frontKnee = -0.58f,
-      backThigh = -0.92f, backKnee = -0.14f,
-      frontArm = 1.22f, frontElbow = 0.92f,
-      backArm = -1.28f, backElbow = 0.96f
-    ),
-    // Frame 5: Airborne Dash Flight B (Wide mid-air split stride, peak flight)
-    SprintKeyframe(
-      torsoLean = 0.62f, hipOffsetY = -27.2f,
-      frontThigh = 0.82f, frontKnee = -0.26f,
-      backThigh = -1.18f, backKnee = -1.28f,
-      frontArm = 0.45f, frontElbow = 0.95f,
-      backArm = -0.35f, backElbow = 1.05f
-    )
-  )
-
   private fun DrawScope.drawAnimatedStickman(
     stickman: StickmanState,
+    animTime: Float,
     toScreenX: (Float) -> Float,
     toScreenY: (Float) -> Float,
     worldScale: Float
@@ -880,13 +817,13 @@ object SketchbookRenderer {
             color = rimCrimsonGlow.copy(alpha = 0.28f),
             start = s1,
             end = s2,
-            strokeWidth = (thicknessWorld + 7.2f) * worldScale,
+            strokeWidth = (thicknessWorld + 7.0f) * worldScale,
             cap = StrokeCap.Round
           )
           if (endCapRadiusWorld > 0f) {
             drawCircle(
               color = rimCrimsonGlow.copy(alpha = 0.28f),
-              radius = (endCapRadiusWorld + 3.6f) * worldScale,
+              radius = (endCapRadiusWorld + 3.5f) * worldScale,
               center = s2
             )
           }
@@ -896,13 +833,13 @@ object SketchbookRenderer {
             color = outlineBlack,
             start = s1,
             end = s2,
-            strokeWidth = (thicknessWorld + 4.6f) * worldScale,
+            strokeWidth = (thicknessWorld + 4.4f) * worldScale,
             cap = StrokeCap.Round
           )
           if (endCapRadiusWorld > 0f) {
             drawCircle(
               color = outlineBlack,
-              radius = (endCapRadiusWorld + 2.3f) * worldScale,
+              radius = (endCapRadiusWorld + 2.2f) * worldScale,
               center = s2
             )
           }
@@ -926,7 +863,7 @@ object SketchbookRenderer {
       }
     }
 
-    // Renders the reference-accurate Super Saiyan God spiky crimson hair crown with dark inner wedges & thick black outline
+    // Renders the Super Saiyan God spiky crimson hair crown with smooth 60fps wind wave & thick black outline
     fun drawFightingGameHair(
       headWorldX: Float,
       headWorldY: Float,
@@ -937,18 +874,16 @@ object SketchbookRenderer {
       val hy = toScreenY(headWorldY)
       val r = (WorldConstants.STICKMAN_HEAD_RADIUS + 0.8f) * worldScale
 
-      // 8 sculpted anime flame-spikes fanning from left temple across the crown to the right brow
       val spikeAngles = floatArrayOf(-2.88f, -2.52f, -2.14f, -1.76f, -1.42f, -1.08f, -0.74f, -0.38f)
-      val spikeLengths = floatArrayOf(18f, 25f, 31f, 34f, 30f, 26f, 21f, 15f)
+      val spikeLengths = floatArrayOf(17f, 24f, 30f, 32f, 29f, 25f, 20f, 14f)
 
       val hairPath = reusableHairPath.apply {
         reset()
         moveTo(hx - r * 0.92f, hy + r * 0.15f)
         for (i in spikeAngles.indices) {
-          val flutter = sin(phase * 3.2f + i * 0.9f) * 0.05f
-          val ang = spikeAngles[i] + headTilt + windDrag * 0.22f + flutter
+          val flutter = sin(animTime * 9.5f + i * 0.85f) * 0.045f
+          val ang = spikeAngles[i] + headTilt + windDrag * 0.20f + flutter
           val len = spikeLengths[i] * worldScale
-          // Slightly curved outer edge toward tip
           val midAng = ang - 0.08f
           val midLen = len * 0.68f
           val tipX = hx + cos(ang) * len
@@ -962,29 +897,27 @@ object SketchbookRenderer {
         close()
       }
 
-      // Thick black cartoon outline + crimson fill + vermilion highlight + dark crimson inner creases
       drawPath(
         path = hairPath,
         color = outlineBlack,
-        style = Stroke(width = 4.4f * worldScale, join = StrokeJoin.Round, cap = StrokeCap.Round)
+        style = Stroke(width = 4.2f * worldScale, join = StrokeJoin.Round, cap = StrokeCap.Round)
       )
       drawPath(path = hairPath, color = hairCrimson)
       drawPath(
         path = hairPath,
         color = hairHighlight.copy(alpha = 0.65f),
-        style = Stroke(width = 1.8f * worldScale, join = StrokeJoin.Round)
+        style = Stroke(width = 1.6f * worldScale, join = StrokeJoin.Round)
       )
 
-      // Dark red interior hair strand lines (matching the reference sheet's cel-shaded hair)
       for (i in 1..5) {
-        val ang = spikeAngles[i] + headTilt + windDrag * 0.22f
+        val ang = spikeAngles[i] + headTilt + windDrag * 0.20f
         val innerStart = Offset(hx + cos(ang) * (r * 0.85f), hy + sin(ang) * (r * 0.85f))
-        val innerEnd = Offset(hx + cos(ang) * (spikeLengths[i] * 0.68f * worldScale), hy + sin(ang) * (spikeLengths[i] * 0.68f * worldScale))
+        val innerEnd = Offset(hx + cos(ang) * (spikeLengths[i] * 0.66f * worldScale), hy + sin(ang) * (spikeLengths[i] * 0.66f * worldScale))
         drawLine(
           color = hairDarkShadow,
           start = innerStart,
           end = innerEnd,
-          strokeWidth = 2.0f * worldScale,
+          strokeWidth = 1.9f * worldScale,
           cap = StrokeCap.Round
         )
       }
@@ -995,7 +928,7 @@ object SketchbookRenderer {
       headWorldX: Float,
       headWorldY: Float,
       faceDirX: Float,
-      expression: Int, // 0 = Fierce Glare (\ /), 1 = Power Scream (> <), 2 = Red Flush Glare, 3 = Knocked Out
+      expression: Int,
       hasHair: Boolean,
       headTilt: Float,
       windDrag: Float
@@ -1005,17 +938,16 @@ object SketchbookRenderer {
       }
 
       val hCenter = Offset(toScreenX(headWorldX), toScreenY(headWorldY))
-      val hRadius = (WorldConstants.STICKMAN_HEAD_RADIUS + 0.8f) * worldScale
+      val hRadius = (WorldConstants.STICKMAN_HEAD_RADIUS + 0.6f) * worldScale
 
-      // Crimson rim glow + thick black cartoon outline + white head fill
       drawCircle(
-        color = rimCrimsonGlow.copy(alpha = 0.30f),
-        radius = hRadius + 4.2f * worldScale,
+        color = rimCrimsonGlow.copy(alpha = 0.28f),
+        radius = hRadius + 4.0f * worldScale,
         center = hCenter
       )
       drawCircle(
         color = outlineBlack,
-        radius = hRadius + 2.4f * worldScale,
+        radius = hRadius + 2.3f * worldScale,
         center = hCenter
       )
       drawCircle(
@@ -1024,7 +956,6 @@ object SketchbookRenderer {
         center = hCenter
       )
 
-      // Red energy flush on upper face for Frame 3 overload state
       if (expression == 2) {
         drawCircle(
           color = hairCrimson.copy(alpha = 0.42f),
@@ -1038,20 +969,16 @@ object SketchbookRenderer {
 
       when (expression) {
         1 -> {
-          // Expression 1 (Reference Frame 1): Squeezed '> <' power scream eyes + wide shouting mouth with teeth
           val leftEyeX = fx - 3.2f * worldScale
           val rightEyeX = fx + 3.4f * worldScale
           val eyeY = fy - 1.8f * worldScale
 
-          // Left '>' chevron eye
           drawLine(outlineBlack, Offset(leftEyeX - 2.6f * worldScale, eyeY - 2.2f * worldScale), Offset(leftEyeX + 0.8f * worldScale, eyeY), 2.2f * worldScale, StrokeCap.Round)
           drawLine(outlineBlack, Offset(leftEyeX + 0.8f * worldScale, eyeY), Offset(leftEyeX - 2.6f * worldScale, eyeY + 2.0f * worldScale), 2.2f * worldScale, StrokeCap.Round)
 
-          // Right '<' chevron eye
           drawLine(outlineBlack, Offset(rightEyeX + 2.6f * worldScale, eyeY - 2.2f * worldScale), Offset(rightEyeX - 0.8f * worldScale, eyeY), 2.2f * worldScale, StrokeCap.Round)
           drawLine(outlineBlack, Offset(rightEyeX - 0.8f * worldScale, eyeY), Offset(rightEyeX + 2.6f * worldScale, eyeY + 2.0f * worldScale), 2.2f * worldScale, StrokeCap.Round)
 
-          // Wide-open shouting cartoon mouth with white upper teeth bar
           val mouthCenter = Offset(fx + 0.4f * worldScale, fy + 4.2f * worldScale)
           drawCircle(color = outlineBlack, radius = 3.8f * worldScale, center = mouthCenter)
           drawCircle(color = Color(0xFF7F0000), radius = 2.8f * worldScale, center = mouthCenter)
@@ -1065,21 +992,17 @@ object SketchbookRenderer {
         }
 
         0, 2 -> {
-          // Expression 0 & 2 (Reference Frames 2 & 3): Sharp angled V-brows (\ /), fierce eyes, and clenched mouth
           val leftEyeX = fx - 2.8f * worldScale
           val rightEyeX = fx + 3.6f * worldScale
           val eyeY = fy - 1.2f * worldScale
 
-          // White eye scleras tucked under V-brows
           drawCircle(color = bodyWhite, radius = 2.1f * worldScale, center = Offset(leftEyeX, eyeY + 0.6f * worldScale))
           drawCircle(color = bodyWhite, radius = 2.1f * worldScale, center = Offset(rightEyeX, eyeY + 0.6f * worldScale))
-          // Fierce crimson/black pupils
           drawCircle(color = hairCrimson, radius = 1.3f * worldScale, center = Offset(leftEyeX + 0.5f * worldScale, eyeY + 0.8f * worldScale))
           drawCircle(color = hairCrimson, radius = 1.3f * worldScale, center = Offset(rightEyeX + 0.5f * worldScale, eyeY + 0.8f * worldScale))
           drawCircle(color = outlineBlack, radius = 0.7f * worldScale, center = Offset(leftEyeX + 0.5f * worldScale, eyeY + 0.8f * worldScale))
           drawCircle(color = outlineBlack, radius = 0.7f * worldScale, center = Offset(rightEyeX + 0.5f * worldScale, eyeY + 0.8f * worldScale))
 
-          // Thick sharp V-brows sloping down to the center bridge
           drawLine(
             color = outlineBlack,
             start = Offset(leftEyeX - 3.2f * worldScale, eyeY - 3.0f * worldScale),
@@ -1095,7 +1018,6 @@ object SketchbookRenderer {
             cap = StrokeCap.Round
           )
 
-          // Gritted battle grimace / clenched teeth line
           drawLine(
             color = outlineBlack,
             start = Offset(fx - 2.0f * worldScale, fy + 4.2f * worldScale),
@@ -1106,7 +1028,6 @@ object SketchbookRenderer {
         }
 
         else -> {
-          // Expression 3 (Reference Frames 4 & 6): Knocked-out closed eye line
           drawLine(
             color = outlineBlack,
             start = Offset(fx - 2.5f * worldScale, fy),
@@ -1118,7 +1039,7 @@ object SketchbookRenderer {
       }
     }
 
-    // Renders the roaring multi-layer fiery red-orange fighting-game aura, ground sparks, and crackling bio-lightning
+    // 60 FPS continuous fiery red-orange aura driven by animTime
     fun drawFieryFightingAura(
       centerWorldX: Float,
       footWorldY: Float,
@@ -1129,101 +1050,96 @@ object SketchbookRenderer {
       if (intensity <= 0.05f) return
       val baseSX = toScreenX(centerWorldX)
       val baseSY = toScreenY(footWorldY)
-      val auraH = (86f + intensity * 26f) * worldScale
-      val auraHalfW = (32f + intensity * 15f) * worldScale
+      val auraH = (82f + intensity * 24f) * worldScale
+      val auraHalfW = (30f + intensity * 14f) * worldScale
       val windTilt = leanBackX * worldScale
 
-      // 1. Soft crimson outer glow halo
       drawCircle(
-        color = auraCrimson.copy(alpha = (0.26f * intensity).coerceAtMost(0.42f)),
-        radius = auraHalfW * 1.55f,
+        color = auraCrimson.copy(alpha = (0.24f * intensity).coerceAtMost(0.40f)),
+        radius = auraHalfW * 1.50f,
         center = Offset(baseSX + windTilt * 0.35f, baseSY - auraH * 0.45f)
       )
 
-      // 2. Tall jagged crimson-red outer flame crown (11 sharp flickering flame tongues)
       val outerSpikes = 11
       val outerAura = reusableAuraOuterPath.apply {
         reset()
-        moveTo(baseSX - auraHalfW * 0.92f, baseSY + 2f * worldScale)
+        moveTo(baseSX - auraHalfW * 0.88f, baseSY + 2f * worldScale)
         for (i in 0..outerSpikes) {
           val t = i.toFloat() / outerSpikes
           val angle = PI.toFloat() + t * PI.toFloat()
-          val wave = sin(phase * 3.8f + i * 1.9f) * 7.5f * worldScale
-          val spikeBoost = if (i % 2 == 1) 1.24f else 0.72f
+          val wave = sin(animTime * 11f + i * 1.9f) * 6.0f * worldScale
+          val spikeBoost = if (i % 2 == 1) 1.22f else 0.75f
           val rx = cos(angle) * auraHalfW * spikeBoost + windTilt * (1f - kotlin.math.abs(t - 0.5f)) + wave * 0.35f
-          val ry = sin(angle) * auraH * spikeBoost - kotlin.math.abs(cos(i * 1.4f + phase * 2.5f)) * 14f * worldScale
+          val ry = sin(angle) * auraH * spikeBoost - kotlin.math.abs(cos(i * 1.4f + animTime * 8.5f)) * 12f * worldScale
           lineTo(baseSX + rx, baseSY + ry * 0.94f)
         }
-        lineTo(baseSX + auraHalfW * 0.92f, baseSY + 2f * worldScale)
+        lineTo(baseSX + auraHalfW * 0.88f, baseSY + 2f * worldScale)
         close()
       }
       drawPath(
         path = outerAura,
-        color = auraDarkRed.copy(alpha = (0.45f * intensity).coerceAtMost(0.75f)),
-        style = Stroke(width = 3.5f * worldScale, join = StrokeJoin.Round)
+        color = auraDarkRed.copy(alpha = (0.42f * intensity).coerceAtMost(0.72f)),
+        style = Stroke(width = 3.2f * worldScale, join = StrokeJoin.Round)
       )
       drawPath(
         path = outerAura,
-        color = auraCrimson.copy(alpha = (0.68f * intensity).coerceAtMost(0.88f))
+        color = auraCrimson.copy(alpha = (0.64f * intensity).coerceAtMost(0.85f))
       )
 
-      // 3. Blazing red-orange middle flame layer (9 sharp inner tongues)
       val midSpikes = 9
       val innerAura = reusableAuraInnerPath.apply {
         reset()
-        moveTo(baseSX - auraHalfW * 0.66f, baseSY + 1f * worldScale)
+        moveTo(baseSX - auraHalfW * 0.64f, baseSY + 1f * worldScale)
         for (i in 0..midSpikes) {
           val t = i.toFloat() / midSpikes
           val angle = PI.toFloat() + t * PI.toFloat()
-          val wave = cos(phase * 4.6f + i * 2.3f) * 5.5f * worldScale
-          val spikeBoost = if (i % 2 == 0) 1.18f else 0.74f
-          val rx = cos(angle) * (auraHalfW * 0.72f * spikeBoost) + windTilt * 0.65f + wave * 0.3f
-          val ry = sin(angle) * (auraH * 0.78f * spikeBoost)
+          val wave = cos(animTime * 13.5f + i * 2.3f) * 4.8f * worldScale
+          val spikeBoost = if (i % 2 == 0) 1.16f else 0.76f
+          val rx = cos(angle) * (auraHalfW * 0.70f * spikeBoost) + windTilt * 0.65f + wave * 0.3f
+          val ry = sin(angle) * (auraH * 0.76f * spikeBoost)
           lineTo(baseSX + rx, baseSY + ry)
         }
-        lineTo(baseSX + auraHalfW * 0.66f, baseSY + 1f * worldScale)
+        lineTo(baseSX + auraHalfW * 0.64f, baseSY + 1f * worldScale)
         close()
       }
       drawPath(
         path = innerAura,
-        color = (if (isBoosted) auraYellow else auraOrange).copy(alpha = (0.76f * intensity).coerceAtMost(0.92f))
+        color = (if (isBoosted) auraYellow else auraOrange).copy(alpha = (0.72f * intensity).coerceAtMost(0.90f))
       )
 
-      // 4. Detached rising flame tongues / embers around the crown (like Reference Frames 1–3)
       for (f in 0..3) {
-        val cycle = (phase * 1.8f + f * 1.57f) % (PI.toFloat() * 2f)
+        val cycle = (animTime * 5.2f + f * 1.57f) % (PI.toFloat() * 2f)
         val rise = (cycle / (PI.toFloat() * 2f))
         val side = if (f % 2 == 0) -1f else 1f
-        val fx = baseSX + side * (auraHalfW * (0.65f + 0.25f * (f % 3))) + windTilt * 0.5f
+        val fx = baseSX + side * (auraHalfW * (0.65f + 0.22f * (f % 3))) + windTilt * 0.5f
         val fy = baseSY - auraH * (0.35f + rise * 0.65f)
-        val flameH = (11f * (1f - rise * 0.5f)) * worldScale
+        val flameH = (10f * (1f - rise * 0.5f)) * worldScale
         drawLine(
-          color = if (f % 2 == 0) auraCrimson else auraOrange,
+          color = (if (f % 2 == 0) auraCrimson else auraOrange).copy(alpha = 1f - rise * 0.6f),
           start = Offset(fx, fy),
           end = Offset(fx + windTilt * 0.15f, fy - flameH),
-          strokeWidth = 3.8f * (1f - rise * 0.4f) * worldScale,
+          strokeWidth = 3.5f * (1f - rise * 0.4f) * worldScale,
           cap = StrokeCap.Round
         )
       }
 
-      // 5. Golden-white foot energy flare & crackling bio-lightning bolts across torso
       drawCircle(
-        color = auraYellow.copy(alpha = (0.55f * intensity).coerceAtMost(0.85f)),
-        radius = 12f * worldScale,
+        color = auraYellow.copy(alpha = (0.50f * intensity).coerceAtMost(0.80f)),
+        radius = 11f * worldScale,
         center = Offset(baseSX, baseSY - 4f * worldScale)
       )
 
-      val boltSeed = (phase * 2.8f).toInt()
-      for (b in 0..2) {
-        val side = if ((boltSeed + b) % 2 == 0) -1f else 1f
-        val sx = baseSX + side * (6f + b * 4f) * worldScale
-        val sy = baseSY - (14f + b * 18f) * worldScale
-        val m1x = sx + side * (11f + sin(phase * 6f + b) * 5f) * worldScale
+      for (b in 0..1) {
+        val side = if (b % 2 == 0) -1f else 1f
+        val pulse = 0.55f + 0.45f * sin(animTime * 16f + b * 2.4f)
+        val sx = baseSX + side * (7f + b * 4f) * worldScale
+        val sy = baseSY - (15f + b * 18f) * worldScale
+        val m1x = sx + side * (10f + sin(animTime * 14f + b) * 4.5f) * worldScale
         val m1y = sy - 10f * worldScale
         val m2x = sx - side * 3f * worldScale
         val m2y = m1y - 9f * worldScale
-        val ex = m2x + side * 8f * worldScale
-        val ey = m2y - 10f * worldScale
+        val ex = m2x + side * 7f * worldScale
+        val ey = m2y - 9f * worldScale
 
         val boltPath = reusableLightningPath.apply {
           reset()
@@ -1234,18 +1150,17 @@ object SketchbookRenderer {
         }
         drawPath(
           path = boltPath,
-          color = auraCrimson.copy(alpha = (0.7f * intensity).coerceIn(0f, 1f)),
-          style = Stroke(width = 3.8f * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+          color = auraCrimson.copy(alpha = (0.65f * intensity * pulse).coerceIn(0f, 1f)),
+          style = Stroke(width = 3.4f * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
         drawPath(
           path = boltPath,
-          color = bodyWhite.copy(alpha = (0.95f * intensity).coerceIn(0f, 1f)),
-          style = Stroke(width = 1.8f * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+          color = bodyWhite.copy(alpha = (0.92f * intensity * pulse).coerceIn(0f, 1f)),
+          style = Stroke(width = 1.6f * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
       }
     }
 
-    // Helper to render the complete 2D cartoon body from joint positions so the white torso/hip/leg merge seamlessly
     fun renderCartoonBodyPose(
       hipWX: Float,
       hipWY: Float,
@@ -1267,22 +1182,22 @@ object SketchbookRenderer {
       headTilt: Float,
       windDrag: Float
     ) {
-      // 1. Rear Shaded Arm & Leg (Rim glow -> Black outline -> Cel-shaded Grey fill)
+      // 1. Rear Shaded Arm & Leg
       for (pass in 0..2) {
-        drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.8f, pass)
-        drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.4f, pass, endCapRadiusWorld = 3.0f)
-        drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.6f, pass)
-        drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 5.0f, pass, endCapRadiusWorld = 3.2f)
+        drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.4f, pass)
+        drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.0f, pass, endCapRadiusWorld = 2.6f)
+        drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.0f, pass)
+        drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 4.5f, pass, endCapRadiusWorld = 2.8f)
       }
 
-      // 2. Unified White Torso + Hip + Front Leg (Pass 0 = glow, Pass 1 = thick black outline, Pass 2 = seamless white fill)
+      // 2. Unified White Torso + Hip + Front Leg
       for (pass in 0..2) {
-        drawCartoonSegment(hipWX, hipWY, shWX, shWY, bodyWhite, 7.2f, pass)
-        drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.8f, pass)
-        drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 5.2f, pass, endCapRadiusWorld = 3.4f)
+        drawCartoonSegment(hipWX, hipWY, shWX, shWY, bodyWhite, 6.4f, pass)
+        drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.2f, pass)
+        drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 4.7f, pass, endCapRadiusWorld = 3.0f)
       }
 
-      // 3. Head, Spiky Crimson Hair & Expressive Fighting-Game Face
+      // 3. Head, Spiky Crimson Hair & Expressive Face
       drawCartoonHeadAndFace(
         headWorldX = hdWX,
         headWorldY = hdWY,
@@ -1293,10 +1208,10 @@ object SketchbookRenderer {
         windDrag = windDrag
       )
 
-      // 4. Foreground White Arm & Clenched Fist (overlapping torso cleanly)
+      // 4. Foreground White Arm & Clenched Fist
       for (pass in 0..2) {
-        drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 5.0f, pass)
-        drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.6f, pass, endCapRadiusWorld = 3.2f)
+        drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 4.6f, pass)
+        drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.2f, pass, endCapRadiusWorld = 2.8f)
       }
     }
 
@@ -1310,7 +1225,6 @@ object SketchbookRenderer {
 
       when {
         dt < 0.22f -> {
-          // REFERENCE FRAME 1: Standing leaned forward in agony, '> <' roar face, towering aura, dust & pebbles at feet
           drawFieryFightingAura(bx, by, intensity = 1.35f, leanBackX = -4f, isBoosted = false)
           for (d in -1..1 step 2) {
             drawCircle(dustTaupe.copy(alpha = 0.75f), 6.5f * worldScale, Offset(toScreenX(bx + d * 18f), toScreenY(by - 4f)))
@@ -1333,7 +1247,6 @@ object SketchbookRenderer {
         }
 
         dt < 0.44f -> {
-          // REFERENCE FRAME 2: Dropping to one knee, front foot sparking, fierce '\ /' glare, wide jagged aura
           drawFieryFightingAura(bx, by, intensity = 1.45f, leanBackX = -6f, isBoosted = false)
           val hipX = bx - 4f
           val hipY = by - 16f
@@ -1349,12 +1262,10 @@ object SketchbookRenderer {
             backElbow = Offset(shX + 5f, shY + 10f), backHand = Offset(shX + 7f, by - 2f),
             faceDirX = 1f, expression = 0, hasHair = true, headTilt = 0.22f, windDrag = -0.25f
           )
-          // Bright golden-white spark at planted front foot
           drawCircle(auraYellow, 6.5f * worldScale, Offset(toScreenX(bx + 12f), toScreenY(by - 2f)))
         }
 
         dt < 0.68f -> {
-          // REFERENCE FRAME 3: Driven down onto stomach/elbows, red-flushed face, huge spiky flame burst & lightning
           drawFieryFightingAura(bx, by, intensity = 1.60f, leanBackX = -10f, isBoosted = true)
           val hipX = bx - 8f
           val hipY = by - 9f
@@ -1373,7 +1284,6 @@ object SketchbookRenderer {
         }
 
         dt < 0.90f -> {
-          // REFERENCE FRAME 4: Lying flat horizontally on stomach, aura extinguished, red spiky hair to the left
           val hipX = bx + 4f
           val hipY = by - 5f
           val shX = bx - 16f
@@ -1391,7 +1301,6 @@ object SketchbookRenderer {
         }
 
         dt < 1.15f -> {
-          // REFERENCE FRAME 5: Prone overload detonation! Dome of white-pink lightning ribbons, orange blast spikes & 5 flying rock boulders
           val burstT = ((dt - 0.90f) / 0.25f).coerceIn(0f, 1f)
           val hipX = bx + 4f
           val hipY = by - 5f
@@ -1400,7 +1309,6 @@ object SketchbookRenderer {
           val hdX = shX - 12f
           val hdY = by - 8f
 
-          // Sharp orange/yellow impact blast spikes behind prone body
           drawFieryFightingAura(bx - 10f, by, intensity = 1.4f * (1f - burstT * 0.4f), leanBackX = 0f, isBoosted = true)
 
           renderCartoonBodyPose(
@@ -1412,7 +1320,6 @@ object SketchbookRenderer {
             faceDirX = -1f, expression = 3, hasHair = true, headTilt = -1.2f, windDrag = -1.1f
           )
 
-          // 5 flying dark-brown outlined angular rock boulders
           val shardAngles = floatArrayOf(-2.65f, -2.15f, -1.55f, -0.95f, -0.45f)
           for (i in shardAngles.indices) {
             val ang = shardAngles[i]
@@ -1426,7 +1333,6 @@ object SketchbookRenderer {
         }
 
         else -> {
-          // REFERENCE FRAME 6: Knocked out flat on stomach, hair blown completely off (bald white head), soot crumbs & rising smoke wisps
           val hipX = bx + 4f
           val hipY = by - 5f
           val shX = bx - 16f
@@ -1441,7 +1347,6 @@ object SketchbookRenderer {
             backElbow = Offset(shX + 6f, by - 4f), backHand = Offset(shX + 14f, by - 4f),
             faceDirX = -1f, expression = 3, hasHair = false, headTilt = 0f, windDrag = 0f
           )
-          // Tiny soot crumbs & rising vertical smoke lines above bald head (exact match to Reference Frame 6)
           val hcx = toScreenX(hdX)
           val hcy = toScreenY(hdY)
           for (s in -1..1) {
@@ -1462,167 +1367,129 @@ object SketchbookRenderer {
     }
 
     // =========================================================================
-    // ACTIVE GAMEPLAY FRAMES: EXPLOSIVE 6-FRAME SPRINT, JUMP, FALL, LANDING
+    // 60 FPS CONTINUOUS HARMONIC RUNNER KINEMATICS (MATCHES REFERENCE VIDEO)
     // =========================================================================
     val isBoosted = stickman.boostTimer > 0f || stickman.blitzTimer > 0f
-    val isLanding = stickman.isGrounded && stickman.landingSquashTimer > 0f
-    val isJumping = !stickman.isGrounded && stickman.velocityY < -50f
-    val isFalling = !stickman.isGrounded && stickman.velocityY >= -50f
-
-    // Select or interpolate the separated animation frame
-    val pose: SprintKeyframe
-    val expression: Int
-    when {
-      isLanding -> {
-        // Separated Frame: Superhero 1-Knee Power Landing (Reference Frame 2)
-        pose = SprintKeyframe(
-          torsoLean = 0.58f, hipOffsetY = -16.5f,
-          frontThigh = 0.95f, frontKnee = -1.05f,
-          backThigh = -0.52f, backKnee = -1.25f,
-          frontArm = -0.95f, frontElbow = 0.85f,
-          backArm = 0.55f, backElbow = 0.95f
-        )
-        expression = 0
-      }
-
-      isJumping -> {
-        // Separated Frame: Explosive Aerial Knee-Drive & Uppercut Launch
-        pose = SprintKeyframe(
-          torsoLean = 0.42f, hipOffsetY = -26.5f,
-          frontThigh = 1.35f, frontKnee = -1.25f,
-          backThigh = -0.78f, backKnee = -0.22f,
-          frontArm = 1.25f, frontElbow = 0.95f,
-          backArm = -1.15f, backElbow = 0.85f
-        )
-        expression = if (isBoosted) 1 else 0
-      }
-
-      isFalling -> {
-        // Separated Frame: Braced Airborne Combat Drop
-        val airWave = sin(phase * 2.4f) * 0.14f
-        pose = SprintKeyframe(
-          torsoLean = 0.48f, hipOffsetY = -24.5f,
-          frontThigh = 0.72f + airWave, frontKnee = -0.88f,
-          backThigh = -0.55f - airWave, backKnee = -0.95f,
-          frontArm = -1.35f + airWave, frontElbow = 0.65f,
-          backArm = 1.15f - airWave, backElbow = 0.75f
-        )
-        expression = 0
-      }
-
-      else -> {
-        // Separated 6-Frame Fighting-Game Sprint Cycle (snappy anime keyframe stepping!)
-        val framePos = ((phase / (PI.toFloat() / 3f)) % 6f + 6f) % 6f
-        val frameIdx = framePos.toInt() % 6
-        val nextIdx = (frameIdx + 1) % 6
-        val rawFrac = framePos - framePos.toInt()
-        // Hold each keyframe slightly so individual fighting-game poses read crisply, then snap smoothly
-        val snapT = ((rawFrac - 0.25f) / 0.75f).coerceIn(0f, 1f)
-        val kfA = SPRINT_KEYFRAMES[frameIdx]
-        val kfB = SPRINT_KEYFRAMES[nextIdx]
-        pose = SprintKeyframe(
-          torsoLean = lerp(kfA.torsoLean, kfB.torsoLean, snapT),
-          hipOffsetY = lerp(kfA.hipOffsetY, kfB.hipOffsetY, snapT),
-          frontThigh = lerp(kfA.frontThigh, kfB.frontThigh, snapT),
-          frontKnee = lerp(kfA.frontKnee, kfB.frontKnee, snapT),
-          backThigh = lerp(kfA.backThigh, kfB.backThigh, snapT),
-          backKnee = lerp(kfA.backKnee, kfB.backKnee, snapT),
-          frontArm = lerp(kfA.frontArm, kfB.frontArm, snapT),
-          frontElbow = lerp(kfA.frontElbow, kfB.frontElbow, snapT),
-          backArm = lerp(kfA.backArm, kfB.backArm, snapT),
-          backElbow = lerp(kfA.backElbow, kfB.backElbow, snapT)
-        )
-        expression = if (isBoosted) 1 else 0
-      }
+    // Continuous blend weights so there is NEVER a 1-frame snap when leaving/touching ground
+    val airFactor = if (stickman.isGrounded) 0f else (kotlin.math.abs(stickman.velocityY) / 240f).coerceIn(0f, 1f)
+    val crouchFactor = if (stickman.isGrounded && stickman.landingSquashTimer > 0f) {
+      sin((stickman.landingSquashTimer / 0.26f).coerceIn(0f, 1f) * PI.toFloat())
+    } else {
+      0f
     }
+
+    // Compute smooth 60 FPS leg angles for legIndex (0 = Front leg, 1 = Back leg)
+    fun computeSmoothLegAngles(legIndex: Int): Pair<Float, Float> {
+      val p = phase + legIndex * PI.toFloat()
+      // Base 60 FPS harmonic running stride matching video_run_strip.jpg:
+      // Swings from -0.66 rad (behind) to +0.86 rad (front reach)
+      val runThigh = sin(p) * 0.76f + 0.10f
+      // Smooth heel kick-up on recovery (-1.26 rad figure-4 fold) and straight extension on front plant (-0.10 rad)
+      val foldWave = (1f - sin(p - 0.52f)) * 0.5f
+      val runKnee = -0.10f - (foldWave * foldWave) * 1.16f
+
+      // Airborne split adjustment (wider stride + slightly deeper knee tuck while in mid-air)
+      val airThigh = sin(p) * 0.88f + 0.14f
+      val airKnee = runKnee - 0.18f
+
+      val thigh = lerp(runThigh, airThigh, airFactor) + crouchFactor * (if (legIndex == 0) 0.22f else -0.18f)
+      val knee = lerp(runKnee, airKnee, airFactor) - crouchFactor * 0.32f
+      return thigh to knee
+    }
+
+    // Compute smooth 60 FPS arm angles in opposition to legs
+    fun computeSmoothArmAngles(armIndex: Int): Pair<Float, Float> {
+      val ap = phase + (armIndex + 1) * PI.toFloat()
+      val runArm = sin(ap) * 0.78f + 0.05f
+      val armForward01 = (sin(ap) + 1f) * 0.5f
+      val runElbow = 0.58f + armForward01 * 0.58f
+
+      // In mid-air, arms lift slightly higher like Row 4 Cols 3-5 of the video
+      val airLift = if (armIndex == 0) 0.42f else -0.35f
+      val upperArm = runArm + airFactor * airLift - crouchFactor * 0.25f
+      val elbow = lerp(runElbow, 0.72f, airFactor) + crouchFactor * 0.22f
+      return upperArm to elbow
+    }
+
+    val (fThigh, fKnee) = computeSmoothLegAngles(0)
+    val (bThigh, bKnee) = computeSmoothLegAngles(1)
+    val (fArm, fElbow) = computeSmoothArmAngles(0)
+    val (bArm, bElbow) = computeSmoothArmAngles(1)
+
+    val thighLen = 13.5f
+    val shinLen = 13.5f
+    val upperArmLen = 11.5f
+    val foreArmLen = 11.5f
+
+    // Calculate relative vertical reach of both legs so the lowest foot anchors cleanly to stickman.footY
+    val fKneeRelY = cos(fThigh) * thighLen
+    val fAnkleRelY = fKneeRelY + cos(fThigh + fKnee) * shinLen
+    val bKneeRelY = cos(bThigh) * thighLen
+    val bAnkleRelY = bKneeRelY + cos(bThigh + bKnee) * shinLen
+    val maxLegReachY = kotlin.math.max(fAnkleRelY, bAnkleRelY).coerceAtLeast(18f)
+
+    // Subtle 60fps double-frequency runner flight bounce at peak split (abs(sin(phase)) == 1)
+    val flightBounce = kotlin.math.abs(sin(phase)) * 3.4f * (1f - airFactor)
+    val crouchDrop = crouchFactor * 4.5f
 
     val slopePitch = if (stickman.isGrounded) {
-      (stickman.slopeRadians * 0.55f).coerceIn(-0.42f, 0.42f)
+      (stickman.slopeRadians * 0.55f).coerceIn(-0.38f, 0.38f)
     } else {
-      (stickman.velocityY / 950f).coerceIn(-0.32f, 0.38f)
+      (stickman.velocityY / 1100f).coerceIn(-0.26f, 0.30f)
     }
 
-    val totalTorsoAngle = pose.torsoLean + slopePitch
-    val torsoLen = 21.5f
-    val hipWX = stickman.footX - 3.5f
-    val hipWY = stickman.footY + pose.hipOffsetY
+    // Balanced athletic forward tilt (~16 degrees, matching video_run_strip.jpg)
+    val baseTorsoTilt = 0.27f + (if (isBoosted) 0.10f else 0f) + crouchFactor * 0.14f
+    val totalTorsoAngle = baseTorsoTilt + slopePitch
+    val torsoLen = 20.5f
+
+    val hipWX = stickman.footX - 2.0f
+    val hipWY = stickman.footY - maxLegReachY - flightBounce + crouchDrop
     val shWX = hipWX + sin(totalTorsoAngle) * torsoLen
     val shWY = hipWY - cos(totalTorsoAngle) * torsoLen
-    val hdWX = shWX + sin(totalTorsoAngle) * 7.5f + 2.0f
-    val hdWY = shWY - cos(totalTorsoAngle) * 9.5f - 2.5f
+    val hdWX = shWX + sin(totalTorsoAngle) * 6.5f + 1.2f
+    val hdWY = shWY - cos(totalTorsoAngle) * 9.5f - 2.2f
 
-    // 1. Roaring Fiery Red-Orange Aura, Bio-Lightning & Speed Lines
+    // 1. Roaring 60 FPS Fiery Red-Orange Aura
     val auraIntensity = when {
-      isBoosted -> 1.45f
-      isLanding -> 1.35f
-      isJumping || isFalling -> 1.15f
-      else -> 1.02f
+      isBoosted -> 1.40f
+      crouchFactor > 0.2f -> 1.25f
+      airFactor > 0.2f -> 1.10f
+      else -> 0.98f
     }
     drawFieryFightingAura(
       centerWorldX = stickman.footX,
       footWorldY = stickman.footY,
       intensity = auraIntensity,
-      leanBackX = -11f,
+      leanBackX = -8f,
       isBoosted = isBoosted
     )
 
-    // High-speed anime dash lines & ground dust puffs while sprinting
-    if (stickman.isGrounded) {
-      for (s in 0..2) {
-        val streakPhase = ((phase * 1.9f + s * 0.8f) % 1f)
-        val sx = toScreenX(stickman.footX - 18f - streakPhase * 34f - s * 9f)
-        val sy = toScreenY(stickman.footY - 12f - s * 16f)
-        drawLine(
-          color = (if (s % 2 == 0) auraOrange else bodyWhite).copy(alpha = 0.55f * (1f - streakPhase)),
-          start = Offset(sx, sy),
-          end = Offset(sx - (18f + s * 6f) * worldScale, sy),
-          strokeWidth = 2.2f * worldScale,
-          cap = StrokeCap.Round
-        )
-      }
-      // Footstrike dust puff & pebble kick
-      val puffAlpha = (1f - ((phase % PI.toFloat()) / PI.toFloat())).coerceIn(0f, 1f)
-      val dustX = toScreenX(stickman.footX - 14f - (1f - puffAlpha) * 22f)
-      val dustY = toScreenY(stickman.footY - 4f)
-      drawCircle(dustTaupe.copy(alpha = 0.65f * puffAlpha), (4.5f + (1f - puffAlpha) * 5f) * worldScale, Offset(dustX, dustY))
-      if (isLanding) {
-        drawCircle(auraYellow, 7.0f * worldScale, Offset(toScreenX(stickman.footX + 8f), toScreenY(stickman.footY - 2f)))
-      }
-    }
+    // 2. Compute Articulated Joint Coordinates
+    val fKneX = hipWX + sin(fThigh) * thighLen
+    val fKneY = hipWY + fKneeRelY
+    val fAnkX = fKneX + sin(fThigh + fKnee) * shinLen
+    val fAnkY = hipWY + fAnkleRelY
 
-    // 2. Compute Articulated Joint Coordinates from the Active Keyframe
-    val thighLen = 13.8f
-    val shinLen = 13.8f
-    val upperArmLen = 11.8f
-    val foreArmLen = 11.8f
+    val bKneX = hipWX + sin(bThigh) * thighLen
+    val bKneY = hipWY + bKneeRelY
+    val bAnkX = bKneX + sin(bThigh + bKnee) * shinLen
+    val bAnkY = hipWY + bAnkleRelY
 
-    val fKneX = hipWX + sin(pose.frontThigh) * thighLen
-    val fKneY = hipWY + cos(pose.frontThigh) * thighLen
-    val fShnAng = pose.frontThigh + pose.frontKnee
-    val fAnkX = fKneX + sin(fShnAng) * shinLen
-    val fAnkY = fKneY + cos(fShnAng) * shinLen
+    val fElbX = shWX + sin(fArm) * upperArmLen
+    val fElbY = shWY + cos(fArm) * upperArmLen
+    val fHndX = fElbX + sin(fArm + fElbow) * foreArmLen
+    val fHndY = fElbY + cos(fArm + fElbow) * foreArmLen
 
-    val bKneX = hipWX + sin(pose.backThigh) * thighLen
-    val bKneY = hipWY + cos(pose.backThigh) * thighLen
-    val bShnAng = pose.backThigh + pose.backKnee
-    val bAnkX = bKneX + sin(bShnAng) * shinLen
-    val bAnkY = bKneY + cos(bShnAng) * shinLen
+    val bElbX = shWX + sin(bArm) * upperArmLen
+    val bElbY = shWY + cos(bArm) * upperArmLen
+    val bHndX = bElbX + sin(bArm + bElbow) * foreArmLen
+    val bHndY = bElbY + cos(bArm + bElbow) * foreArmLen
 
-    val fElbX = shWX + sin(pose.frontArm) * upperArmLen
-    val fElbY = shWY + cos(pose.frontArm) * upperArmLen
-    val fForAng = pose.frontArm + pose.frontElbow
-    val fHndX = fElbX + sin(fForAng) * foreArmLen
-    val fHndY = fElbY + cos(fForAng) * foreArmLen
+    val windDrag = (-stickman.velocityX / 200f).coerceIn(-1.15f, -0.35f) + (stickman.velocityY / 700f).coerceIn(-0.35f, 0.45f)
+    val expression = if (isBoosted) 1 else 0
 
-    val bElbX = shWX + sin(pose.backArm) * upperArmLen
-    val bElbY = shWY + cos(pose.backArm) * upperArmLen
-    val bForAng = pose.backArm + pose.backElbow
-    val bHndX = bElbX + sin(bForAng) * foreArmLen
-    val bHndY = bElbY + cos(bForAng) * foreArmLen
-
-    val windDrag = (-stickman.velocityX / 170f).coerceIn(-1.45f, -0.35f) + (stickman.velocityY / 600f).coerceIn(-0.4f, 0.5f)
-
-    // 3. Render Complete 2D Cartoon Body with Thick Black Outlines, White Body, and Expressive Face
+    // 3. Render Complete 2D Cartoon Body
     renderCartoonBodyPose(
       hipWX = hipWX,
       hipWY = hipWY,
@@ -1641,7 +1508,7 @@ object SketchbookRenderer {
       faceDirX = 1f,
       expression = expression,
       hasHair = true,
-      headTilt = totalTorsoAngle * 0.42f,
+      headTilt = totalTorsoAngle * 0.35f,
       windDrag = windDrag
     )
   }

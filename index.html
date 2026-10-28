@@ -1554,7 +1554,7 @@
         };
       }
 
-      const phaseAdvance = grounded ? dt * (vx / 9.5) : dt * 7.5;
+      const phaseAdvance = grounded ? dt * (vx / 20.5) : dt * (vx / 23.5);
       return {
         ...st,
         footX: newX,
@@ -2565,23 +2565,52 @@
       }
     }
 
-    const SPRINT_KEYFRAMES = [
-      // Frame 0: Power Drive Contact A (Front foot strikes & drives, Back knee rockets up)
-      { torsoLean: 0.64, hipOffsetY: -21.0, frontThigh: 0.28, frontKnee: -0.32, backThigh: 1.36, backKnee: -1.22, frontArm: -0.98, frontElbow: 0.82, backArm: 0.96, backElbow: 1.12 },
-      // Frame 1: Explosive Push-Off A (Front leg blasts far behind, Back leg extends forward)
-      { torsoLean: 0.68, hipOffsetY: -25.0, frontThigh: -0.92, frontKnee: -0.14, backThigh: 1.16, backKnee: -0.58, frontArm: -1.28, frontElbow: 0.96, backArm: 1.22, backElbow: 0.92 },
-      // Frame 2: Airborne Dash Flight A (Wide mid-air split stride, peak flight)
-      { torsoLean: 0.62, hipOffsetY: -27.2, frontThigh: -1.18, frontKnee: -1.28, backThigh: 0.82, backKnee: -0.26, frontArm: -0.35, frontElbow: 1.05, backArm: 0.45, backElbow: 0.95 },
-      // Frame 3: Power Drive Contact B (Back foot strikes & drives, Front knee rockets up)
-      { torsoLean: 0.64, hipOffsetY: -21.0, frontThigh: 1.36, frontKnee: -1.22, backThigh: 0.28, backKnee: -0.32, frontArm: 0.96, frontElbow: 1.12, backArm: -0.98, backElbow: 0.82 },
-      // Frame 4: Explosive Push-Off B (Back leg blasts far behind, Front leg extends forward)
-      { torsoLean: 0.68, hipOffsetY: -25.0, frontThigh: 1.16, frontKnee: -0.58, backThigh: -0.92, backKnee: -0.14, frontArm: 1.22, frontElbow: 0.92, backArm: -1.28, backElbow: 0.96 },
-      // Frame 5: Airborne Dash Flight B (Wide mid-air split stride, peak flight)
-      { torsoLean: 0.62, hipOffsetY: -27.2, frontThigh: 0.82, frontKnee: -0.26, backThigh: -1.18, backKnee: -1.28, frontArm: 0.45, frontElbow: 0.95, backArm: -0.35, backElbow: 1.05 }
-    ];
+    // =========================================================================
+    // 60 FPS CONTINUOUS HARMONIC RUNNING KINEMATICS (Matches Reference Video)
+    // =========================================================================
+    // Instead of stepped keyframes that freeze or snap between frames, the
+    // runner uses C-infinity smooth trigonometric curves evaluated at 60 FPS:
+    // - Full stride cycle = 2*PI (~0.64s at base speed, 1 step = 0.32s).
+    // - Thighs swing smoothly from -0.66 rad (rear push-off) to +0.86 rad (front high knee).
+    // - Knees stay nearly straight (-0.10 rad) during front strike & rear extension,
+    //   and fold smoothly up to -1.26 rad (heel-to-glute figure-4 recovery) as the
+    //   leg swings forward from the rear.
+    // - Supporting foot is dynamically ground-anchored so feet never sink or float.
+    function computeSmoothLegAngles(legPhase, airFactor, vyNorm, crouchFactor) {
+      const s = Math.sin(legPhase);
+      const runThigh = s * 0.76 + 0.10;
+      const foldWave = (1 - Math.sin(legPhase - 0.52)) * 0.5;
+      const runKnee = -0.10 - (foldWave * foldWave) * 1.16;
+
+      const airThigh = runThigh * 0.65 + (s >= 0 ? 0.36 : -0.26) - vyNorm * 0.12;
+      const airKnee = s >= 0 ? -0.92 : -0.48;
+
+      const lerp = (a, b, t) => a + (b - a) * t;
+      let thigh = lerp(runThigh, airThigh, airFactor);
+      let knee = lerp(runKnee, airKnee, airFactor);
+
+      thigh += crouchFactor * 0.28;
+      knee -= crouchFactor * 0.42;
+      return { thigh, knee };
+    }
+
+    function computeSmoothArmAngles(armPhase, airFactor, crouchFactor) {
+      const s = Math.sin(armPhase);
+      const runShoulder = s * 0.88 - 0.08;
+      const runElbow = 0.88 + (s + 1) * 0.24;
+
+      const airShoulder = runShoulder * 0.72 - 0.22;
+      const airElbow = 1.05;
+
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const shoulder = lerp(runShoulder, airShoulder, airFactor) - crouchFactor * 0.25;
+      const elbow = lerp(runElbow, airElbow, airFactor) + crouchFactor * 0.22;
+      return { shoulder, elbow };
+    }
 
     function drawAnimatedStickman(stickman, toScreenX, toScreenY, worldScale) {
       const phase = stickman.runCyclePhase || 0;
+      const animTime = state.lavaAnimTime || 0;
       const outlineBlack = '#140707';
       const bodyWhite = '#FFFFFF';
       const backLimbGrey = '#BEC4CE';
@@ -2590,8 +2619,6 @@
       const auraOrange = '#FF6D00';
       const auraYellow = '#FFEA00';
       const rockDarkBrown = '#4E342E';
-
-      const lerp = (a, b, t) => a + (b - a) * t;
 
       function drawCartoonSegment(x1, y1, x2, y2, fillColor, thicknessWorld, pass, endCapRadiusWorld = 0) {
         const sx1 = toScreenX(x1), sy1 = toScreenY(y1);
@@ -2635,7 +2662,7 @@
         ctx.beginPath();
         ctx.moveTo(hx - r * 0.92, hy + r * 0.15);
         for (let i = 0; i < spikeAngles.length; i++) {
-          const flutter = Math.sin(phase * 3.2 + i * 0.9) * 0.05;
+          const flutter = Math.sin(animTime * 14.0 + phase * 1.5 + i * 0.9) * 0.045;
           const ang = spikeAngles[i] + headTilt + windDrag * 0.22 + flutter;
           const len = spikeLengths[i] * worldScale;
           const midAng = ang - 0.08;
@@ -2787,10 +2814,10 @@
         for (let i = 0; i <= 11; i++) {
           const t = i / 11;
           const ang = Math.PI + t * Math.PI;
-          const wave = Math.sin(phase * 3.8 + i * 1.9) * 7.5 * worldScale;
+          const wave = Math.sin(animTime * 16.0 + phase * 1.4 + i * 1.9) * 6.5 * worldScale;
           const spikeBoost = i % 2 === 1 ? 1.24 : 0.72;
           const rx = Math.cos(ang) * auraHalfW * spikeBoost + windTilt * (1 - Math.abs(t - 0.5)) + wave * 0.35;
-          const ry = Math.sin(ang) * auraH * spikeBoost - Math.abs(Math.cos(i * 1.4 + phase * 2.5)) * 14 * worldScale;
+          const ry = Math.sin(ang) * auraH * spikeBoost - Math.abs(Math.cos(i * 1.4 + animTime * 11.0)) * 13 * worldScale;
           ctx.lineTo(baseSX + rx, baseSY + ry * 0.94);
         }
         ctx.lineTo(baseSX + auraHalfW * 0.92, baseSY + 2 * worldScale);
@@ -2807,7 +2834,7 @@
         for (let i = 0; i <= 9; i++) {
           const t = i / 9;
           const ang = Math.PI + t * Math.PI;
-          const wave = Math.cos(phase * 4.6 + i * 2.3) * 5.5 * worldScale;
+          const wave = Math.cos(animTime * 19.0 + phase * 1.6 + i * 2.3) * 5.0 * worldScale;
           const spikeBoost = i % 2 === 0 ? 1.18 : 0.74;
           const rx = Math.cos(ang) * (auraHalfW * 0.72 * spikeBoost) + windTilt * 0.65 + wave * 0.3;
           const ry = Math.sin(ang) * (auraH * 0.78 * spikeBoost);
@@ -2822,7 +2849,7 @@
 
         // 4. Detached rising flame tongues / embers around the crown
         for (let f = 0; f <= 3; f++) {
-          const cycle = (phase * 1.8 + f * 1.57) % (Math.PI * 2);
+          const cycle = (animTime * 8.5 + f * 1.57) % (Math.PI * 2);
           const rise = cycle / (Math.PI * 2);
           const side = f % 2 === 0 ? -1 : 1;
           const fx = baseSX + side * (auraHalfW * (0.65 + 0.25 * (f % 3))) + windTilt * 0.5;
@@ -2840,16 +2867,16 @@
         ctx.fillStyle = `rgba(255, 234, 0, ${Math.min(0.85, 0.55 * intensity)})`;
         ctx.beginPath(); ctx.arc(baseSX, baseSY - 4 * worldScale, 12 * worldScale, 0, Math.PI * 2); ctx.fill();
 
-        const boltSeed = Math.floor(phase * 2.8);
+        const boltPhase = animTime * 12.0 + phase;
         for (let b = 0; b <= 2; b++) {
-          const side = (boltSeed + b) % 2 === 0 ? -1 : 1;
-          const sx = baseSX + side * (6 + b * 4) * worldScale;
-          const sy = baseSY - (14 + b * 18) * worldScale;
-          const m1x = sx + side * (11 + Math.sin(phase * 6 + b) * 5) * worldScale;
+          const side = b % 2 === 0 ? -1 : 1;
+          const sx = baseSX + side * (5 + b * 4) * worldScale;
+          const sy = baseSY - (14 + b * 17) * worldScale;
+          const m1x = sx + side * (9 + Math.sin(boltPhase + b * 2.1) * 4.5) * worldScale;
           const m1y = sy - 10 * worldScale;
-          const m2x = sx - side * 3 * worldScale;
+          const m2x = sx - side * 2.5 * worldScale;
           const m2y = m1y - 9 * worldScale;
-          const ex = m2x + side * 8 * worldScale;
+          const ex = m2x + side * (6 + Math.cos(boltPhase * 1.3 + b) * 3.5) * worldScale;
           const ey = m2y - 10 * worldScale;
 
           ctx.strokeStyle = `rgba(229, 28, 35, ${Math.min(1, 0.7 * intensity)})`;
@@ -2998,115 +3025,110 @@
       }
 
       // =======================================================================
-      // ACTIVE GAMEPLAY FRAMES: EXPLOSIVE 6-FRAME SPRINT, JUMP, FALL, LANDING
+      // ACTIVE GAMEPLAY: 60 FPS CONTINUOUS HARMONIC RUN, JUMP, FALL & LANDING
       // =======================================================================
       const isBoosted = stickman.boostTimer > 0 || stickman.blitzTimer > 0;
-      const isLanding = stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0;
-      const isJumping = !stickman.isGrounded && stickman.velocityY < -50;
-      const isFalling = !stickman.isGrounded && stickman.velocityY >= -50;
 
-      let pose;
-      let expression;
-      if (isLanding) {
-        pose = { torsoLean: 0.58, hipOffsetY: -16.5, frontThigh: 0.95, frontKnee: -1.05, backThigh: -0.52, backKnee: -1.25, frontArm: -0.95, frontElbow: 0.85, backArm: 0.55, backElbow: 0.95 };
-        expression = 0;
-      } else if (isJumping) {
-        pose = { torsoLean: 0.42, hipOffsetY: -26.5, frontThigh: 1.35, frontKnee: -1.25, backThigh: -0.78, backKnee: -0.22, frontArm: 1.25, frontElbow: 0.95, backArm: -1.15, backElbow: 0.85 };
-        expression = isBoosted ? 1 : 0;
-      } else if (isFalling) {
-        const airWave = Math.sin(phase * 2.4) * 0.14;
-        pose = { torsoLean: 0.48, hipOffsetY: -24.5, frontThigh: 0.72 + airWave, frontKnee: -0.88, backThigh: -0.55 - airWave, backKnee: -0.95, frontArm: -1.35 + airWave, frontElbow: 0.65, backArm: 1.15 - airWave, backElbow: 0.75 };
-        expression = 0;
-      } else {
-        const framePos = ((phase / (Math.PI / 3)) % 6 + 6) % 6;
-        const frameIdx = Math.floor(framePos) % 6;
-        const nextIdx = (frameIdx + 1) % 6;
-        const rawFrac = framePos - Math.floor(framePos);
-        const snapT = Math.max(0, Math.min(1, (rawFrac - 0.25) / 0.75));
-        const kfA = SPRINT_KEYFRAMES[frameIdx];
-        const kfB = SPRINT_KEYFRAMES[nextIdx];
-        pose = {
-          torsoLean: lerp(kfA.torsoLean, kfB.torsoLean, snapT),
-          hipOffsetY: lerp(kfA.hipOffsetY, kfB.hipOffsetY, snapT),
-          frontThigh: lerp(kfA.frontThigh, kfB.frontThigh, snapT),
-          frontKnee: lerp(kfA.frontKnee, kfB.frontKnee, snapT),
-          backThigh: lerp(kfA.backThigh, kfB.backThigh, snapT),
-          backKnee: lerp(kfA.backKnee, kfB.backKnee, snapT),
-          frontArm: lerp(kfA.frontArm, kfB.frontArm, snapT),
-          frontElbow: lerp(kfA.frontElbow, kfB.frontElbow, snapT),
-          backArm: lerp(kfA.backArm, kfB.backArm, snapT),
-          backElbow: lerp(kfA.backElbow, kfB.backElbow, snapT)
-        };
-        expression = isBoosted ? 1 : 0;
-      }
+      // Smooth continuous blend factors (no 1-frame boolean snaps!)
+      const airFactor = stickman.isGrounded ? 0 : Math.min(1, Math.max(0, Math.abs(stickman.velocityY) / 240));
+      const vyNorm = Math.min(1, Math.max(-1, stickman.velocityY / 420));
+      const crouchFactor = stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0
+        ? Math.sin(((stickman.landingSquashTimer || 0) / 0.26) * Math.PI)
+        : 0;
+      const expression = isBoosted ? 1 : 0;
 
+      // Evaluate 60 FPS continuous harmonic joint angles for Front & Back legs (PI out of phase)
+      const frontLeg = computeSmoothLegAngles(phase, airFactor, vyNorm, crouchFactor);
+      const backLeg = computeSmoothLegAngles(phase + Math.PI, airFactor, vyNorm, crouchFactor);
+
+      // Opposite arm swing (Front Arm paired with Back Leg, Back Arm paired with Front Leg)
+      const frontArm = computeSmoothArmAngles(phase + Math.PI, airFactor, crouchFactor);
+      const backArm = computeSmoothArmAngles(phase, airFactor, crouchFactor);
+
+      const thighLen = 13.8, shinLen = 13.8, upperArmLen = 11.6, foreArmLen = 11.4;
+
+      // Relative leg positions from hip
+      const fKneRelX = Math.sin(frontLeg.thigh) * thighLen;
+      const fKneRelY = Math.cos(frontLeg.thigh) * thighLen;
+      const fShnAng = frontLeg.thigh + frontLeg.knee;
+      const fAnkRelX = fKneRelX + Math.sin(fShnAng) * shinLen;
+      const fAnkRelY = fKneRelY + Math.cos(fShnAng) * shinLen;
+
+      const bKneRelX = Math.sin(backLeg.thigh) * thighLen;
+      const bKneRelY = Math.cos(backLeg.thigh) * thighLen;
+      const bShnAng = backLeg.thigh + backLeg.knee;
+      const bAnkRelX = bKneRelX + Math.sin(bShnAng) * shinLen;
+      const bAnkRelY = bKneRelY + Math.cos(bShnAng) * shinLen;
+
+      // Ground-anchored hip height: lowest foot touches ground during stance, with smooth flight bounce at peak split
+      const maxLegReachY = Math.max(fAnkRelY, bAnkRelY);
+      const strideFlightBounce = (1 - airFactor) * Math.abs(Math.sin(phase)) * 3.4;
+      const crouchDrop = crouchFactor * 3.5;
+
+      const hipWX = stickman.footX - 1.5;
+      const hipWY = stickman.footY - maxLegReachY - strideFlightBounce + crouchDrop;
+
+      // Balanced athletic forward lean matching the video (~16 degrees = 0.27 rad)
+      const speedRatio = Math.min(1.35, Math.max(0.8, stickman.velocityX / BASE_RUN_SPEED));
+      const baseTorsoTilt = 0.25 * speedRatio + (isBoosted ? 0.08 : 0) + crouchFactor * 0.14;
       const slopePitch = stickman.isGrounded
-        ? Math.max(-0.42, Math.min(0.42, stickman.slopeRadians * 0.55))
-        : Math.max(-0.32, Math.min(0.38, stickman.velocityY / 950));
+        ? Math.max(-0.35, Math.min(0.35, stickman.slopeRadians * 0.50))
+        : Math.max(-0.22, Math.min(0.26, vyNorm * 0.22));
+      const totalTorsoAngle = baseTorsoTilt + slopePitch + Math.sin(phase * 2) * 0.025;
 
-      const totalTorsoAngle = pose.torsoLean + slopePitch;
-      const torsoLen = 21.5;
-      const hipWX = stickman.footX - 3.5;
-      const hipWY = stickman.footY + pose.hipOffsetY;
+      const torsoLen = 21.0;
       const shWX = hipWX + Math.sin(totalTorsoAngle) * torsoLen;
       const shWY = hipWY - Math.cos(totalTorsoAngle) * torsoLen;
-      const hdWX = shWX + Math.sin(totalTorsoAngle) * 7.5 + 2.0;
-      const hdWY = shWY - Math.cos(totalTorsoAngle) * 9.5 - 2.5;
+      const hdWX = shWX + Math.sin(totalTorsoAngle * 0.65) * 9.5 + 1.2;
+      const hdWY = shWY - Math.cos(totalTorsoAngle * 0.65) * 10.5 - 1.5;
 
-      const auraIntensity = isBoosted ? 1.45 : (isLanding ? 1.35 : (isJumping || isFalling ? 1.15 : 1.02));
-      drawFieryFightingAura(stickman.footX, stickman.footY, auraIntensity, -11, isBoosted);
+      const auraIntensity = isBoosted ? 1.38 : (crouchFactor > 0.2 ? 1.25 : 1.02);
+      drawFieryFightingAura(stickman.footX, stickman.footY, auraIntensity, -8, isBoosted);
 
       if (stickman.isGrounded) {
         for (let s = 0; s <= 2; s++) {
-          const streakPhase = (phase * 1.9 + s * 0.8) % 1;
-          const sx = toScreenX(stickman.footX - 18 - streakPhase * 34 - s * 9);
-          const sy = toScreenY(stickman.footY - 12 - s * 16);
+          const streakPhase = (animTime * 3.2 + s * 0.33) % 1;
+          const sx = toScreenX(stickman.footX - 16 - streakPhase * 32 - s * 8);
+          const sy = toScreenY(stickman.footY - 12 - s * 15);
           ctx.strokeStyle = s % 2 === 0
-            ? `rgba(255, 109, 0, ${0.55 * (1 - streakPhase)})`
-            : `rgba(255, 255, 255, ${0.55 * (1 - streakPhase)})`;
-          ctx.lineWidth = 2.2 * worldScale;
+            ? `rgba(255, 109, 0, ${0.50 * (1 - streakPhase)})`
+            : `rgba(255, 255, 255, ${0.50 * (1 - streakPhase)})`;
+          ctx.lineWidth = 2.0 * worldScale;
           ctx.beginPath();
           ctx.moveTo(sx, sy);
-          ctx.lineTo(sx - (18 + s * 6) * worldScale, sy);
+          ctx.lineTo(sx - (16 + s * 5) * worldScale, sy);
           ctx.stroke();
         }
-        const puffAlpha = Math.max(0, Math.min(1, 1 - ((phase % Math.PI) / Math.PI)));
-        const dustX = toScreenX(stickman.footX - 14 - (1 - puffAlpha) * 22);
-        const dustY = toScreenY(stickman.footY - 4);
-        ctx.fillStyle = `rgba(141, 123, 104, ${0.65 * puffAlpha})`;
-        ctx.beginPath(); ctx.arc(dustX, dustY, (4.5 + (1 - puffAlpha) * 5) * worldScale, 0, Math.PI * 2); ctx.fill();
-        if (isLanding) {
-          ctx.fillStyle = auraYellow;
-          ctx.beginPath(); ctx.arc(toScreenX(stickman.footX + 8), toScreenY(stickman.footY - 2), 7.0 * worldScale, 0, Math.PI * 2); ctx.fill();
+        const stepWave = ((phase % Math.PI) + Math.PI) % Math.PI;
+        const puffAlpha = Math.max(0, Math.min(1, 1 - (stepWave / Math.PI)));
+        const dustX = toScreenX(stickman.footX - 12 - (1 - puffAlpha) * 20);
+        const dustY = toScreenY(stickman.footY - 3.5);
+        ctx.fillStyle = `rgba(141, 123, 104, ${0.58 * puffAlpha})`;
+        ctx.beginPath(); ctx.arc(dustX, dustY, (4.0 + (1 - puffAlpha) * 4.5) * worldScale, 0, Math.PI * 2); ctx.fill();
+        if (crouchFactor > 0.25) {
+          ctx.fillStyle = `rgba(255, 234, 0, ${crouchFactor * 0.85})`;
+          ctx.beginPath(); ctx.arc(toScreenX(stickman.footX + 6), toScreenY(stickman.footY - 2), 6.5 * worldScale, 0, Math.PI * 2); ctx.fill();
         }
       }
 
-      const thighLen = 13.8, shinLen = 13.8, upperArmLen = 11.8, foreArmLen = 11.8;
-      const fKneX = hipWX + Math.sin(pose.frontThigh) * thighLen;
-      const fKneY = hipWY + Math.cos(pose.frontThigh) * thighLen;
-      const fShnAng = pose.frontThigh + pose.frontKnee;
-      const fAnkX = fKneX + Math.sin(fShnAng) * shinLen;
-      const fAnkY = fKneY + Math.cos(fShnAng) * shinLen;
+      const fKneX = hipWX + fKneRelX, fKneY = hipWY + fKneRelY;
+      const fAnkX = hipWX + fAnkRelX, fAnkY = hipWY + fAnkRelY;
+      const bKneX = hipWX + bKneRelX, bKneY = hipWY + bKneRelY;
+      const bAnkX = hipWX + bAnkRelX, bAnkY = hipWY + bAnkRelY;
 
-      const bKneX = hipWX + Math.sin(pose.backThigh) * thighLen;
-      const bKneY = hipWY + Math.cos(pose.backThigh) * thighLen;
-      const bShnAng = pose.backThigh + pose.backKnee;
-      const bAnkX = bKneX + Math.sin(bShnAng) * shinLen;
-      const bAnkY = bKneY + Math.cos(bShnAng) * shinLen;
-
-      const fElbX = shWX + Math.sin(pose.frontArm) * upperArmLen;
-      const fElbY = shWY + Math.cos(pose.frontArm) * upperArmLen;
-      const fForAng = pose.frontArm + pose.frontElbow;
+      const fElbX = shWX + Math.sin(frontArm.shoulder) * upperArmLen;
+      const fElbY = shWY + Math.cos(frontArm.shoulder) * upperArmLen;
+      const fForAng = frontArm.shoulder + frontArm.elbow;
       const fHndX = fElbX + Math.sin(fForAng) * foreArmLen;
       const fHndY = fElbY + Math.cos(fForAng) * foreArmLen;
 
-      const bElbX = shWX + Math.sin(pose.backArm) * upperArmLen;
-      const bElbY = shWY + Math.cos(pose.backArm) * upperArmLen;
-      const bForAng = pose.backArm + pose.backElbow;
+      const bElbX = shWX + Math.sin(backArm.shoulder) * upperArmLen;
+      const bElbY = shWY + Math.cos(backArm.shoulder) * upperArmLen;
+      const bForAng = backArm.shoulder + backArm.elbow;
       const bHndX = bElbX + Math.sin(bForAng) * foreArmLen;
       const bHndY = bElbY + Math.cos(bForAng) * foreArmLen;
 
-      const windDrag = Math.max(-1.45, Math.min(-0.35, -stickman.velocityX / 170)) + Math.max(-0.4, Math.min(0.5, stickman.velocityY / 600));
+      const windDrag = Math.max(-1.25, Math.min(-0.35, -stickman.velocityX / 190)) + Math.max(-0.35, Math.min(0.4, vyNorm * 0.45));
 
       renderCartoonBodyPose(
         hipWX, hipWY, shWX, shWY, hdWX, hdWY,
@@ -3114,7 +3136,7 @@
         { x: bKneX, y: bKneY }, { x: bAnkX, y: bAnkY },
         { x: fElbX, y: fElbY }, { x: fHndX, y: fHndY },
         { x: bElbX, y: bElbY }, { x: bHndX, y: bHndY },
-        1, expression, true, totalTorsoAngle * 0.42, windDrag
+        1, expression, true, totalTorsoAngle * 0.35, windDrag
       );
     }
 

@@ -442,7 +442,7 @@ object PhysicsEngine {
         velocityY = resolvedVy,
         isGrounded = grounded,
         slopeRadians = resolvedSlope,
-        runCyclePhase = state.runCyclePhase + dt * 16f,
+        runCyclePhase = state.runCyclePhase + dt * 10.5f,
         hasReachedFinish = true,
         boostTimer = updatedBoostTimer,
         lowGravityTimer = nextLowGravTimer,
@@ -451,7 +451,7 @@ object PhysicsEngine {
       )
     }
 
-    val phaseAdvance = if (grounded) dt * (vx / 9.5f) else dt * 7.5f
+    val phaseAdvance = if (grounded) dt * (vx / 20.5f) else dt * (vx / 23.5f)
 
     return state.copy(
       footX = newX,
