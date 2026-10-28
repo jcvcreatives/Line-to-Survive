@@ -475,8 +475,14 @@ class GameViewModel(
         dt = clampedDt,
         emitFootsteps = false
       )
+      val updatedStickman = if (!state.stickman.isAlive) {
+        state.stickman.copy(deathTimer = (state.stickman.deathTimer + clampedDt).coerceAtMost(1.25f))
+      } else {
+        state.stickman
+      }
       updateState {
         it.copy(
+          stickman = updatedStickman,
           lavaAnimTime = nextLavaTime,
           embers = nextEmbers,
           sketchParticles = idleParticles

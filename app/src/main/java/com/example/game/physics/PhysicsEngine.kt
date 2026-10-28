@@ -382,10 +382,15 @@ object PhysicsEngine {
 
     // Apply special chalk surface properties (Blue Bounce or Gold Boost)
     var updatedBoostTimer = nextBoostTimer
+    var nextLandingSquash = (state.landingSquashTimer - dt).coerceAtLeast(0f)
     if (grounded) {
+      if (!state.isGrounded && state.velocityY > 110f) {
+        nextLandingSquash = 0.26f
+      }
       if (activeSurfaceTool == ChalkTool.SPRING) {
         resolvedVy = -530f
         grounded = false
+        nextLandingSquash = 0f
       } else if (activeSurfaceTool == ChalkTool.BOOST) {
         updatedBoostTimer = max(updatedBoostTimer, 0.55f)
       }
@@ -405,7 +410,9 @@ object PhysicsEngine {
               velocityX = 0f,
               velocityY = 0f,
               isGrounded = false,
-              isAlive = false
+              isAlive = false,
+              landingSquashTimer = 0f,
+              deathTimer = 0.01f
             )
           }
         }
@@ -420,7 +427,9 @@ object PhysicsEngine {
         velocityX = 0f,
         velocityY = 0f,
         isGrounded = false,
-        isAlive = false
+        isAlive = false,
+        landingSquashTimer = 0f,
+        deathTimer = 0.01f
       )
     }
 
@@ -437,7 +446,8 @@ object PhysicsEngine {
         hasReachedFinish = true,
         boostTimer = updatedBoostTimer,
         lowGravityTimer = nextLowGravTimer,
-        blitzTimer = nextBlitzTimer
+        blitzTimer = nextBlitzTimer,
+        landingSquashTimer = nextLandingSquash
       )
     }
 
@@ -453,7 +463,8 @@ object PhysicsEngine {
       runCyclePhase = state.runCyclePhase + phaseAdvance,
       boostTimer = updatedBoostTimer,
       lowGravityTimer = nextLowGravTimer,
-      blitzTimer = nextBlitzTimer
+      blitzTimer = nextBlitzTimer,
+      landingSquashTimer = nextLandingSquash
     )
   }
 

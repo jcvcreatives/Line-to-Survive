@@ -1213,7 +1213,9 @@
         hasReachedFinish: false,
         boostTimer: 0,
         lowGravityTimer: 0,
-        blitzTimer: 0
+        blitzTimer: 0,
+        landingSquashTimer: 0,
+        deathTimer: 0
       };
       state.cameraX = Math.max(0, lvl.spawnPosition.x - getVisibleWorldWidth() * CAMERA_LEAD_RATIO);
       state.completedLines = [];
@@ -1428,10 +1430,15 @@
       }
 
       let updatedBoost = nextBoostTimer;
+      let nextLandingSquash = Math.max(0, (st.landingSquashTimer || 0) - dt);
       if (grounded) {
+        if (!st.isGrounded && st.velocityY > 110) {
+          nextLandingSquash = 0.26;
+        }
         if (activeTool === 'SPRING') {
           resolvedVy = -530;
           grounded = false;
+          nextLandingSquash = 0;
           sound.playSpring();
         } else if (activeTool === 'BOOST') {
           updatedBoost = Math.max(updatedBoost, 0.55);
@@ -1454,7 +1461,9 @@
                 velocityX: 0,
                 velocityY: 0,
                 isGrounded: false,
-                isAlive: false
+                isAlive: false,
+                landingSquashTimer: 0,
+                deathTimer: 0.01
               };
             }
           }
@@ -1471,7 +1480,9 @@
           velocityX: 0,
           velocityY: 0,
           isGrounded: false,
-          isAlive: false
+          isAlive: false,
+          landingSquashTimer: 0,
+          deathTimer: 0.01
         };
       }
 
@@ -1488,7 +1499,8 @@
           hasReachedFinish: true,
           boostTimer: updatedBoost,
           lowGravityTimer: nextLowGravTimer,
-          blitzTimer: nextBlitzTimer
+          blitzTimer: nextBlitzTimer,
+          landingSquashTimer: nextLandingSquash
         };
       }
 
@@ -1504,7 +1516,8 @@
         runCyclePhase: st.runCyclePhase + phaseAdvance,
         boostTimer: updatedBoost,
         lowGravityTimer: nextLowGravTimer,
-        blitzTimer: nextBlitzTimer
+        blitzTimer: nextBlitzTimer,
+        landingSquashTimer: nextLandingSquash
       };
     }
 
@@ -2249,96 +2262,343 @@
     }
 
     function drawStickman(st) {
-      ctx.save();
-      ctx.translate(st.footX, st.footY);
-      ctx.rotate(st.slopeRadians * 0.45);
+      const phase = st.runCyclePhase || 0;
+      const outlineColor = '#1c0b0b';
+      const bodyWhite = '#fdfbf7';
+      const backLimbGrey = '#c5c8ce';
+      const hairCrimson = '#d50000';
+      const hairHighlight = '#ff3d00';
 
+      function drawOutlinedLimb(x1, y1, x2, y2, fillColor, thickness) {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = outlineColor;
+        ctx.lineWidth = thickness + 3.4;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        ctx.strokeStyle = fillColor;
+        ctx.lineWidth = thickness;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      function drawSpikyCrimsonHair(hx, hy, headAngleOffset, windDrag) {
+        const r = 10;
+        const spikeAngles = [-2.75, -2.35, -1.95, -1.55, -1.15, -0.78, -0.42];
+        const spikeLengths = [17, 23, 28, 26, 24, 19, 14];
+
+        ctx.beginPath();
+        ctx.moveTo(hx - r * 0.85, hy + r * 0.1);
+        for (let i = 0; i < spikeAngles.length; i++) {
+          const ang = spikeAngles[i] + headAngleOffset + windDrag * 0.18;
+          const len = spikeLengths[i];
+          const tipX = hx + Math.cos(ang) * len;
+          const tipY = hy + Math.sin(ang) * len;
+          const valAng = ang + 0.22;
+          const valLen = len * 0.48;
+          ctx.lineTo(tipX, tipY);
+          ctx.lineTo(hx + Math.cos(valAng) * valLen, hy + Math.sin(valAng) * valLen);
+        }
+        ctx.closePath();
+
+        ctx.strokeStyle = outlineColor;
+        ctx.lineWidth = 3.2;
+        ctx.stroke();
+        ctx.fillStyle = hairCrimson;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 61, 0, 0.55)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+
+      function drawKiAuraAndLightning(cx, footY, intensity, isBoosted) {
+        if (intensity <= 0.05) return;
+        const auraH = 74 + intensity * 22;
+        const auraHalfW = 26 + intensity * 14;
+
+        ctx.save();
+        ctx.fillStyle = isBoosted
+          ? `rgba(255, 213, 79, ${Math.min(0.32, 0.24 * intensity)})`
+          : `rgba(229, 57, 53, ${Math.min(0.32, 0.24 * intensity)})`;
+        ctx.beginPath();
+        ctx.arc(cx, footY - auraH * 0.45, auraHalfW * 1.45, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outer crimson flame crown
+        ctx.fillStyle = isBoosted
+          ? `rgba(255, 109, 0, ${Math.min(0.85, 0.52 * intensity)})`
+          : `rgba(229, 57, 53, ${Math.min(0.85, 0.52 * intensity)})`;
+        ctx.beginPath();
+        ctx.moveTo(cx - auraHalfW * 0.85, footY);
+        const spikes = 9;
+        for (let i = 0; i <= spikes; i++) {
+          const t = i / spikes;
+          const ang = Math.PI + t * Math.PI;
+          const jitter = Math.sin(phase * 4.5 + i * 1.7) * 6.5;
+          const rx = Math.cos(ang) * auraHalfW + jitter * 0.35;
+          const ry = Math.sin(ang) * auraH - Math.abs(Math.cos(i * 1.3 + phase * 3)) * 12;
+          ctx.lineTo(cx + rx, footY + ry * 0.92);
+        }
+        ctx.lineTo(cx + auraHalfW * 0.85, footY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner fiery orange-gold flame core
+        ctx.fillStyle = isBoosted
+          ? `rgba(255, 213, 79, ${Math.min(0.9, 0.62 * intensity)})`
+          : `rgba(255, 109, 0, ${Math.min(0.9, 0.62 * intensity)})`;
+        ctx.beginPath();
+        ctx.moveTo(cx - auraHalfW * 0.58, footY);
+        for (let i = 0; i <= 7; i++) {
+          const t = i / 7;
+          const ang = Math.PI + t * Math.PI;
+          const jitter = Math.cos(phase * 5.5 + i * 2.1) * 4.5;
+          const rx = Math.cos(ang) * (auraHalfW * 0.65) + jitter * 0.3;
+          const ry = Math.sin(ang) * (auraH * 0.78);
+          ctx.lineTo(cx + rx, footY + ry);
+        }
+        ctx.lineTo(cx + auraHalfW * 0.58, footY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Crackling white bio-lightning arcs
+        ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1, 0.85 * intensity)})`;
+        ctx.lineWidth = 1.8;
+        const boltSeed = Math.floor(phase * 3.5);
+        for (let b = 0; b <= 1; b++) {
+          const side = (boltSeed + b) % 2 === 0 ? -1 : 1;
+          const sx = cx + side * 8;
+          const sy = footY - (18 + b * 20);
+          const mx = sx + side * (10 + Math.sin(phase * 7 + b) * 5);
+          const my = sy - 12;
+          const ex = sx - side * 4;
+          const ey = my - 11;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(mx, my);
+          ctx.lineTo(ex, ey);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 3-Stage Death Animation (Matches Frames 1–6 of Goku God Sprite Sheet)
+      if (!st.isAlive) {
+        const dt = Math.min(1.25, st.deathTimer || 0);
+        const bx = st.footX;
+        const by = st.footY;
+
+        if (dt < 0.36) {
+          const collapseT = dt / 0.36;
+          drawKiAuraAndLightning(bx, by, 1.35, false);
+          const hipX = bx - 4 * collapseT;
+          const hipY = by - 22 + 8 * collapseT;
+          const shX = hipX + 6 + 4 * collapseT;
+          const shY = hipY - 19 + 6 * collapseT;
+          const hdX = shX + 3;
+          const hdY = shY - 11;
+
+          drawOutlinedLimb(hipX, hipY, hipX - 10, by - 2, backLimbGrey, 4.6);
+          drawOutlinedLimb(hipX - 10, by - 2, hipX - 22, by - 2, backLimbGrey, 4.4);
+          drawOutlinedLimb(shX, shY, shX - 13, shY + 6, backLimbGrey, 4.0);
+          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
+          drawOutlinedLimb(hipX, hipY, hipX + 11, hipY + 4, bodyWhite, 4.6);
+          drawOutlinedLimb(hipX + 11, hipY + 4, hipX + 13, by, bodyWhite, 4.4);
+          drawOutlinedLimb(shX, shY, shX - 9, shY + 11, bodyWhite, 4.2);
+
+          drawSpikyCrimsonHair(hdX, hdY, 0.15, -0.3);
+          ctx.fillStyle = outlineColor;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+        } else if (dt < 0.72) {
+          const burstT = (dt - 0.36) / 0.36;
+          drawKiAuraAndLightning(bx, by, 1.5 * (1 - burstT * 0.5), true);
+          const hipX = bx;
+          const hipY = by - 6;
+          const shX = hipX - 20;
+          const shY = by - 7;
+          const hdX = shX - 11;
+          const hdY = by - 9;
+
+          drawOutlinedLimb(hipX, hipY, hipX + 20, by - 4, backLimbGrey, 4.5);
+          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
+          drawOutlinedLimb(hipX, hipY, hipX + 22, by - 2, bodyWhite, 4.6);
+          drawOutlinedLimb(shX, shY, shX + 10, by - 2, bodyWhite, 4.0);
+
+          drawSpikyCrimsonHair(hdX, hdY, -1.1, -0.8);
+          ctx.fillStyle = outlineColor;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+
+          const shardAngles = [-2.5, -2.0, -1.4, -0.9, -0.5];
+          shardAngles.forEach((ang, i) => {
+            const dist = 18 + burstT * 48 + i * 5;
+            const rx = bx + Math.cos(ang) * dist;
+            const ry = by + Math.sin(ang) * dist;
+            ctx.fillStyle = '#3e2f28';
+            ctx.beginPath(); ctx.arc(rx, ry, 4.5, 0, Math.PI * 2); ctx.fill();
+          });
+        } else {
+          const hipX = bx;
+          const hipY = by - 5;
+          const shX = hipX - 22;
+          const shY = by - 5;
+          const hdX = shX - 12;
+          const hdY = by - 8;
+
+          drawOutlinedLimb(hipX, hipY, hipX + 16, by - 9, backLimbGrey, 4.4);
+          drawOutlinedLimb(hipX + 16, by - 9, hipX + 25, by - 3, backLimbGrey, 4.2);
+          drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
+          drawOutlinedLimb(hipX, hipY, hipX + 24, by - 3, bodyWhite, 4.6);
+          drawOutlinedLimb(shX, shY, shX + 12, by - 2, bodyWhite, 4.0);
+
+          drawSpikyCrimsonHair(hdX, hdY, -1.25, -1.0);
+          ctx.fillStyle = outlineColor;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = bodyWhite;
+          ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+        }
+        return;
+      }
+
+      // Active Gameplay States: Running, Jumping, Falling, Landing Squash
       const isBoosted = st.boostTimer > 0 || st.blitzTimer > 0;
-      const strokeColor = isBoosted ? '#ffd54f' : '#ffffff';
+      const isLanding = st.isGrounded && (st.landingSquashTimer || 0) > 0;
+      const isJumping = !st.isGrounded && st.velocityY < -50;
+      const isFalling = !st.isGrounded && st.velocityY >= -50;
 
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 4.2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      const squashProgress = isLanding ? Math.min(1, st.landingSquashTimer / 0.26) : 0;
+      const squashDrop = Math.sin(squashProgress * Math.PI) * 10;
+      const runBounce = (st.isGrounded && !isLanding) ? Math.abs(Math.sin(phase * 2)) * 4.2 : 0;
 
-      const hipY = -22;
-      const shoulderY = -44;
-      const headCenterY = -55;
+      const pitchAngle = st.isGrounded
+        ? Math.max(-0.45, Math.min(0.45, st.slopeRadians * 0.65))
+        : Math.max(-0.38, Math.min(0.42, st.velocityY / 900));
+      const speedLean = Math.max(0.6, Math.min(1.45, st.velocityX / 180)) * 6.5 + squashDrop * 0.4;
 
-      // Running limb swing angles
-      const swing = Math.sin(st.runCyclePhase) * 0.75;
-      const kneeBend = Math.cos(st.runCyclePhase) * 0.35;
+      const hipX = st.footX - 2;
+      const hipY = st.footY - 24 - runBounce + squashDrop;
+      const torsoLen = 21 - squashDrop * 0.25;
+      const shX = hipX + speedLean + Math.sin(pitchAngle) * torsoLen;
+      const shY = hipY - Math.cos(pitchAngle) * torsoLen;
+      const hdX = shX + 2.8 + Math.sin(pitchAngle) * 4;
+      const hdY = shY - 11;
 
-      // Back Leg
+      const auraIntensity = isBoosted ? 1.35 : (isLanding ? 1.25 : (isJumping || isFalling ? 1.05 : 0.85));
+      drawKiAuraAndLightning(st.footX, st.footY, auraIntensity, isBoosted);
+
+      function getLegJoints(legIdx) {
+        const legPhase = phase + legIdx * Math.PI;
+        let thighAngle, kneeBend;
+        if (isLanding) {
+          thighAngle = legIdx === 0 ? 0.78 : -0.45;
+          kneeBend = legIdx === 0 ? -0.95 : -1.15;
+        } else if (isJumping) {
+          thighAngle = legIdx === 0 ? 0.95 : -0.42;
+          kneeBend = legIdx === 0 ? -1.1 : -0.25;
+        } else if (isFalling) {
+          const flutter = Math.sin(phase * 1.8 + legIdx * Math.PI) * 0.18;
+          thighAngle = (legIdx === 0 ? 0.48 : -0.32) + flutter;
+          kneeBend = -0.68;
+        } else {
+          thighAngle = Math.sin(legPhase) * 0.82 + 0.16 + pitchAngle * 0.5;
+          kneeBend = Math.min(-0.08, -Math.cos(legPhase) * 0.58 - 0.48);
+        }
+        const kx = hipX + Math.sin(thighAngle) * 13.5;
+        const ky = hipY + Math.cos(thighAngle) * 13.5;
+        const sa = thighAngle + kneeBend;
+        return { kx, ky, ax: kx + Math.sin(sa) * 13.5, ay: ky + Math.cos(sa) * 13.5 };
+      }
+
+      function getArmJoints(armIdx) {
+        const armPhase = phase + (armIdx + 1) * Math.PI;
+        let upperAngle, elbowBend;
+        if (isLanding) {
+          upperAngle = armIdx === 0 ? 0.45 : -0.85;
+          elbowBend = 0.85;
+        } else if (isJumping) {
+          upperAngle = armIdx === 0 ? 0.85 : -0.95;
+          elbowBend = 0.95;
+        } else if (isFalling) {
+          const wave = Math.cos(phase * 2.2 + armIdx) * 0.22;
+          upperAngle = (armIdx === 0 ? 1.85 : -1.65) + wave;
+          elbowBend = 0.45;
+        } else {
+          upperAngle = Math.sin(armPhase) * 0.78 + 0.08;
+          elbowBend = 0.82 + Math.cos(armPhase) * 0.25;
+        }
+        const ex = shX + Math.sin(upperAngle) * 11.5;
+        const ey = shY + Math.cos(upperAngle) * 11.5;
+        const fa = upperAngle + elbowBend;
+        return { ex, ey, hx: ex + Math.sin(fa) * 11.5, hy: ey + Math.cos(fa) * 11.5 };
+      }
+
+      // Rear Arm & Rear Leg (shaded grey for depth)
+      const backArm = getArmJoints(1);
+      drawOutlinedLimb(shX, shY, backArm.ex, backArm.ey, backLimbGrey, 3.8);
+      drawOutlinedLimb(backArm.ex, backArm.ey, backArm.hx, backArm.hy, backLimbGrey, 3.6);
+
+      const backLeg = getLegJoints(1);
+      drawOutlinedLimb(hipX, hipY, backLeg.kx, backLeg.ky, backLimbGrey, 4.4);
+      drawOutlinedLimb(backLeg.kx, backLeg.ky, backLeg.ax, backLeg.ay, backLimbGrey, 4.2);
+
+      // Torso & Front Leg
+      drawOutlinedLimb(hipX, hipY, shX, shY, bodyWhite, 5.2);
+      const frontLeg = getLegJoints(0);
+      drawOutlinedLimb(hipX, hipY, frontLeg.kx, frontLeg.ky, bodyWhite, 4.5);
+      drawOutlinedLimb(frontLeg.kx, frontLeg.ky, frontLeg.ax, frontLeg.ay, bodyWhite, 4.3);
+
+      // Spiky Crimson Hair + Outlined Head + Fierce Eyes
+      const windDrag = Math.max(-1.2, Math.min(0, -st.velocityX / 220)) + Math.max(-0.5, Math.min(0.6, st.velocityY / 600));
+      drawSpikyCrimsonHair(hdX, hdY, pitchAngle * 0.5, windDrag);
+
+      ctx.fillStyle = outlineColor;
+      ctx.beginPath(); ctx.arc(hdX, hdY, 11.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = bodyWhite;
+      ctx.beginPath(); ctx.arc(hdX, hdY, 10, 0, Math.PI * 2); ctx.fill();
+
+      // Intense V-brow & crimson eye
+      const eyeX = hdX + 3.6;
+      const eyeY = hdY - 0.5;
+      ctx.strokeStyle = outlineColor;
+      ctx.lineWidth = 2.0;
       ctx.beginPath();
-      ctx.moveTo(0, hipY);
-      ctx.lineTo(-Math.sin(swing) * 12, hipY + 11);
-      ctx.lineTo(-Math.sin(swing - kneeBend) * 16, 0);
+      ctx.moveTo(eyeX - 3.5, eyeY - 3.2);
+      ctx.lineTo(eyeX + 2.2, eyeY - 1.0);
       ctx.stroke();
+      ctx.fillStyle = hairCrimson;
+      ctx.beginPath(); ctx.arc(eyeX, eyeY + 0.6, 1.9, 0, Math.PI * 2); ctx.fill();
 
-      // Front Leg
-      ctx.beginPath();
-      ctx.moveTo(0, hipY);
-      ctx.lineTo(Math.sin(swing) * 12, hipY + 11);
-      ctx.lineTo(Math.sin(swing + kneeBend) * 16, 0);
-      ctx.stroke();
-
-      // Spine
-      ctx.beginPath();
-      ctx.moveTo(0, hipY);
-      ctx.lineTo(3, shoulderY);
-      ctx.stroke();
-
-      // Arms
-      ctx.beginPath();
-      ctx.moveTo(3, shoulderY);
-      ctx.lineTo(3 + Math.cos(st.runCyclePhase) * 13, shoulderY + 12);
-      ctx.moveTo(3, shoulderY);
-      ctx.lineTo(3 - Math.cos(st.runCyclePhase) * 13, shoulderY + 12);
-      ctx.stroke();
-
-      // Red Bandana flutter
-      ctx.strokeStyle = '#ff5252';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-4, headCenterY + 2);
-      ctx.quadraticCurveTo(
-        -16,
-        headCenterY + Math.sin(st.runCyclePhase * 1.5) * 6,
-        -24,
-        headCenterY + 5
-      );
-      ctx.stroke();
-
-      // Head Circle
-      ctx.fillStyle = '#18221e';
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 3.8;
-      ctx.beginPath();
-      ctx.arc(4, headCenterY, 9.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      // Front Arm
+      const frontArm = getArmJoints(0);
+      drawOutlinedLimb(shX, shY, frontArm.ex, frontArm.ey, bodyWhite, 4.0);
+      drawOutlinedLimb(frontArm.ex, frontArm.ey, frontArm.hx, frontArm.hy, bodyWhite, 3.8);
 
       // Active Callout Speech Bubble
       if (state.activeCallout) {
         ctx.save();
-        ctx.rotate(-st.slopeRadians * 0.45);
+        ctx.translate(st.footX, st.footY);
         ctx.fillStyle = '#ffd54f';
         ctx.strokeStyle = '#18221e';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(-38, -96, 76, 24, 8);
+        ctx.roundRect(-38, -108, 76, 24, 8);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = '#18221e';
         ctx.font = '700 13px "Cabin Sketch", cursive';
         ctx.textAlign = 'center';
-        ctx.fillText(state.activeCallout.type + '!', 0, -80);
+        ctx.fillText(state.activeCallout.type + '!', 0, -92);
         ctx.restore();
       }
-
-      ctx.restore();
     }
 
     function drawScribbler(enemy) {
@@ -2597,6 +2857,9 @@
       if (state.screenState === 'PLAYING') {
         updatePhysics(dt);
       } else {
+        if (state.stickman && !state.stickman.isAlive) {
+          state.stickman.deathTimer = Math.min(1.25, (state.stickman.deathTimer || 0) + Math.min(0.033, dt));
+        }
         updateParticlesAndEmbers(Math.min(0.033, dt));
       }
 

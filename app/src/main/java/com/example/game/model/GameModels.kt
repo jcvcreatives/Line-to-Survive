@@ -216,7 +216,9 @@ data class StickmanState(
   val hasReachedFinish: Boolean = false,
   val boostTimer: Float = 0f,
   val lowGravityTimer: Float = 0f,
-  val blitzTimer: Float = 0f
+  val blitzTimer: Float = 0f,
+  val landingSquashTimer: Float = 0f,
+  val deathTimer: Float = 0f
 )
 
 /**
