@@ -768,6 +768,7 @@
     const DEFAULT_GROUND_Y = 420;
     const STICKMAN_HEIGHT = 58;
     const STICKMAN_HEAD_RADIUS = 10;
+    const BASE_RUN_SPEED = 175;
     const GRAVITY = 960;
     const MAX_FALL_SPEED = 680;
     const CAMERA_LEAD_RATIO = 0.24;
@@ -2107,6 +2108,14 @@
             ctx.lineTo(toScreenX(guide.points[i].x), toScreenY(guide.points[i].y));
           }
           ctx.stroke();
+          if (guide.caption) {
+            const midPt = guide.points[Math.floor(guide.points.length / 2)];
+            ctx.setLineDash([]);
+            ctx.font = `800 ${Math.max(10, Math.round(11 * worldScale))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(255, 202, 40, ${Math.min(0.95, pulseAlpha + 0.35)})`;
+            ctx.fillText(guide.caption, toScreenX(midPt.x), toScreenY(midPt.y - 16));
+          }
           ctx.restore();
         }
       }
@@ -2292,6 +2301,15 @@
       ctx.moveTo(left + 2 * worldScale, top + 3.5 * worldScale);
       ctx.lineTo(right - 2 * worldScale, top + 2.5 * worldScale);
       ctx.stroke();
+
+      if (platform.label) {
+        ctx.save();
+        ctx.font = `800 ${Math.max(10, Math.round(12 * worldScale))}px monospace`;
+        ctx.fillStyle = 'rgba(216, 219, 208, 0.42)';
+        ctx.textAlign = 'left';
+        ctx.fillText(platform.label, left + 16 * worldScale, top + 28 * worldScale);
+        ctx.restore();
+      }
     }
 
     function drawFinishLine(finishX, groundY, toScreenX, toScreenY, worldScale, w) {
