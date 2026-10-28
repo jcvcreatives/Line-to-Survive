@@ -50,6 +50,52 @@ object PhysicsEngine {
     val reachedFinish: Boolean = false
   )
 
+  /**
+   * Matter.js-inspired 2D rigid body representation for Compose physics simulation.
+   * Supports static oriented bounding boxes (OBBs) for drawn line segments and platforms,
+   * and dynamic circular/capsule bodies for the stickman runner.
+   */
+  data class MatterBody2D(
+    val id: Long,
+    val centerX: Float,
+    val centerY: Float,
+    val width: Float,
+    val height: Float,
+    val angleRadians: Float = 0f,
+    val isStatic: Boolean = true,
+    val restitution: Float = 0f,
+    val friction: Float = 0f,
+    val tool: ChalkTool = ChalkTool.WHITE
+  )
+
+  /**
+   * Converts a player-drawn polyline into a chain of Matter.js-equivalent static oriented
+   * segment bodies (`Bodies.rectangle(cx, cy, length, thickness, { isStatic: true, angle })`).
+   */
+  fun createMatterBodiesForLine(line: DrawnLine, thickness: Float = 8f): List<MatterBody2D> {
+    return line.segments.mapIndexedNotNull { index, seg ->
+      val dx = seg.end.x - seg.start.x
+      val dy = seg.end.y - seg.start.y
+      val len = sqrt(dx * dx + dy * dy)
+      if (len < 2f) {
+        null
+      } else {
+        MatterBody2D(
+          id = line.id * 1000L + index,
+          centerX = (seg.start.x + seg.end.x) * 0.5f,
+          centerY = (seg.start.y + seg.end.y) * 0.5f,
+          width = len + 4f,
+          height = thickness,
+          angleRadians = atan2(dy, dx),
+          isStatic = true,
+          restitution = if (line.tool == ChalkTool.SPRING) 1.15f else 0f,
+          friction = 0f,
+          tool = line.tool
+        )
+      }
+    }
+  }
+
 
   /**
    * Appends a new touch point in world coordinates while respecting both the per-stroke

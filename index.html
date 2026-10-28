@@ -1,0 +1,2609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f2c26" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Draw to Survive — Chalk Runner Evolved</title>
+  <!-- Google Fonts: Cabin Sketch & Patrick Hand -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cabin+Sketch:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+  <!-- Matter.js 2D Rigid-Body Physics Engine via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --wall: #141a17;
+      --slate: #23312b;
+      --slate-deep: #18221e;
+      --chalk: #f3efe6;
+      --chalk-dim: #a9b2a8;
+      --chalk-faint: rgba(243, 239, 230, 0.18);
+      --yellow: #ffd54f;
+      --cyan: #4dd0e1;
+      --pink: #ff6e6e;
+      --orange: #ff6d00;
+      --wood: #6d4628;
+      --wood-dark: #472c18;
+      --font-display: "Cabin Sketch", "Chalkboard SE", "Comic Sans MS", cursive, sans-serif;
+      --font-body: "Patrick Hand", "Chalkboard SE", "Comic Sans MS", cursive, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--wall);
+      color: var(--chalk);
+      font-family: var(--font-body);
+      touch-action: none;
+      overscroll-behavior: none;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 50% 35%, #283831 0%, #1b2621 70%, #141c18 100%);
+       overflow: hidden;
+    }
+
+    @media (min-width: 900px) and (min-height: 600px) {
+      #app {
+        box-shadow: inset 0 0 0 8px var(--wood), inset 0 0 0 11px var(--wood-dark), inset 0 0 70px rgba(0,0,0,0.55);
+      }
+    }
+
+    #gameCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    /* Top HUD Overlay */
+    .hud-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      z-index: 10;
+    }
+
+    .hud-top {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .hud-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(20, 26, 23, 0.84);
+      border: 1.5px solid rgba(243, 239, 230, 0.22);
+      border-radius: 16px;
+      padding: 8px 14px;
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .level-badge-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .level-pill {
+      background: rgba(255, 213, 79, 0.16);
+      border: 1.5px solid var(--yellow);
+      color: var(--yellow);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
+    }
+
+    .level-title-text {
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--chalk);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meters-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      max-width: 440px;
+      justify-content: center;
+    }
+
+    .meter-box {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+      min-width: 95px;
+    }
+
+    .meter-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--chalk-dim);
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .meter-track {
+      height: 9px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .meter-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.08s linear, background-color 0.2s ease;
+    }
+
+    .hud-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      pointer-events: auto;
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      border: 1.5px solid rgba(243, 239, 230, 0.24);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--chalk);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+      font-size: 17px;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: var(--chalk);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* Tool Dock Row */
+    .tool-dock-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tool-selector {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(20, 26, 23, 0.84);
+      border: 1.5px solid rgba(243, 239, 230, 0.2);
+      padding: 5px 8px;
+      border-radius: 14px;
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
+    }
+
+    .tool-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 11px;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--chalk-dim);
+      font-family: var(--font-body);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .tool-chip .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .tool-chip .kbd-hint {
+      font-size: 11px;
+      opacity: 0.65;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .tool-chip.active[data-tool="WHITE"] {
+      background: rgba(243, 239, 230, 0.18);
+      border-color: #f3efe6;
+      color: #ffffff;
+    }
+    .tool-chip.active[data-tool="SPRING"] {
+      background: rgba(77, 208, 225, 0.2);
+      border-color: #4dd0e1;
+      color: #80deea;
+    }
+    .tool-chip.active[data-tool="BOOST"] {
+      background: rgba(255, 213, 79, 0.22);
+      border-color: #ffd54f;
+      color: #ffe082;
+    }
+    .tool-chip.active[data-tool="CUTTER"] {
+      background: rgba(255, 110, 110, 0.22);
+      border-color: #ff6e6e;
+      color: #ff9e9e;
+    }
+
+    .status-pills {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .badge-pill {
+      background: rgba(20, 26, 23, 0.85);
+      border: 1.5px solid rgba(255, 213, 79, 0.45);
+      color: var(--yellow);
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .instruction-toast {
+      align-self: center;
+      background: rgba(20, 26, 23, 0.86);
+      border: 1.5px dashed rgba(255, 213, 79, 0.65);
+      color: var(--chalk);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 15px;
+      letter-spacing: 0.4px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      transition: opacity 0.3s ease;
+    }
+
+    /* Modal Overlays (Start, Pause, Game Over, Level Complete) */
+    .overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(14, 19, 17, 0.78);
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 30;
+    }
+
+    .overlay-backdrop[hidden] {
+      display: none !important;
+    }
+
+    .sketch-card {
+      width: 100%;
+      max-width: 500px;
+      background: #212e28;
+      border: 2.5px solid var(--chalk);
+      border-radius: 22px;
+      padding: 28px 26px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), inset 0 0 40px rgba(0, 0, 0, 0.25);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+    }
+
+    .eyebrow-tag {
+      font-family: var(--font-display);
+      font-size: 14px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: var(--yellow);
+      background: rgba(255, 213, 79, 0.12);
+      border: 1px solid rgba(255, 213, 79, 0.4);
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(32px, 6vw, 46px);
+      line-height: 1.02;
+      color: var(--chalk);
+      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-subtitle {
+      margin: 0;
+      font-size: 17px;
+      color: var(--chalk-dim);
+      max-width: 38ch;
+      line-height: 1.35;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      margin: 4px 0;
+    }
+
+    .feature-item {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(243, 239, 230, 0.14);
+      border-radius: 12px;
+      padding: 8px 11px;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .feature-item strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+
+    .level-picker-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      width: 100%;
+      margin: 4px 0;
+    }
+
+    .lvl-btn {
+      padding: 6px 13px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(243, 239, 230, 0.25);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--chalk);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.14s ease;
+    }
+
+    .lvl-btn.selected, .lvl-btn:hover {
+      border-color: var(--yellow);
+      background: rgba(255, 213, 79, 0.2);
+      color: var(--yellow);
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 13px 24px;
+      border-radius: 14px;
+      border: 2px solid #fff3c4;
+      background: linear-gradient(180deg, #ffe066 0%, #f5b727 100%);
+      color: #18221e;
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(245, 183, 39, 0.35);
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.06);
+    }
+
+    .primary-btn:active {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    .secondary-btn-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .secondary-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(243, 239, 230, 0.32);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--chalk);
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.14s ease;
+    }
+
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .stars-row {
+      display: flex;
+      gap: 10px;
+      font-size: 36px;
+      margin: 4px 0;
+    }
+
+    .star-glyph {
+      color: rgba(255, 255, 255, 0.2);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    .star-glyph.earned {
+      color: var(--yellow);
+      text-shadow: 0 0 16px rgba(255, 213, 79, 0.6);
+    }
+
+    @media (max-width: 640px) {
+      .hud-bar {
+        padding: 6px 10px;
+      }
+      .level-title-text {
+        display: none;
+      }
+      .tool-chip .kbd-hint {
+        display: none;
+      }
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD Layer -->
+    <div class="hud-layer" id="hudLayer" hidden>
+      <div class="hud-top">
+        <div class="hud-bar">
+          <div class="level-badge-group">
+            <span class="level-pill" id="hudLevelPill">LVL 1</span>
+            <span class="level-title-text" id="hudLevelTitle">Homeroom Sketch</span>
+          </div>
+
+          <div class="meters-group">
+            <div class="meter-box">
+              <div class="meter-label-row">
+                <span>PROGRESS</span>
+                <span id="hudProgressPct">0%</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" id="hudProgressFill" style="width: 0%; background: #81c784;"></div>
+              </div>
+            </div>
+
+            <div class="meter-box">
+              <div class="meter-label-row">
+                <span id="hudInkLabel">CHALK INK</span>
+                <span id="hudInkPct">100%</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" id="hudInkFill" style="width: 100%; background: #4dd0e1;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hud-actions">
+            <button class="icon-btn" id="btnUndo" title="Clear Drawn Lines (C)">⌫</button>
+            <button class="icon-btn" id="btnSound" title="Toggle Sound (M)">🔊</button>
+            <button class="icon-btn" id="btnRetryQuick" title="Quick Retry (R)">↻</button>
+            <button class="icon-btn" id="btnPause" title="Pause Game (Space)">⏸</button>
+          </div>
+        </div>
+
+        <div class="tool-dock-row">
+          <div class="tool-selector" id="toolSelector">
+            <button class="tool-chip active" data-tool="WHITE">
+              <span class="swatch" style="background:#f3efe6;"></span>
+              <span>Chalk</span>
+              <span class="kbd-hint">1</span>
+            </button>
+            <button class="tool-chip" data-tool="SPRING">
+              <span class="swatch" style="background:#4dd0e1;"></span>
+              <span>Bounce</span>
+              <span class="kbd-hint">2</span>
+            </button>
+            <button class="tool-chip" data-tool="BOOST">
+              <span class="swatch" style="background:#ffd54f;"></span>
+              <span>Turbo</span>
+              <span class="kbd-hint">3</span>
+            </button>
+            <button class="tool-chip" data-tool="CUTTER">
+              <span class="swatch" style="background:#ff6e6e;"></span>
+              <span>Cut/Erase</span>
+              <span class="kbd-hint">4</span>
+            </button>
+          </div>
+
+          <div class="status-pills">
+            <div class="badge-pill" id="hudBitsPill">✦ 0/7 Bits</div>
+            <div class="badge-pill" id="hudComboPill" hidden>🔥 x2 Magnet!</div>
+          </div>
+        </div>
+
+        <div class="instruction-toast" id="instructionBanner">
+          ✏️ DRAW A PATH TO SURVIVE! Drag across gaps to build solid Matter.js bridges &amp; ramps.
+        </div>
+      </div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div class="overlay-backdrop" id="startOverlay">
+      <div class="sketch-card">
+        <span class="eyebrow-tag">MATTER.JS 2D PHYSICS EDITION</span>
+        <h1 class="card-title">DRAW TO SURVIVE</h1>
+        <p class="card-subtitle">
+          Sketch solid chalk bridges, bouncy trampolines, and turbo ramps in real time before the runner plummets into the lava abyss!
+        </p>
+
+        <div class="feature-grid">
+          <div class="feature-item">
+            <strong style="color:#f3efe6;">1 • White Chalk</strong>
+            Solid bridges &amp; ramps. Steep lines become vault hurdles!
+          </div>
+          <div class="feature-item">
+            <strong style="color:#4dd0e1;">2 • Bounce Chalk</strong>
+            High-restitution spring pad that launches the runner skyward.
+          </div>
+          <div class="feature-item">
+            <strong style="color:#ffd54f;">3 • Turbo Gold</strong>
+            Unbreakable steel line: boosts speed &amp; rams Red Scribblers!
+          </div>
+          <div class="feature-item">
+            <strong style="color:#ff6e6e;">4 • Tap Cutter</strong>
+            Snip any drawn line to refund 60% ink &amp; stun nearby enemies.
+          </div>
+        </div>
+
+        <div class="level-picker-row" id="levelPickerRow">
+          <button class="lvl-btn selected" data-level="1">Lvl 1</button>
+          <button class="lvl-btn" data-level="2">Lvl 2</button>
+          <button class="lvl-btn" data-level="3">Lvl 3</button>
+          <button class="lvl-btn" data-level="4">Lvl 4</button>
+          <button class="lvl-btn" data-level="5">Endless 5+</button>
+        </div>
+
+        <button class="primary-btn" id="btnStartGame">▶ PLAY LEVEL 1</button>
+      </div>
+    </div>
+
+    <!-- PAUSE OVERLAY -->
+    <div class="overlay-backdrop" id="pauseOverlay" hidden>
+      <div class="sketch-card">
+        <span class="eyebrow-tag">GAME PAUSED</span>
+        <h2 class="card-title">TAKE A BREATHER</h2>
+        <p class="card-subtitle" id="pauseSubtitle">Level 1 • Homeroom Sketch</p>
+        <button class="primary-btn" id="btnResume">▶ RESUME</button>
+        <div class="secondary-btn-row">
+          <button class="secondary-btn" id="btnPauseRetry">↻ RETRY</button>
+          <button class="secondary-btn" id="btnPauseMenu">🏠 MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME OVER OVERLAY -->
+    <div class="overlay-backdrop" id="gameOverOverlay" hidden>
+      <div class="sketch-card">
+        <span class="eyebrow-tag" style="color:var(--pink); border-color:var(--pink);">HAZARD COLLISION</span>
+        <h2 class="card-title" style="color:var(--pink);">GAME OVER</h2>
+        <p class="card-subtitle" id="gameOverReason">
+          The stickman fell into the molten lava pit! Draw a smoother bridge or use Bounce chalk.
+        </p>
+        <button class="primary-btn" id="btnGameOverRetry">↻ RETRY LEVEL</button>
+        <div class="secondary-btn-row">
+          <button class="secondary-btn" id="btnGameOverMenu">🏠 MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEVEL COMPLETE OVERLAY -->
+    <div class="overlay-backdrop" id="levelCompleteOverlay" hidden>
+      <div class="sketch-card">
+        <span class="eyebrow-tag">FINISH LINE CROSSED!</span>
+        <h2 class="card-title">LEVEL COMPLETE!</h2>
+        <div class="stars-row" id="completeStarsRow">
+          <span class="star-glyph earned">★</span>
+          <span class="star-glyph earned">★</span>
+          <span class="star-glyph earned">★</span>
+        </div>
+        <p class="card-subtitle" id="completeStatsText">
+          Chalk Bits: 6/6 • Ink Efficiency: 92%
+        </p>
+        <button class="primary-btn" id="btnNextLevel">NEXT LEVEL ➔</button>
+        <div class="secondary-btn-row">
+          <button class="secondary-btn" id="btnCompleteReplay">↻ REPLAY</button>
+          <button class="secondary-btn" id="btnCompleteMenu">🏠 MENU</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************************************
+     * DRAW TO SURVIVE (CHALK RUNNER EVOLVED) — STANDALONE MATTER.JS PORT
+     * Mirrors the native Android Kotlin + Jetpack Compose implementation:
+     * - Matter.js 2D rigid-body world (static platform bodies, chamfered
+     *   line-segment rigid bodies, stickman wheel/torso composite body)
+     * - Multi-substep collision safety so the stickman never tunnels
+     * - 4 Chalk Tools (White, Bounce Blue, Turbo Gold, Cutter)
+     * - 4 Curated Levels + Procedural Level 5+ Generator
+     * - Red Scribbler enemies, Thumbtack clusters, Callout moves, WebAudio
+     *************************************************************************/
+
+    const WORLD_HEIGHT = 600;
+    const LAVA_SURFACE_Y = 532;
+    const DEFAULT_GROUND_Y = 420;
+    const STICKMAN_HEIGHT = 58;
+    const GRAVITY = 960;
+    const MAX_FALL_SPEED = 680;
+    const CAMERA_LEAD_RATIO = 0.24;
+    const MAX_STROKE_LENGTH = 760;
+    const MIN_POINT_DISTANCE = 10;
+    const DEFAULT_LINE_LIFETIME = 7.5;
+    const MAX_CLIMBABLE_SLOPE_RADIANS = 1.18;
+
+    const TOOLS = {
+      WHITE:  { id: 'WHITE',  name: 'Chalk',     cost: 1.0,  color: '#f3efe6' },
+      SPRING: { id: 'SPRING', name: 'Bounce',    cost: 1.25, color: '#4dd0e1' },
+      BOOST:  { id: 'BOOST',  name: 'Turbo',     cost: 1.5,  color: '#ffd54f' },
+      CUTTER: { id: 'CUTTER', name: 'Cut/Erase', cost: 0.0,  color: '#ff6e6e' }
+    };
+
+    /* ----------------------- WEB AUDIO SYNTHESIZER ----------------------- */
+    class SoundManager {
+      constructor() {
+        this.enabled = true;
+        this.ctx = null;
+      }
+
+       ensureCtx() {
+        if (!this.enabled) return null;
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        return this.ctx;
+      }
+
+      playTone(freqStart, freqEnd, durationMs, type = 'sine', gainVal = 0.14) {
+        const ctx = this.ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freqStart, now);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + durationMs / 1000);
+
+        gain.gain.setValueAtTime(gainVal, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + durationMs / 1000);
+      }
+
+      playJump() {
+        this.playTone(260, 580, 140, 'triangle', 0.16);
+      }
+
+      playSpring() {
+        this.playTone(220, 880, 240, 'sine', 0.22);
+      }
+
+      playScratch() {
+        this.playTone(900 + Math.random() * 400, 700 + Math.random() * 300, 35, 'triangle', 0.04);
+      }
+
+      playLineLock() {
+        this.playTone(440, 660, 90, 'sine', 0.12);
+      }
+
+      playPickup(isStar = false) {
+        if (isStar) {
+          this.playTone(587, 1174, 220, 'triangle', 0.2);
+        } else {
+          this.playTone(520, 780, 110, 'sine', 0.14);
+        }
+      }
+
+      playCut() {
+        this.playTone(620, 180, 160, 'sawtooth', 0.15);
+      }
+
+      playGameOver() {
+        this.playTone(340, 95, 420, 'sawtooth', 0.18);
+      }
+
+      playLevelComplete() {
+        this.playTone(440, 880, 320, 'triangle', 0.2);
+        setTimeout(() => this.playTone(660, 1320, 360, 'triangle', 0.2), 140);
+      }
+    }
+
+    const sound = new SoundManager();
+
+    /* -------------------------- LEVEL CATALOG ---------------------------- */
+    function getLevelDefinition(levelNumber) {
+      const groundY = DEFAULT_GROUND_Y;
+      if (levelNumber === 1) {
+        return {
+          levelNumber: 1,
+          title: "Homeroom Sketch",
+          subtitle: "Bridge the gaps, grab Chalk Bits to refill ink, or switch to Bounce/Turbo chalk!",
+          runSpeed: 175,
+          spawnPosition: { x: 110, y: groundY },
+          finishLineX: 1980,
+          levelEndX: 2220,
+          maxInkPerLevel: 1000,
+          inkRechargeRate: 120,
+          parInkUsage: 920,
+          maxStrokeLength: 760,
+          platforms: [
+            { startX: -80, endX: 560, topY: groundY, label: "START" },
+            { startX: 860, endX: 1280, topY: groundY, label: "CHECKPOINT" },
+            { startX: 1760, endX: 2350, topY: groundY, label: "FINISH" }
+          ],
+          guideStrokes: [
+            {
+              points: [{ x: 535, y: groundY - 4 }, { x: 710, y: groundY - 22 }, { x: 885, y: groundY - 4 }],
+              caption: "DRAG HERE TO BRIDGE GAP 1"
+            },
+            {
+              points: [{ x: 1255, y: groundY - 4 }, { x: 1520, y: groundY - 30 }, { x: 1785, y: groundY - 4 }],
+              caption: "DRAW LONGER BRIDGE"
+            }
+          ],
+          chalkBits: [
+            { id: 1, x: 360, y: groundY - 34, inkAmount: 135, isStar: false },
+            { id: 2, x: 650, y: groundY - 44, inkAmount: 135, isStar: false },
+            { id: 3, x: 760, y: groundY - 44, inkAmount: 135, isStar: false },
+            { id: 4, x: 1060, y: groundY - 36, inkAmount: 135, isStar: false },
+            { id: 5, x: 1420, y: groundY - 48, inkAmount: 135, isStar: false },
+            { id: 6, x: 1520, y: groundY - 76, inkAmount: 220, isStar: true },
+            { id: 7, x: 1620, y: groundY - 48, inkAmount: 135, isStar: false }
+          ],
+          thumbtacks: [],
+          scribblers: [],
+          calloutScript: [
+            { triggerX: 890, type: "BLITZ" }
+          ]
+        };
+      }
+
+      if (levelNumber === 2) {
+        return {
+          levelNumber: 2,
+          title: "Recess Bounce",
+          subtitle: "Use Blue Bounce chalk or upward ramps to climb, and bonk Red Scribblers with walls!",
+          runSpeed: 185,
+          spawnPosition: { x: 110, y: 430 },
+          finishLineX: 2320,
+          levelEndX: 2560,
+          maxInkPerLevel: 1000,
+          inkRechargeRate: 125,
+          parInkUsage: 960,
+          maxStrokeLength: 780,
+          platforms: [
+            { startX: -80, endX: 520, topY: 430, label: "START" },
+            { startX: 860, endX: 1260, topY: 370, label: "LEDGE 1" },
+            { startX: 1680, endX: 2000, topY: 320, label: "HIGH LEDGE" },
+            { startX: 2180, endX: 2680, topY: 360, label: "FINISH" }
+          ],
+          guideStrokes: [
+            {
+              points: [{ x: 495, y: 426 }, { x: 690, y: 395 }, { x: 880, y: 366 }],
+              caption: "DRAW RAMP OR BLUE BOUNCE PAD"
+            }
+          ],
+          chalkBits: [
+            { id: 10, x: 620, y: 370, inkAmount: 135, isStar: false },
+            { id: 11, x: 740, y: 345, inkAmount: 135, isStar: false },
+            { id: 12, x: 1060, y: 335, inkAmount: 135, isStar: false },
+            { id: 13, x: 1460, y: 295, inkAmount: 135, isStar: false },
+            { id: 14, x: 1560, y: 265, inkAmount: 220, isStar: true },
+            { id: 15, x: 2090, y: 305, inkAmount: 135, isStar: false }
+          ],
+          thumbtacks: [
+            { x: 690, y: 455, count: 3, spacing: 26 }
+          ],
+          scribblers: [
+            { id: 201, x: 1160, y: 370, speed: 110 },
+            { id: 202, x: 1910, y: 320, speed: 120 }
+          ],
+          calloutScript: [
+            { triggerX: 320, type: "JUMP" },
+            { triggerX: 1320, type: "GRAVITY" }
+          ]
+        };
+      }
+
+      if (levelNumber === 3) {
+        return {
+          levelNumber: 3,
+          title: "Field Trip Canyon",
+          subtitle: "Ride Low Gravity arcs, ram Red Scribblers with Gold Turbo chalk, and survive Wipeout!",
+          runSpeed: 195,
+          spawnPosition: { x: 110, y: 310 },
+          finishLineX: 2580,
+          levelEndX: 2820,
+          maxInkPerLevel: 1050,
+          inkRechargeRate: 130,
+          parInkUsage: 1000,
+          maxStrokeLength: 800,
+          platforms: [
+            { startX: -80, endX: 480, topY: 310, label: "HIGH CLIFF" },
+            { startX: 980, endX: 1320, topY: 430, label: "VALLEY" },
+            { startX: 1680, endX: 1860, topY: 390, label: "ISLAND" },
+            { startX: 2380, endX: 2950, topY: 380, label: "FINISH" }
+          ],
+          guideStrokes: [],
+          chalkBits: [
+            { id: 20, x: 640, y: 320, inkAmount: 135, isStar: false },
+            { id: 21, x: 790, y: 355, inkAmount: 135, isStar: false },
+            { id: 22, x: 1150, y: 390, inkAmount: 135, isStar: false },
+            { id: 23, x: 1500, y: 365, inkAmount: 135, isStar: false },
+            { id: 24, x: 2020, y: 325, inkAmount: 240, isStar: true },
+            { id: 25, x: 2180, y: 340, inkAmount: 135, isStar: false }
+          ],
+          thumbtacks: [
+            { x: 1500, y: 445, count: 3, spacing: 26 }
+          ],
+          scribblers: [
+            { id: 301, x: 1240, y: 430, speed: 125 },
+            { id: 302, x: 2520, y: 380, speed: 130 }
+          ],
+          calloutScript: [
+            { triggerX: 350, type: "GRAVITY" },
+            { triggerX: 1050, type: "BLITZ" },
+            { triggerX: 1880, type: "WIPEOUT" }
+          ]
+        };
+      }
+
+      if (levelNumber === 4) {
+        return {
+          levelNumber: 4,
+          title: "Final Exam Gauntlet",
+          subtitle: "Combine Bounce, Turbo Gold, and Tap-Cut shockwaves across the night board!",
+          runSpeed: 205,
+          spawnPosition: { x: 110, y: 410 },
+          finishLineX: 2850,
+          levelEndX: 3100,
+          maxInkPerLevel: 1100,
+          inkRechargeRate: 135,
+          parInkUsage: 1050,
+          maxStrokeLength: 800,
+          platforms: [
+            { startX: -80, endX: 460, topY: 410, label: "START" },
+            { startX: 820, endX: 1040, topY: 380 },
+            { startX: 1420, endX: 1640, topY: 340 },
+            { startX: 2060, endX: 2260, topY: 400 },
+            { startX: 2720, endX: 3220, topY: 370, label: "FINISH" }
+          ],
+          guideStrokes: [],
+          chalkBits: [
+            { id: 30, x: 640, y: 355, inkAmount: 135, isStar: false },
+            { id: 31, x: 1230, y: 315, inkAmount: 135, isStar: false },
+            { id: 32, x: 1850, y: 310, inkAmount: 250, isStar: true },
+            { id: 33, x: 2480, y: 340, inkAmount: 135, isStar: false }
+          ],
+          thumbtacks: [
+            { x: 1230, y: 425, count: 3, spacing: 26 },
+            { x: 2480, y: 435, count: 3, spacing: 26 }
+          ],
+          scribblers: [
+            { id: 401, x: 980, y: 380, speed: 130 },
+            { id: 402, x: 1580, y: 340, speed: 135 },
+            { id: 403, x: 2200, y: 400, speed: 140 }
+          ],
+          calloutScript: [
+            { triggerX: 330, type: "JUMP" },
+            { triggerX: 1440, type: "GRAVITY" },
+            { triggerX: 2100, type: "BLITZ" }
+          ]
+        };
+      }
+
+      // Procedural Level 5+
+      const platforms = [];
+      const chalkBits = [];
+      const scribblers = [];
+      const calloutScript = [];
+      const calloutTypes = ["JUMP", "BLITZ", "GRAVITY", "WIPEOUT"];
+
+      let cursorX = -80;
+      let currentY = 410;
+      const startEnd = 480;
+      platforms.push({ startX: cursorX, endX: startEnd, topY: currentY, label: "START" });
+      cursorX = startEnd;
+
+      const segmentsCount = Math.min(6, 3 + (levelNumber % 3));
+      for (let i = 0; i < segmentsCount; i++) {
+        const gapWidth = 310 + ((levelNumber * 37 + i * 83) % 210);
+        const midGapX = cursorX + gapWidth * 0.5;
+        chalkBits.push({
+          id: levelNumber * 100 + i,
+          x: midGapX,
+          y: Math.max(180, currentY - 52),
+          inkAmount: i === segmentsCount - 1 ? 240 : 135,
+          isStar: i === segmentsCount - 1
+        });
+        if (i % 2 === 0) {
+          calloutScript.push({
+            triggerX: cursorX - 90,
+            type: calloutTypes[(levelNumber + i) % calloutTypes.length]
+          });
+        }
+        cursorX += gapWidth;
+        const deltaY = ((levelNumber * 29 + i * 53) % 110) - 55;
+        currentY = Math.max(290, Math.min(445, currentY + deltaY));
+        const platWidth = 240 + ((i * 67) % 140);
+        platforms.push({ startX: cursorX, endX: cursorX + platWidth, topY: currentY });
+        scribblers.push({
+          id: levelNumber * 1000 + i,
+          x: cursorX + platWidth * 0.7,
+          y: currentY,
+          speed: 125 + (levelNumber % 5) * 6
+        });
+        cursorX += platWidth;
+      }
+
+      const finalGap = 420 + ((levelNumber * 41) % 140);
+      cursorX += finalGap;
+      const finishX = cursorX + 180;
+      const endX = cursorX + 480;
+      platforms.push({
+        startX: cursorX,
+        endX: endX + 100,
+        topY: Math.max(320, Math.min(430, currentY)),
+        label: "FINISH"
+      });
+
+      return {
+        levelNumber,
+        title: `Chalk Trial #${levelNumber}`,
+        subtitle: "Master Bounce, Turbo Gold, and Tap-Cut shockwaves!",
+        runSpeed: Math.min(245, 195 + (levelNumber - 4) * 5),
+        spawnPosition: { x: 110, y: 410 },
+        finishLineX: finishX,
+        levelEndX: endX,
+        maxInkPerLevel: 1150,
+        inkRechargeRate: 140,
+        parInkUsage: 1080,
+        maxStrokeLength: 820,
+        platforms,
+        guideStrokes: [],
+        chalkBits,
+        thumbtacks: [],
+        scribblers,
+        calloutScript
+      };
+    }
+
+    /* ---------------------- MATTER.JS WORLD BRIDGE ----------------------- */
+    class MatterPhysicsBridge {
+      constructor() {
+        this.hasMatter = typeof window.Matter !== 'undefined';
+        this.engine = null;
+        this.world = null;
+        this.runnerBody = null;
+        this.platformBodies = [];
+        this.lineBodies = new Map();
+      }
+
+      initWorld(level) {
+        if (!this.hasMatter) return;
+        const { Engine, World, Bodies, Body } = window.Matter;
+        if (this.engine) {
+          World.clear(this.engine.world);
+          Engine.clear(this.engine);
+        }
+        this.engine = Engine.create({
+          gravity: { x: 0, y: 1.6, scale: 0.001 }
+        });
+        this.world = this.engine.world;
+        this.platformBodies = [];
+        this.lineBodies.clear();
+
+        // Create static rigid bodies for each platform in the level
+        for (const p of level.platforms) {
+          const width = p.endX - p.startX;
+          const height = WORLD_HEIGHT - p.topY;
+          const cx = p.startX + width * 0.5;
+          const cy = p.topY + height * 0.5;
+          const body = Bodies.rectangle(cx, cy, width, height, {
+            isStatic: true,
+            friction: 0.0,
+            restitution: 0.0,
+            label: 'platform'
+          });
+          World.add(this.world, body);
+          this.platformBodies.push(body);
+        }
+
+        // Create dynamic composite rigid body for the stickman (foot wheel + torso)
+        this.runnerBody = Bodies.circle(
+          level.spawnPosition.x,
+          level.spawnPosition.y - 14,
+          14,
+          {
+            friction: 0.0,
+            frictionAir: 0.005,
+            restitution: 0.0,
+            inertia: Infinity,
+            label: 'stickman'
+          }
+        );
+        Body.setMass(this.runnerBody, 1);
+        World.add(this.world, this.runnerBody);
+      }
+
+      addDrawnLineBodies(lineObj) {
+        if (!this.hasMatter || !this.world) return;
+        const { Bodies, World } = window.Matter;
+        const created = [];
+        for (const seg of lineObj.segments) {
+          const dx = seg.end.x - seg.start.x;
+          const dy = seg.end.y - seg.start.y;
+          const len = Math.hypot(dx, dy);
+          if (len < 2) continue;
+          const cx = (seg.start.x + seg.end.x) * 0.5;
+          const cy = (seg.start.y + seg.end.y) * 0.5;
+          const angle = Math.atan2(dy, dx);
+          const segBody = Bodies.rectangle(cx, cy, len + 4, 8, {
+            isStatic: true,
+            angle,
+            friction: 0.0,
+            restitution: lineObj.tool === 'SPRING' ? 1.15 : 0.0,
+            label: `line_${lineObj.tool}`
+          });
+          World.add(this.world, segBody);
+          created.push(segBody);
+        }
+        this.lineBodies.set(lineObj.id, created);
+      }
+
+      removeDrawnLineBodies(lineId) {
+        if (!this.hasMatter || !this.world) return;
+        const { World } = window.Matter;
+        const bodies = this.lineBodies.get(lineId);
+        if (bodies) {
+          for (const b of bodies) {
+            World.remove(this.world, b);
+          }
+          this.lineBodies.delete(lineId);
+        }
+      }
+
+      syncStickmanAndStep(stickman, dt) {
+        if (!this.hasMatter || !this.engine || !this.runnerBody) return;
+        const { Engine, Body } = window.Matter;
+        Body.setPosition(this.runnerBody, {
+          x: stickman.footX,
+          y: stickman.footY - 14
+        });
+        Body.setVelocity(this.runnerBody, {
+          x: stickman.velocityX * 0.016,
+          y: stickman.velocityY * 0.016
+        });
+        Engine.update(this.engine, Math.min(dt, 0.033) * 1000);
+      }
+    }
+
+    const matterBridge = new MatterPhysicsBridge();
+
+    /* ------------------------- GAME STATE & LOOP ------------------------- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+      screenState: 'START_MENU', // START_MENU, PLAYING, PAUSED, GAME_OVER, LEVEL_COMPLETE
+      currentLevel: 1,
+      bestLevel: parseInt(localStorage.getItem('dts_best_level') || '1', 10),
+      level: getLevelDefinition(1),
+      selectedTool: 'WHITE',
+      stickman: null,
+      cameraX: 0,
+      completedLines: [],
+      activeStrokePoints: [],
+      currentInk: 1000,
+      totalInkDrawn: 0,
+      chalkBits: [],
+      scribblers: [],
+      activeCallout: null,
+      triggeredCallouts: new Set(),
+      comboCount: 0,
+      comboTimer: 0,
+      starsEarned: 3,
+      lavaAnimTime: 0,
+      embers: [],
+      sketchParticles: [],
+      shockwaves: [],
+      showInstructionBanner: true,
+      gameOverReason: ''
+    };
+
+    function resetLevel(levelNum) {
+      const lvl = getLevelDefinition(levelNum);
+      state.currentLevel = levelNum;
+      state.level = lvl;
+      state.stickman = {
+        footX: lvl.spawnPosition.x,
+        footY: lvl.spawnPosition.y,
+        velocityX: lvl.runSpeed,
+        velocityY: 0,
+        isGrounded: true,
+        slopeRadians: 0,
+        runCyclePhase: 0,
+        isAlive: true,
+        hasReachedFinish: false,
+        boostTimer: 0,
+        lowGravityTimer: 0,
+        blitzTimer: 0
+      };
+      state.cameraX = Math.max(0, lvl.spawnPosition.x - getVisibleWorldWidth() * CAMERA_LEAD_RATIO);
+      state.completedLines = [];
+      state.activeStrokePoints = [];
+      state.currentInk = lvl.maxInkPerLevel;
+      state.totalInkDrawn = 0;
+      state.chalkBits = lvl.chalkBits.map(b => ({ ...b, collected: false }));
+      state.scribblers = lvl.scribblers.map(s => ({
+        ...s,
+        facing: -1,
+        runPhase: 0,
+        isAlive: true,
+        isTumbling: false,
+        tumbleVy: 0
+      }));
+      state.activeCallout = null;
+      state.triggeredCallouts = new Set();
+      state.comboCount = 0;
+      state.comboTimer = 0;
+      state.sketchParticles = [];
+      state.shockwaves = [];
+      state.showInstructionBanner = true;
+
+      matterBridge.initWorld(lvl);
+      updateHudDOM();
+    }
+
+    function getVisibleWorldWidth() {
+      const scale = canvas.height / WORLD_HEIGHT;
+      return scale > 0 ? canvas.width / scale : 1000;
+    }
+
+    function screenToWorld(screenX, screenY) {
+      const scale = canvas.height / WORLD_HEIGHT;
+      return {
+        x: state.cameraX + screenX / scale,
+        y: screenY / scale
+      };
+    }
+
+    function distance(a, b) {
+      return Math.hypot(b.x - a.x, b.y - a.y);
+    }
+
+    function calculatePolylineLength(pts) {
+      let sum = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        sum += distance(pts[i], pts[i + 1]);
+      }
+      return sum;
+    }
+
+    function smoothStrokePoints(rawPoints) {
+      if (rawPoints.length <= 2) return rawPoints.slice();
+      const smoothed = [rawPoints[0]];
+      for (let i = 0; i < rawPoints.length - 1; i++) {
+        const p0 = rawPoints[i];
+        const p1 = rawPoints[i + 1];
+        const d = distance(p0, p1);
+        if (d > 18) {
+          const q = { x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y };
+          const r = { x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y };
+          if (distance(smoothed[smoothed.length - 1], q) >= 6) smoothed.push(q);
+          if (distance(smoothed[smoothed.length - 1], r) >= 6) smoothed.push(r);
+        } else if (i > 0 && distance(smoothed[smoothed.length - 1], p0) >= 6) {
+          smoothed.push(p0);
+        }
+      }
+      const last = rawPoints[rawPoints.length - 1];
+      if (distance(smoothed[smoothed.length - 1], last) >= 2 || smoothed.length === 1) {
+        smoothed.push(last);
+      }
+      return smoothed;
+    }
+
+    function makeSegments(points) {
+      const segs = [];
+      for (let i = 0; i < points.length - 1; i++) {
+        segs.push({ start: points[i], end: points[i + 1] });
+      }
+      return segs;
+    }
+
+    /* ---------------- SUBSTEP PHYSICS & COLLISION SOLVER ----------------- */
+    function collectSupportingSurfaces(footX, platforms, completedLines) {
+      const hits = [];
+      const minFootX = footX - 9;
+      const maxFootX = footX + 9;
+
+      for (const p of platforms) {
+        if (maxFootX >= p.startX && minFootX <= p.endX) {
+          hits.push({ y: p.topY, slopeRadians: 0, tool: 'WHITE' });
+        }
+      }
+
+      for (const line of completedLines) {
+        for (const seg of line.segments) {
+          const left = seg.start.x <= seg.end.x ? seg.start : seg.end;
+          const right = seg.start.x <= seg.end.x ? seg.end : seg.start;
+          const dx = right.x - left.x;
+          const dy = right.y - left.y;
+
+          if (maxFootX < left.x || minFootX > right.x) continue;
+
+          if (dx < 2) {
+            if (Math.abs(dy) <= 24) {
+              hits.push({ y: Math.min(left.y, right.y), slopeRadians: 0, tool: line.tool });
+            }
+            continue;
+          }
+
+          const slopeAngle = Math.atan2(dy, dx);
+          if (Math.abs(slopeAngle) > MAX_CLIMBABLE_SLOPE_RADIANS) continue;
+
+          const sampleX = Math.max(left.x, Math.min(right.x, footX));
+          const t = Math.max(0, Math.min(1, (sampleX - left.x) / dx));
+          const surfaceY = left.y + dy * t;
+          hits.push({ y: surfaceY, slopeRadians: slopeAngle, tool: line.tool });
+        }
+      }
+      return hits;
+    }
+
+    function findVaultWallHeight(x0, x1, footY, completedLines) {
+      const lo = Math.min(x0, x1) - 4;
+      const hi = Math.max(x0, x1) + 4;
+      for (const line of completedLines) {
+        for (const seg of line.segments) {
+          const dx = Math.abs(seg.end.x - seg.start.x);
+          const dy = Math.abs(seg.end.y - seg.start.y);
+          if (dx > 0.1 && dy / dx <= MAX_CLIMBABLE_SLOPE_RADIANS) continue;
+          const midX = (seg.start.x + seg.end.x) * 0.5;
+          if (midX < lo || midX > hi) continue;
+          const topY = Math.min(seg.start.y, seg.end.y);
+          const botY = Math.max(seg.start.y, seg.end.y);
+          if (botY >= footY - 12 && topY < footY - 14 && footY - topY <= 68) {
+            return Math.max(22, Math.min(68, footY - topY));
+          }
+        }
+      }
+      return null;
+    }
+
+    function stepSingleSubstep(st, level, completedLines, dt) {
+      const nextBoostTimer = Math.max(0, st.boostTimer - dt);
+      const nextLowGravTimer = Math.max(0, st.lowGravityTimer - dt);
+      const nextBlitzTimer = Math.max(0, st.blitzTimer - dt);
+
+      const slopeFactor = (st.isGrounded && st.slopeRadians < 0)
+        ? Math.max(0.62, Math.min(1, Math.cos(Math.max(-1.05, st.slopeRadians))))
+        : 1;
+
+      const boostMult = nextBlitzTimer > 0 ? 1.85 : (nextBoostTimer > 0 ? 1.5 : 1.0);
+      const vx = level.runSpeed * slopeFactor * boostMult;
+      const prevX = st.footX;
+      const prevY = st.footY;
+      const newX = prevX + vx * dt;
+
+      let vy = st.isGrounded
+        ? (st.slopeRadians < -0.15 ? Math.sin(st.slopeRadians) * vx * 0.85 : 0)
+        : st.velocityY;
+
+      if (st.isGrounded) {
+        const vaultH = findVaultWallHeight(prevX, newX + 8, prevY, completedLines);
+        if (vaultH !== null) {
+          vy = -Math.max(280, Math.min(520, Math.sqrt(2 * GRAVITY * (vaultH + 24))));
+          sound.playJump();
+        }
+      }
+
+      const gravScale = nextLowGravTimer > 0 ? 0.48 : 1.0;
+      vy = Math.min(MAX_FALL_SPEED, vy + GRAVITY * gravScale * dt);
+      const freeFallY = prevY + vy * dt;
+
+      const candidateHits = collectSupportingSurfaces(newX, level.platforms, completedLines);
+      let resolvedY = freeFallY;
+      let resolvedVy = vy;
+      let grounded = false;
+      let resolvedSlope = 0;
+      let activeTool = 'WHITE';
+
+      if (st.isGrounded && vy >= -100) {
+        let best = null;
+        for (const h of candidateHits) {
+          if (h.y >= prevY - 18 && h.y <= Math.max(prevY, freeFallY) + 13) {
+            if (!best || h.y < best.y) best = h;
+          }
+        }
+        if (best) {
+          resolvedY = best.y;
+          resolvedVy = 0;
+          grounded = true;
+          resolvedSlope = best.slopeRadians;
+          activeTool = best.tool;
+        }
+      }
+
+      if (!grounded && vy >= 0) {
+        let best = null;
+        for (const h of candidateHits) {
+          if (prevY <= h.y + 14 && freeFallY >= h.y - 14) {
+            if (!best || h.y < best.y) best = h;
+          }
+        }
+        if (best) {
+          resolvedY = best.y;
+          resolvedVy = 0;
+          grounded = true;
+          resolvedSlope = best.slopeRadians;
+          activeTool = best.tool;
+        }
+      }
+
+      let updatedBoost = nextBoostTimer;
+      if (grounded) {
+        if (activeTool === 'SPRING') {
+          resolvedVy = -530;
+          grounded = false;
+          sound.playSpring();
+        } else if (activeTool === 'BOOST') {
+          updatedBoost = Math.max(updatedBoost, 0.55);
+        }
+      }
+
+      // Check thumbtacks
+      if (updatedBoost <= 0 && nextBlitzTimer <= 0) {
+        for (const cluster of level.thumbtacks) {
+          for (let i = 0; i < cluster.count; i++) {
+            const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
+            const tx = cluster.x + offset;
+            const ty = cluster.y;
+            if (Math.abs(newX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
+              state.gameOverReason = "The stickman stepped on sharp thumbtacks! Bridge over them or shield with Gold Turbo chalk.";
+              return {
+                ...st,
+                footX: newX,
+                footY: resolvedY,
+                velocityX: 0,
+                velocityY: 0,
+                isGrounded: false,
+                isAlive: false
+              };
+            }
+          }
+        }
+      }
+
+      // Check lava pit
+      if (resolvedY >= LAVA_SURFACE_Y) {
+        state.gameOverReason = "The stickman fell into the molten lava pit! Draw a bridge across the gap before he reaches the edge.";
+        return {
+          ...st,
+          footX: newX,
+          footY: LAVA_SURFACE_Y,
+          velocityX: 0,
+          velocityY: 0,
+          isGrounded: false,
+          isAlive: false
+        };
+      }
+
+      if (newX >= level.finishLineX) {
+        return {
+          ...st,
+          footX: newX,
+          footY: resolvedY,
+          velocityX: vx,
+          velocityY: resolvedVy,
+          isGrounded: grounded,
+          slopeRadians: resolvedSlope,
+          runCyclePhase: st.runCyclePhase + dt * 11,
+          hasReachedFinish: true,
+          boostTimer: updatedBoost,
+          lowGravityTimer: nextLowGravTimer,
+          blitzTimer: nextBlitzTimer
+        };
+      }
+
+      const phaseAdvance = grounded ? dt * (vx / 16) : dt * 5.5;
+      return {
+        ...st,
+        footX: newX,
+        footY: resolvedY,
+        velocityX: vx,
+        velocityY: resolvedVy,
+        isGrounded: grounded,
+        slopeRadians: resolvedSlope,
+        runCyclePhase: st.runCyclePhase + phaseAdvance,
+        boostTimer: updatedBoost,
+        lowGravityTimer: nextLowGravTimer,
+        blitzTimer: nextBlitzTimer
+      };
+    }
+
+    function updatePhysics(dt) {
+      const clampedDt = Math.min(0.06, Math.max(0, dt));
+      if (clampedDt <= 0) return;
+
+      // Age & crumble completed lines (except BOOST)
+      const survivingLines = [];
+      for (const line of state.completedLines) {
+        if (line.tool === 'BOOST') {
+          survivingLines.push(line);
+        } else {
+          line.ageSeconds += clampedDt;
+          if (line.ageSeconds < line.maxLifetime) {
+            survivingLines.push(line);
+          } else {
+            matterBridge.removeDrawnLineBodies(line.id);
+          }
+        }
+      }
+      state.completedLines = survivingLines;
+
+      // Recharge ink when not actively drawing
+      if (state.activeStrokePoints.length === 0 && state.currentInk < state.level.maxInkPerLevel) {
+        state.currentInk = Math.min(
+          state.level.maxInkPerLevel,
+          state.currentInk + state.level.inkRechargeRate * clampedDt
+        );
+      }
+
+      // Substeps for stickman movement
+      const steps = Math.max(1, Math.floor(clampedDt / (1 / 120)) + 1);
+      const subDt = clampedDt / steps;
+      const prevGrounded = state.stickman.isGrounded;
+
+      for (let s = 0; s < steps; s++) {
+        state.stickman = stepSingleSubstep(state.stickman, state.level, state.completedLines, subDt);
+        if (!state.stickman.isAlive || state.stickman.hasReachedFinish) break;
+      }
+
+      matterBridge.syncStickmanAndStep(state.stickman, clampedDt);
+
+      const justLanded = !prevGrounded && state.stickman.isGrounded;
+      if (justLanded) {
+        spawnLandingParticles(state.stickman.footX, state.stickman.footY);
+      }
+
+      // Check scripted callout triggers
+      state.level.calloutScript.forEach((sc, idx) => {
+        if (!state.triggeredCallouts.has(idx) && state.stickman.footX >= sc.triggerX) {
+          state.triggeredCallouts.add(idx);
+          state.activeCallout = {
+            type: sc.type,
+            remainingSeconds: 1.5,
+            totalSeconds: 1.5
+          };
+        }
+      });
+
+      if (state.activeCallout) {
+        state.activeCallout.remainingSeconds -= clampedDt;
+        if (state.activeCallout.remainingSeconds <= 0) {
+          const moveType = state.activeCallout.type;
+          state.activeCallout = null;
+          if (moveType === 'JUMP' && state.stickman.isGrounded) {
+            state.stickman.velocityY = -430;
+            state.stickman.isGrounded = false;
+            sound.playJump();
+          } else if (moveType === 'BLITZ') {
+            state.stickman.blitzTimer = 2.6;
+            sound.playSpring();
+          } else if (moveType === 'GRAVITY') {
+            state.stickman.lowGravityTimer = 3.4;
+            sound.playPickup(true);
+          } else if (moveType === 'WIPEOUT') {
+            // Erase oldest non-gold line
+            const idx = state.completedLines.findIndex(l => l.tool !== 'BOOST');
+            if (idx >= 0) {
+              matterBridge.removeDrawnLineBodies(state.completedLines[idx].id);
+              state.completedLines.splice(idx, 1);
+              sound.playCut();
+            }
+          }
+        }
+      }
+
+      // Step Red Scribblers
+      const nextScribblers = [];
+      for (const enemy of state.scribblers) {
+        if (!enemy.isAlive) continue;
+        if (enemy.isTumbling) {
+          enemy.tumbleVy += GRAVITY * clampedDt;
+          enemy.y += enemy.tumbleVy * clampedDt;
+          enemy.x -= enemy.facing * 160 * clampedDt;
+          enemy.runPhase += clampedDt * 14;
+          if (enemy.y <= WORLD_HEIGHT + 40) nextScribblers.push(enemy);
+        } else {
+          const dir = state.stickman.footX < enemy.x ? -1 : 1;
+          const active = Math.abs(state.stickman.footX - enemy.x) < 620;
+          const moveVx = active ? dir * enemy.speed : 0;
+          const nextX = enemy.x + moveVx * clampedDt;
+
+          const wallHit = findVaultWallHeight(enemy.x, nextX + dir * 10, enemy.y, state.completedLines);
+          if (wallHit !== null) {
+            enemy.isTumbling = true;
+            enemy.tumbleVy = -380;
+            enemy.facing = dir;
+            sound.playCut();
+            nextScribblers.push(enemy);
+            continue;
+          }
+
+          const supports = collectSupportingSurfaces(nextX, state.level.platforms, state.completedLines)
+            .filter(h => h.y >= enemy.y - 20 && h.y <= enemy.y + 20);
+          supports.sort((a, b) => a.y - b.y);
+          const support = supports[0];
+
+          if (!support) {
+            enemy.x = nextX;
+            enemy.isTumbling = true;
+            enemy.tumbleVy = 60;
+            nextScribblers.push(enemy);
+          } else {
+            const distX = Math.abs(state.stickman.footX - nextX);
+            const distY = Math.abs(state.stickman.footY - support.y);
+            if (distX < 24 && distY < 44 && state.stickman.isAlive) {
+              if (state.stickman.boostTimer > 0 || state.stickman.blitzTimer > 0 || state.stickman.velocityY > 120) {
+                if (state.stickman.velocityY > 120) {
+                  state.stickman.velocityY = -360;
+                  state.stickman.isGrounded = false;
+                }
+                enemy.x = nextX;
+                enemy.y = support.y;
+                enemy.isTumbling = true;
+                enemy.tumbleVy = -420;
+                sound.playSpring();
+                nextScribblers.push(enemy);
+                continue;
+              } else {
+                state.stickman.velocityY = -340;
+                state.stickman.isGrounded = false;
+                enemy.x = nextX;
+                enemy.y = support.y;
+                enemy.isTumbling = true;
+                enemy.tumbleVy = -320;
+                sound.playJump();
+                nextScribblers.push(enemy);
+                continue;
+              }
+            }
+            enemy.x = nextX;
+            enemy.y = support.y;
+            enemy.facing = dir;
+            enemy.runPhase += clampedDt * (Math.abs(moveVx) / 15 + 2);
+            nextScribblers.push(enemy);
+          }
+        }
+      }
+      state.scribblers = nextScribblers;
+
+      // Collect Chalk Bits & Gold Stars
+      if (state.comboTimer > 0) {
+        state.comboTimer -= clampedDt;
+        if (state.comboTimer <= 0) state.comboCount = 0;
+      }
+      const magnetRadius = (state.comboCount >= 2 || state.stickman.blitzTimer > 0) ? 135 : 52;
+      const bodyCenterX = state.stickman.footX;
+      const bodyCenterY = state.stickman.footY - STICKMAN_HEIGHT * 0.5;
+
+      for (const bit of state.chalkBits) {
+        if (bit.collected) continue;
+        const dx = bodyCenterX - bit.x;
+        const dy = bodyCenterY - bit.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= 38) {
+          bit.collected = true;
+          state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + bit.inkAmount);
+          state.comboCount += 1;
+          state.comboTimer = 3.2;
+          sound.playPickup(bit.isStar);
+          spawnLineSparks([{ x: bit.x, y: bit.y }]);
+        } else if (d <= magnetRadius && d > 1) {
+          const pull = 280 * clampedDt;
+          bit.x += (dx / d) * pull;
+          bit.y += (dy / d) * pull;
+        }
+      }
+
+      // Camera follow
+      const targetCamX = Math.max(0, state.stickman.footX - getVisibleWorldWidth() * CAMERA_LEAD_RATIO);
+      state.cameraX += (targetCamX - state.cameraX) * Math.min(1, clampedDt * 12);
+
+      // Update particles & embers
+      updateParticlesAndEmbers(clampedDt);
+
+      // Check terminal states
+      if (!state.stickman.isAlive) {
+        state.screenState = 'GAME_OVER';
+        sound.playGameOver();
+        syncOverlays();
+      } else if (state.stickman.hasReachedFinish) {
+        state.screenState = 'LEVEL_COMPLETE';
+        if (state.currentLevel >= state.bestLevel) {
+          state.bestLevel = state.currentLevel + 1;
+          localStorage.setItem('dts_best_level', String(state.bestLevel));
+        }
+        sound.playLevelComplete();
+        syncOverlays();
+      }
+
+      updateHudDOM();
+    }
+
+    /* ----------------------- PARTICLE GENERATORS ------------------------- */
+    function spawnLandingParticles(x, y) {
+      for (let i = 0; i < 8; i++) {
+        const dir = i % 2 === 0 ? -1 : 1;
+        state.sketchParticles.push({
+          worldX: x + dir * (2 + Math.random() * 8),
+          worldY: y - 2,
+          velocityX: dir * (25 + Math.random() * 75) - 20,
+          velocityY: -(18 + Math.random() * 48),
+          size: 3.2 + Math.random() * 3.5,
+          alpha: 0.88,
+          rotation: Math.random() * 6.28,
+          angularVel: (Math.random() - 0.5) * 8,
+          type: 'PUFF'
+        });
+      }
+    }
+
+    function spawnPencilShavings(pt) {
+      for (let i = 0; i < 2; i++) {
+        state.sketchParticles.push({
+          worldX: pt.x + (Math.random() - 0.5) * 8,
+          worldY: pt.y + (Math.random() - 0.5) * 8,
+          velocityX: (Math.random() - 0.5) * 70,
+          velocityY: -(10 + Math.random() * 45),
+          size: 3.0 + Math.random() * 3.0,
+          alpha: 0.85,
+          rotation: Math.random() * 6.28,
+          angularVel: (Math.random() - 0.5) * 10,
+          type: 'SHAVING'
+        });
+      }
+    }
+
+    function spawnLineSparks(points) {
+      for (const pt of points) {
+        for (let s = 0; s < 2; s++) {
+          state.sketchParticles.push({
+            worldX: pt.x + (Math.random() - 0.5) * 10,
+            worldY: pt.y + (Math.random() - 0.5) * 10,
+            velocityX: (Math.random() - 0.5) * 85,
+            velocityY: (Math.random() - 0.5) * 85 - 15,
+            size: 4.2 + Math.random() * 3.8,
+            alpha: 0.95,
+            rotation: Math.random() * 3.14,
+            angularVel: (Math.random() - 0.5) * 9,
+            type: 'SPARK'
+          });
+        }
+      }
+    }
+
+    function updateParticlesAndEmbers(dt) {
+      state.lavaAnimTime += dt;
+
+      // Embers
+      const nextEmbers = [];
+      for (const e of state.embers) {
+        e.worldX += e.velocityX * dt;
+        e.worldY += e.velocityY * dt;
+        e.alpha -= dt * 0.55;
+        if (e.alpha > 0.05 && e.worldY >= DEFAULT_GROUND_Y - 60) {
+          nextEmbers.push(e);
+        }
+      }
+      const visW = getVisibleWorldWidth();
+      while (nextEmbers.length < 14) {
+        nextEmbers.push({
+          worldX: state.cameraX - 60 + Math.random() * (visW + 180),
+          worldY: LAVA_SURFACE_Y - Math.random() * 14,
+          velocityY: -(35 + Math.random() * 65),
+          velocityX: (Math.random() - 0.5) * 32,
+          radius: 2.2 + Math.random() * 3.8,
+          alpha: 0.65 + Math.random() * 0.35,
+          isYellow: Math.random() > 0.5
+        });
+      }
+      state.embers = nextEmbers;
+
+      // Footstep puffs while running
+      if (state.screenState === 'PLAYING' && state.stickman.isGrounded && Math.random() < 0.28) {
+        state.sketchParticles.push({
+          worldX: state.stickman.footX - 6 - Math.random() * 8,
+          worldY: state.stickman.footY - 2 - Math.random() * 4,
+          velocityX: -(35 + Math.random() * 55),
+          velocityY: -(12 + Math.random() * 34),
+          size: 2.6 + Math.random() * 3.2,
+          alpha: 0.72,
+          rotation: Math.random() * 6.28,
+          angularVel: (Math.random() - 0.5) * 6,
+          type: 'PUFF'
+        });
+      }
+
+      const nextParticles = [];
+      for (const p of state.sketchParticles) {
+        const fade = p.type === 'PUFF' ? 2.2 : (p.type === 'SHAVING' ? 1.9 : 2.4);
+        const grav = p.type === 'PUFF' ? -18 : (p.type === 'SHAVING' ? 140 : 45);
+        p.alpha -= dt * fade;
+        if (p.alpha > 0.04) {
+          p.worldX += p.velocityX * dt;
+          p.worldY += p.velocityY * dt;
+          p.velocityY += grav * dt;
+          p.rotation += p.angularVel * dt;
+          nextParticles.push(p);
+        }
+      }
+      state.sketchParticles = nextParticles.slice(-120);
+
+      // Shockwaves from Cutter
+      state.shockwaves = state.shockwaves.filter(sw => {
+        sw.radius += dt * 320;
+        sw.alpha -= dt * 2.2;
+        return sw.alpha > 0.02;
+      });
+    }
+
+    /* ----------------------- TOUCH & MOUSE DRAWING ----------------------- */
+    let isDrawing = false;
+
+    function handleCutTap(worldPt) {
+      let bestLineIdx = -1;
+      let bestPtIdx = -1;
+      let bestDist = 42;
+
+      state.completedLines.forEach((line, lIdx) => {
+        line.points.forEach((pt, pIdx) => {
+          const d = distance(pt, worldPt);
+          if (d <= bestDist) {
+            bestDist = d;
+            bestLineIdx = lIdx;
+            bestPtIdx = pIdx;
+          }
+        });
+      });
+
+      if (bestLineIdx < 0) return false;
+
+      const targetLine = state.completedLines[bestLineIdx];
+      const removedPts = targetLine.points.slice(bestPtIdx);
+      const removedLen = Math.max(24, calculatePolylineLength(removedPts));
+      const refund = removedLen * TOOLS[targetLine.tool].cost * 0.6;
+      state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + refund);
+
+      matterBridge.removeDrawnLineBodies(targetLine.id);
+
+      const keptPts = targetLine.points.slice(0, bestPtIdx);
+      if (keptPts.length < 2) {
+        state.completedLines.splice(bestLineIdx, 1);
+      } else {
+        targetLine.points = keptPts;
+        targetLine.segments = makeSegments(keptPts);
+        matterBridge.addDrawnLineBodies(targetLine);
+      }
+
+      // Emit enemy-stunning shockwave
+      state.shockwaves.push({ x: worldPt.x, y: worldPt.y, radius: 10, alpha: 0.95 });
+      for (const enemy of state.scribblers) {
+        if (!enemy.isTumbling && Math.hypot(enemy.x - worldPt.x, enemy.y - worldPt.y) <= 135) {
+          enemy.isTumbling = true;
+          enemy.tumbleVy = -390;
+        }
+      }
+      sound.playCut();
+      updateHudDOM();
+      return true;
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.screenState !== 'PLAYING') return;
+      canvas.setPointerCapture(e.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const worldPt = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      worldPt.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, worldPt.y));
+
+      state.showInstructionBanner = false;
+
+      if (state.selectedTool === 'CUTTER') {
+        handleCutTap(worldPt);
+        return;
+      }
+
+      if (state.currentInk <= 2) return;
+      isDrawing = true;
+      state.activeStrokePoints = [worldPt];
+      spawnPencilShavings(worldPt);
+      sound.playScratch();
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!isDrawing || state.screenState !== 'PLAYING') return;
+      const rect = canvas.getBoundingClientRect();
+      const candidate = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      candidate.y = Math.max(24, Math.min(LAVA_SURFACE_Y - 6, candidate.y));
+
+      const pts = state.activeStrokePoints;
+      if (pts.length === 0) return;
+
+      const last = pts[pts.length - 1];
+      const d = distance(last, candidate);
+      if (d < MIN_POINT_DISTANCE) return;
+
+      const toolCost = TOOLS[state.selectedTool].cost;
+      const currentStrokeLen = calculatePolylineLength(pts);
+      const maxRemainingStroke = Math.max(0, state.level.maxStrokeLength - currentStrokeLen);
+      const maxInkLength = toolCost > 0 ? state.currentInk / toolCost : maxRemainingStroke;
+      const budget = Math.min(maxRemainingStroke, maxInkLength);
+
+      if (budget <= 1) {
+        finishActiveStroke();
+        return;
+      }
+
+      let addedPt = candidate;
+      let usedDist = d;
+      if (d > budget) {
+        const ratio = budget / d;
+        addedPt = {
+          x: last.x + (candidate.x - last.x) * ratio,
+          y: last.y + (candidate.y - last.y) * ratio
+        };
+        usedDist = budget;
+      }
+
+      pts.push(addedPt);
+      const inkSpent = usedDist * toolCost;
+      state.currentInk = Math.max(0, state.currentInk - inkSpent);
+      state.totalInkDrawn += inkSpent;
+      spawnPencilShavings(addedPt);
+      if (Math.random() < 0.45) sound.playScratch();
+      updateHudDOM();
+    });
+
+    function finishActiveStroke() {
+      if (!isDrawing) return;
+      isDrawing = false;
+      if (state.activeStrokePoints.length >= 2) {
+        const smoothed = smoothStrokePoints(state.activeStrokePoints);
+        const newLine = {
+          id: Date.now() + Math.random(),
+          points: smoothed,
+          segments: makeSegments(smoothed),
+          tool: state.selectedTool,
+          ageSeconds: 0,
+          maxLifetime: state.selectedTool === 'BOOST' ? 9999 : DEFAULT_LINE_LIFETIME
+        };
+        state.completedLines.push(newLine);
+        matterBridge.addDrawnLineBodies(newLine);
+        spawnLineSparks(smoothed);
+        sound.playLineLock();
+      }
+      state.activeStrokePoints = [];
+      updateHudDOM();
+    }
+
+    canvas.addEventListener('pointerup', finishActiveStroke);
+    canvas.addEventListener('pointercancel', finishActiveStroke);
+
+    /* ------------------------ CANVAS RENDERING --------------------------- */
+    function renderScene() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const scale = h / WORLD_HEIGHT;
+      const camX = state.cameraX;
+      const visW = w / scale;
+
+      ctx.save();
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. Sketchbook ruled grid lines in world space
+      ctx.scale(scale, scale);
+      ctx.translate(-camX, 0);
+
+      ctx.strokeStyle = 'rgba(243, 239, 230, 0.04)';
+      ctx.lineWidth = 1;
+      const firstGridX = Math.floor(camX / 60) * 60;
+      for (let gx = firstGridX; gx < camX + visW + 60; gx += 60) {
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.lineTo(gx, WORLD_HEIGHT);
+        ctx.stroke();
+      }
+      for (let gy = 60; gy < WORLD_HEIGHT; gy += 60) {
+        ctx.beginPath();
+        ctx.moveTo(camX, gy);
+        ctx.lineTo(camX + visW, gy);
+        ctx.stroke();
+      }
+
+      // 2. Guide Strokes (Level 1 & 2 tutorials)
+      for (const guide of state.level.guideStrokes) {
+        if (guide.points.length < 2) continue;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 213, 79, 0.34)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.moveTo(guide.points[0].x, guide.points[0].y);
+        for (let i = 1; i < guide.points.length; i++) {
+          ctx.lineTo(guide.points[i].x, guide.points[i].y);
+        }
+        ctx.stroke();
+        const mid = guide.points[Math.floor(guide.points.length / 2)];
+        ctx.fillStyle = 'rgba(255, 213, 79, 0.72)';
+        ctx.font = '700 13px "Cabin Sketch", cursive';
+        ctx.textAlign = 'center';
+        ctx.fillText(guide.caption, mid.x, mid.y - 12);
+        ctx.restore();
+      }
+
+      // 3. Lava Pit Waves & Glow
+      drawLavaLayer(camX, visW);
+
+      // 4. Platforms
+      for (const p of state.level.platforms) {
+        if (p.endX < camX - 50 || p.startX > camX + visW + 50) continue;
+        const pw = p.endX - p.startX;
+        const ph = WORLD_HEIGHT - p.topY;
+
+        ctx.fillStyle = '#1b2520';
+        ctx.fillRect(p.startX, p.topY, pw, ph);
+
+        // Hatching lines along top edge
+        ctx.strokeStyle = 'rgba(243, 239, 230, 0.22)';
+        ctx.lineWidth = 1.5;
+        for (let hx = p.startX + 8; hx < p.endX - 6; hx += 16) {
+          ctx.beginPath();
+          ctx.moveTo(hx, p.topY + 2);
+          ctx.lineTo(hx - 8, p.topY + 16);
+          ctx.stroke();
+        }
+
+        // Top chalk crust
+        ctx.strokeStyle = '#f3efe6';
+        ctx.lineWidth = 4.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.startX, p.topY);
+        ctx.lineTo(p.endX, p.topY);
+        ctx.stroke();
+
+        if (p.label) {
+          ctx.fillStyle = 'rgba(243, 239, 230, 0.55)';
+          ctx.font = '700 14px "Cabin Sketch", cursive';
+          ctx.textAlign = 'left';
+          ctx.fillText(p.label, p.startX + 14, p.topY + 28);
+        }
+      }
+
+      // 5. Finish Line Banner
+      const fx = state.level.finishLineX;
+      const finishPlat = state.level.platforms[state.level.platforms.length - 1];
+      const fy = finishPlat ? finishPlat.topY : DEFAULT_GROUND_Y;
+      ctx.strokeStyle = '#ffd54f';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx, fy - 95);
+      ctx.stroke();
+
+      // Checkered flag
+      ctx.fillStyle = '#ffd54f';
+      ctx.fillRect(fx, fy - 95, 48, 28);
+      ctx.fillStyle = '#18221e';
+      ctx.font = '700 12px "Cabin Sketch", cursive';
+      ctx.textAlign = 'center';
+      ctx.fillText('FINISH', fx + 24, fy - 76);
+
+      // 6. Thumbtack Hazards
+      for (const cluster of state.level.thumbtacks) {
+        for (let i = 0; i < cluster.count; i++) {
+          const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
+          const tx = cluster.x + offset;
+          const ty = cluster.y;
+          ctx.fillStyle = '#ff6e6e';
+          ctx.beginPath();
+          ctx.moveTo(tx - 8, ty + 6);
+          ctx.lineTo(tx + 8, ty + 6);
+          ctx.lineTo(tx, ty - 14);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // 7. Chalk Bits & Gold Stars
+      for (const bit of state.chalkBits) {
+        if (bit.collected) continue;
+        const bob = Math.sin(state.lavaAnimTime * 4 + bit.id) * 4;
+        ctx.save();
+        ctx.translate(bit.x, bit.y + bob);
+        if (bit.isStar) {
+          ctx.fillStyle = '#ffd54f';
+          ctx.strokeStyle = '#fff8e1';
+          ctx.lineWidth = 1.5;
+          drawStarPolygon(ctx, 0, 0, 5, 14, 6);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.rotate(-0.35);
+          ctx.fillStyle = '#4dd0e1';
+          ctx.strokeStyle = '#e0f7fa';
+          ctx.lineWidth = 1.5;
+          ctx.fillRect(-9, -4, 18, 8);
+          ctx.strokeRect(-9, -4, 18, 8);
+        }
+        ctx.restore();
+      }
+
+      // 8. Completed Player-Drawn Lines
+      for (const line of state.completedLines) {
+        const alpha = line.tool === 'BOOST'
+          ? 1
+          : Math.max(0.18, Math.min(1, (line.maxLifetime - line.ageSeconds) / 1.5));
+        drawChalkPolyline(line.points, TOOLS[line.tool].color, alpha, false);
+      }
+
+      // 9. Active In-Progress Stroke
+      if (state.activeStrokePoints.length >= 2) {
+        drawChalkPolyline(state.activeStrokePoints, TOOLS[state.selectedTool].color, 0.9, true);
+      }
+
+      // 10. Cutter Shockwaves
+      for (const sw of state.shockwaves) {
+        ctx.strokeStyle = `rgba(255, 110, 110, ${sw.alpha})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 11. Red Scribbler Enemies
+      for (const enemy of state.scribblers) {
+        drawScribbler(enemy);
+      }
+
+      // 12. Stickman Runner
+      if (state.stickman) {
+        drawStickman(state.stickman);
+      }
+
+      // 13. Sketch Particles & Embers
+      for (const e of state.embers) {
+        ctx.fillStyle = e.isYellow
+          ? `rgba(255, 213, 79, ${e.alpha})`
+          : `rgba(255, 109, 0, ${e.alpha})`;
+        ctx.beginPath();
+        ctx.arc(e.worldX, e.worldY, e.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const p of state.sketchParticles) {
+        ctx.save();
+        ctx.translate(p.worldX, p.worldY);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.type === 'SPARK'
+          ? `rgba(255, 213, 79, ${p.alpha})`
+          : `rgba(243, 239, 230, ${p.alpha})`;
+        ctx.fillRect(-p.size * 0.5, -p.size * 0.5, p.size, p.size);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function drawLavaLayer(camX, visW) {
+      const startX = camX - 20;
+      const endX = camX + visW + 20;
+
+      // Back glow wave
+      ctx.fillStyle = 'rgba(213, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.moveTo(startX, WORLD_HEIGHT);
+      for (let x = startX; x <= endX; x += 28) {
+        const y = LAVA_SURFACE_Y - 6 + Math.sin(x * 0.025 + state.lavaAnimTime * 3.2) * 7;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(endX, WORLD_HEIGHT);
+      ctx.closePath();
+      ctx.fill();
+
+      // Core bright orange-red wave
+      const grad = ctx.createLinearGradient(0, LAVA_SURFACE_Y - 10, 0, WORLD_HEIGHT);
+      grad.addColorStop(0, '#ff9100');
+      grad.addColorStop(0.35, '#ff3d00');
+      grad.addColorStop(1, '#b71c1c');
+      ctx.fillStyle = grad;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, WORLD_HEIGHT);
+      for (let x = startX; x <= endX; x += 22) {
+        const y = LAVA_SURFACE_Y + Math.sin(x * 0.035 - state.lavaAnimTime * 4.5) * 5.5;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(endX, WORLD_HEIGHT);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawChalkPolyline(points, colorHex, alpha, isDashed) {
+      if (points.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = colorHex;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (isDashed) ctx.setLineDash([10, 6]);
+
+      // Primary thick chalk stroke
+      ctx.lineWidth = 6.5;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.stroke();
+
+      // Secondary sketch double-line highlight
+      ctx.lineWidth = 2.2;
+      ctx.globalAlpha = alpha * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y - 2.2);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y - 2.2);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawStickman(st) {
+      ctx.save();
+      ctx.translate(st.footX, st.footY);
+      ctx.rotate(st.slopeRadians * 0.45);
+
+      const isBoosted = st.boostTimer > 0 || st.blitzTimer > 0;
+      const strokeColor = isBoosted ? '#ffd54f' : '#ffffff';
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 4.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const hipY = -22;
+      const shoulderY = -44;
+      const headCenterY = -55;
+
+      // Running limb swing angles
+      const swing = Math.sin(st.runCyclePhase) * 0.75;
+      const kneeBend = Math.cos(st.runCyclePhase) * 0.35;
+
+      // Back Leg
+      ctx.beginPath();
+      ctx.moveTo(0, hipY);
+      ctx.lineTo(-Math.sin(swing) * 12, hipY + 11);
+      ctx.lineTo(-Math.sin(swing - kneeBend) * 16, 0);
+      ctx.stroke();
+
+      // Front Leg
+      ctx.beginPath();
+      ctx.moveTo(0, hipY);
+      ctx.lineTo(Math.sin(swing) * 12, hipY + 11);
+      ctx.lineTo(Math.sin(swing + kneeBend) * 16, 0);
+      ctx.stroke();
+
+      // Spine
+      ctx.beginPath();
+      ctx.moveTo(0, hipY);
+      ctx.lineTo(3, shoulderY);
+      ctx.stroke();
+
+      // Arms
+      ctx.beginPath();
+      ctx.moveTo(3, shoulderY);
+      ctx.lineTo(3 + Math.cos(st.runCyclePhase) * 13, shoulderY + 12);
+      ctx.moveTo(3, shoulderY);
+      ctx.lineTo(3 - Math.cos(st.runCyclePhase) * 13, shoulderY + 12);
+      ctx.stroke();
+
+      // Red Bandana flutter
+      ctx.strokeStyle = '#ff5252';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(-4, headCenterY + 2);
+      ctx.quadraticCurveTo(
+        -16,
+        headCenterY + Math.sin(st.runCyclePhase * 1.5) * 6,
+        -24,
+        headCenterY + 5
+      );
+      ctx.stroke();
+
+      // Head Circle
+      ctx.fillStyle = '#18221e';
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 3.8;
+      ctx.beginPath();
+      ctx.arc(4, headCenterY, 9.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Active Callout Speech Bubble
+      if (state.activeCallout) {
+        ctx.save();
+        ctx.rotate(-st.slopeRadians * 0.45);
+        ctx.fillStyle = '#ffd54f';
+        ctx.strokeStyle = '#18221e';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-38, -96, 76, 24, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#18221e';
+        ctx.font = '700 13px "Cabin Sketch", cursive';
+        ctx.textAlign = 'center';
+        ctx.fillText(state.activeCallout.type + '!', 0, -80);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function drawScribbler(enemy) {
+      ctx.save();
+      ctx.translate(enemy.x, enemy.y);
+      if (enemy.isTumbling) {
+        ctx.rotate(enemy.runPhase);
+      }
+      ctx.strokeStyle = '#ff6e6e';
+      ctx.lineWidth = 3.6;
+      ctx.lineCap = 'round';
+
+      const s = Math.sin(enemy.runPhase) * 8;
+      // Legs
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.lineTo(-s, 0);
+      ctx.moveTo(0, -16);
+      ctx.lineTo(s, 0);
+      // Body & jagged head
+      ctx.moveTo(0, -16);
+      ctx.lineTo(0, -34);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, -41, 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawStarPolygon(ctx, cx, cy, spikes, outerR, innerR) {
+      let rot = (Math.PI / 2) * 3;
+      const step = Math.PI / spikes;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerR);
+      for (let i = 0; i < spikes; i++) {
+        ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+        rot += step;
+        ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+        rot += step;
+      }
+      ctx.lineTo(cx, cy - outerR);
+      ctx.closePath();
+    }
+
+    /* ------------------------- UI & HUD BINDINGS ------------------------- */
+    const hudLayer = document.getElementById('hudLayer');
+    const startOverlay = document.getElementById('startOverlay');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const levelCompleteOverlay = document.getElementById('levelCompleteOverlay');
+
+    function updateHudDOM() {
+      document.getElementById('hudLevelPill').textContent = `LVL ${state.currentLevel}`;
+      document.getElementById('hudLevelTitle').textContent = state.level.title;
+
+      const prog = Math.max(0, Math.min(1,
+        (state.stickman.footX - state.level.spawnPosition.x) /
+        Math.max(1, state.level.finishLineX - state.level.spawnPosition.x)
+      ));
+      const progPct = Math.round(prog * 100);
+      document.getElementById('hudProgressPct').textContent = `${progPct}%`;
+      document.getElementById('hudProgressFill').style.width = `${progPct}%`;
+
+      const inkRatio = Math.max(0, Math.min(1, state.currentInk / state.level.maxInkPerLevel));
+      const inkPct = Math.round(inkRatio * 100);
+      document.getElementById('hudInkPct').textContent = `${inkPct}%`;
+      const inkFill = document.getElementById('hudInkFill');
+      inkFill.style.width = `${inkPct}%`;
+      inkFill.style.background = inkRatio < 0.25 ? '#ff6e6e' : (inkRatio < 0.5 ? '#ffd54f' : '#4dd0e1');
+
+      const totalBits = state.chalkBits.filter(b => !b.isStar).length;
+      const gotBits = state.chalkBits.filter(b => !b.isStar && b.collected).length;
+      document.getElementById('hudBitsPill').textContent = `✦ ${gotBits}/${totalBits} Bits`;
+
+      const comboPill = document.getElementById('hudComboPill');
+      if (state.comboCount >= 2) {
+        comboPill.hidden = false;
+        comboPill.textContent = `🔥 x${state.comboCount} Magnet!`;
+      } else {
+        comboPill.hidden = true;
+      }
+
+      const banner = document.getElementById('instructionBanner');
+      banner.style.opacity = state.showInstructionBanner ? '1' : '0';
+    }
+
+    function syncOverlays() {
+      hudLayer.hidden = (state.screenState === 'START_MENU');
+      startOverlay.hidden = (state.screenState !== 'START_MENU');
+      pauseOverlay.hidden = (state.screenState !== 'PAUSED');
+      gameOverOverlay.hidden = (state.screenState !== 'GAME_OVER');
+      levelCompleteOverlay.hidden = (state.screenState !== 'LEVEL_COMPLETE');
+
+      if (state.screenState === 'PAUSED') {
+        document.getElementById('pauseSubtitle').textContent =
+          `Level ${state.currentLevel} • ${state.level.title}`;
+      } else if (state.screenState === 'GAME_OVER') {
+        document.getElementById('gameOverReason').textContent = state.gameOverReason;
+      } else if (state.screenState === 'LEVEL_COMPLETE') {
+        const totalBits = state.chalkBits.filter(b => !b.isStar).length;
+        const gotBits = state.chalkBits.filter(b => !b.isStar && b.collected).length;
+        const gotStar = state.chalkBits.some(b => b.isStar && b.collected);
+        let stars = 1;
+        if (gotBits >= Math.ceil(totalBits * 0.6)) stars++;
+        if (gotStar || state.totalInkDrawn <= state.level.parInkUsage) stars++;
+        state.starsEarned = stars;
+
+        const glyphs = document.querySelectorAll('#completeStarsRow .star-glyph');
+        glyphs.forEach((el, idx) => {
+          el.classList.toggle('earned', idx < stars);
+        });
+        document.getElementById('completeStatsText').textContent =
+          `Chalk Bits: ${gotBits}/${totalBits} • Ink Used: ${Math.round(state.totalInkDrawn)} pts`;
+      }
+    }
+
+    function selectTool(toolId) {
+      state.selectedTool = toolId;
+      document.querySelectorAll('#toolSelector .tool-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === toolId);
+      });
+    }
+
+    // Tool selector clicks
+    document.querySelectorAll('#toolSelector .tool-chip').forEach(btn => {
+      btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+    });
+
+    // Level picker on Start Screen
+    let pickedStartLevel = 1;
+    document.querySelectorAll('#levelPickerRow .lvl-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pickedStartLevel = parseInt(btn.dataset.level, 10);
+        document.querySelectorAll('#levelPickerRow .lvl-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('btnStartGame').textContent = `▶ PLAY LEVEL ${pickedStartLevel}`;
+      });
+    });
+
+    document.getElementById('btnStartGame').addEventListener('click', () => {
+      sound.ensureCtx();
+      resetLevel(pickedStartLevel);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnPause').addEventListener('click', () => {
+      if (state.screenState === 'PLAYING') {
+        state.screenState = 'PAUSED';
+        syncOverlays();
+      }
+    });
+
+    document.getElementById('btnResume').addEventListener('click', () => {
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnRetryQuick').addEventListener('click', () => {
+      resetLevel(state.currentLevel);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnUndo').addEventListener('click', () => {
+      for (const l of state.completedLines) {
+        matterBridge.removeDrawnLineBodies(l.id);
+      }
+      state.completedLines = [];
+      sound.playCut();
+    });
+
+    document.getElementById('btnSound').addEventListener('click', (e) => {
+      sound.enabled = !sound.enabled;
+      e.currentTarget.textContent = sound.enabled ? '🔊' : '🔇';
+    });
+
+    document.getElementById('btnPauseRetry').addEventListener('click', () => {
+      resetLevel(state.currentLevel);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnGameOverRetry').addEventListener('click', () => {
+      resetLevel(state.currentLevel);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnCompleteReplay').addEventListener('click', () => {
+      resetLevel(state.currentLevel);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    document.getElementById('btnNextLevel').addEventListener('click', () => {
+      resetLevel(state.currentLevel + 1);
+      state.screenState = 'PLAYING';
+      syncOverlays();
+    });
+
+    function goToMainMenu() {
+      state.screenState = 'START_MENU';
+      syncOverlays();
+    }
+    document.getElementById('btnPauseMenu').addEventListener('click', goToMainMenu);
+    document.getElementById('btnGameOverMenu').addEventListener('click', goToMainMenu);
+    document.getElementById('btnCompleteMenu').addEventListener('click', goToMainMenu);
+
+    // Keyboard Hotkeys (1-4 tools, Space pause, R retry, C clear)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') selectTool('WHITE');
+      else if (e.key === '2') selectTool('SPRING');
+      else if (e.key === '3') selectTool('BOOST');
+      else if (e.key === '4') selectTool('CUTTER');
+      else if (e.key === ' ' || e.code === 'Space') {
+        if (state.screenState === 'PLAYING') {
+          state.screenState = 'PAUSED';
+          syncOverlays();
+        } else if (state.screenState === 'PAUSED') {
+          state.screenState = 'PLAYING';
+          syncOverlays();
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (state.screenState !== 'START_MENU') {
+          resetLevel(state.currentLevel);
+          state.screenState = 'PLAYING';
+          syncOverlays();
+        }
+      } else if (e.key === 'c' || e.key === 'C') {
+        for (const l of state.completedLines) {
+          matterBridge.removeDrawnLineBodies(l.id);
+        }
+        state.completedLines = [];
+      }
+    });
+
+    // Resize handling
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    resetLevel(1);
+    syncOverlays();
+
+    // Main 60 FPS Animation Loop
+    let lastTimestamp = performance.now();
+    function frameLoop(now) {
+      const dt = (now - lastTimestamp) / 1000;
+      lastTimestamp = now;
+
+      if (state.screenState === 'PLAYING') {
+        updatePhysics(dt);
+      } else {
+        updateParticlesAndEmbers(Math.min(0.033, dt));
+      }
+
+      renderScene();
+      requestAnimationFrame(frameLoop);
+    }
+    requestAnimationFrame(frameLoop);
+  </script>
+</body>
+</html>
