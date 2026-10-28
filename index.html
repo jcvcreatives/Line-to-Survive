@@ -1358,10 +1358,17 @@
     }
 
     /* ---------------- SUBSTEP PHYSICS & COLLISION SOLVER ----------------- */
+    const FOOT_SUPPORT_HALF_WIDTH = 12;
+    const LINE_ENDPOINT_MARGIN = 6;
+    const STEP_UP_TOLERANCE = 34;
+    const GROUND_SNAP_TOLERANCE = 22;
+    const FALL_CROSSING_TOLERANCE = 24;
+    const PLATFORM_MANTLE_TOLERANCE = 115;
+
     function collectSupportingSurfaces(footX, platforms, completedLines) {
       const hits = [];
-      const minFootX = footX - 9;
-      const maxFootX = footX + 9;
+      const minFootX = footX - FOOT_SUPPORT_HALF_WIDTH;
+      const maxFootX = footX + FOOT_SUPPORT_HALF_WIDTH;
 
       for (const p of platforms) {
         if (maxFootX >= p.startX && minFootX <= p.endX) {
@@ -1376,22 +1383,33 @@
           const dx = right.x - left.x;
           const dy = right.y - left.y;
 
-          if (maxFootX < left.x || minFootX > right.x) continue;
+          if (maxFootX < left.x - LINE_ENDPOINT_MARGIN || minFootX > right.x + LINE_ENDPOINT_MARGIN) continue;
 
-          if (dx < 2) {
-            if (Math.abs(dy) <= 24) {
+          if (dx < 3) {
+            if (Math.abs(dy) <= 36) {
               hits.push({ y: Math.min(left.y, right.y), slopeRadians: 0, tool: line.tool });
             }
             continue;
           }
 
           const slopeAngle = Math.atan2(dy, dx);
-          if (Math.abs(slopeAngle) > MAX_CLIMBABLE_SLOPE_RADIANS) continue;
+          if (Math.abs(slopeAngle) > 1.44 && Math.abs(dy) > 42) continue;
 
+          const clampedSlope = Math.max(-MAX_CLIMBABLE_SLOPE_RADIANS, Math.min(MAX_CLIMBABLE_SLOPE_RADIANS, slopeAngle));
           const sampleX = Math.max(left.x, Math.min(right.x, footX));
           const t = Math.max(0, Math.min(1, (sampleX - left.x) / dx));
-          const surfaceY = left.y + dy * t;
-          hits.push({ y: surfaceY, slopeRadians: slopeAngle, tool: line.tool });
+          let surfaceY = left.y + dy * t;
+          for (const p of platforms) {
+            if (
+              sampleX >= p.startX &&
+              sampleX <= p.endX &&
+              surfaceY > p.topY &&
+              surfaceY <= p.topY + PLATFORM_MANTLE_TOLERANCE
+            ) {
+              surfaceY = p.topY;
+            }
+          }
+          hits.push({ y: surfaceY, slopeRadians: clampedSlope, tool: line.tool });
         }
       }
       return hits;
@@ -1430,17 +1448,31 @@
       const vx = level.runSpeed * slopeFactor * boostMult;
       const prevX = st.footX;
       const prevY = st.footY;
-      const newX = prevX + vx * dt;
+      let resolvedX = prevX + vx * dt;
 
       let vy = st.isGrounded
         ? (st.slopeRadians < -0.15 ? Math.sin(st.slopeRadians) * vx * 0.85 : 0)
         : st.velocityY;
 
       if (st.isGrounded) {
-        const vaultH = findVaultWallHeight(prevX, newX + 8, prevY, completedLines);
+        const vaultH = findVaultWallHeight(prevX, resolvedX + 8, prevY, completedLines);
         if (vaultH !== null) {
           vy = -Math.max(280, Math.min(520, Math.sqrt(2 * GRAVITY * (vaultH + 24))));
           sound.playJump();
+        } else {
+          for (const p of level.platforms) {
+            if (
+              prevX <= p.startX + 4 &&
+              resolvedX + 18 >= p.startX &&
+              prevY > p.topY + STEP_UP_TOLERANCE &&
+              prevY <= p.topY + PLATFORM_MANTLE_TOLERANCE
+            ) {
+              const climbHeight = Math.max(24, Math.min(PLATFORM_MANTLE_TOLERANCE, prevY - p.topY));
+              vy = -Math.max(260, Math.min(520, Math.sqrt(2 * GRAVITY * (climbHeight + 26))));
+              sound.playJump();
+              break;
+            }
+          }
         }
       }
 
@@ -1448,7 +1480,7 @@
       vy = Math.min(MAX_FALL_SPEED, vy + GRAVITY * gravScale * dt);
       const freeFallY = prevY + vy * dt;
 
-      const candidateHits = collectSupportingSurfaces(newX, level.platforms, completedLines);
+      const candidateHits = collectSupportingSurfaces(resolvedX, level.platforms, completedLines);
       let resolvedY = freeFallY;
       let resolvedVy = vy;
       let grounded = false;
@@ -1458,7 +1490,7 @@
       if (st.isGrounded && vy >= -100) {
         let best = null;
         for (const h of candidateHits) {
-          if (h.y >= prevY - 18 && h.y <= Math.max(prevY, freeFallY) + 13) {
+          if (h.y >= prevY - STEP_UP_TOLERANCE && h.y <= Math.max(prevY, freeFallY) + GROUND_SNAP_TOLERANCE) {
             if (!best || h.y < best.y) best = h;
           }
         }
@@ -1474,7 +1506,7 @@
       if (!grounded && vy >= 0) {
         let best = null;
         for (const h of candidateHits) {
-          if (prevY <= h.y + 14 && freeFallY >= h.y - 14) {
+          if (prevY <= h.y + FALL_CROSSING_TOLERANCE && freeFallY >= h.y - FALL_CROSSING_TOLERANCE) {
             if (!best || h.y < best.y) best = h;
           }
         }
@@ -1484,6 +1516,29 @@
           grounded = true;
           resolvedSlope = best.slopeRadians;
           activeTool = best.tool;
+        }
+      }
+
+      // Solid platform enforcement: never allow the stickman to pass inside a platform below its top surface,
+      // and smoothly mantle onto the platform top if arriving via a bridge connected to the upper side wall.
+      for (const p of level.platforms) {
+        if (resolvedX + FOOT_SUPPORT_HALF_WIDTH >= p.startX && resolvedX - FOOT_SUPPORT_HALF_WIDTH <= p.endX) {
+          if (
+            resolvedY > p.topY &&
+            (prevY <= p.topY + PLATFORM_MANTLE_TOLERANCE || resolvedY <= p.topY + PLATFORM_MANTLE_TOLERANCE)
+          ) {
+            resolvedY = p.topY;
+            resolvedVy = 0;
+            grounded = true;
+            resolvedSlope = 0;
+            activeTool = 'WHITE';
+          } else if (
+            resolvedY > p.topY + PLATFORM_MANTLE_TOLERANCE &&
+            prevX + 6 <= p.startX &&
+            resolvedX + 6 > p.startX
+          ) {
+            resolvedX = p.startX - 6;
+          }
         }
       }
 
@@ -1509,11 +1564,11 @@
             const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
             const tx = cluster.x + offset;
             const ty = cluster.y;
-            if (Math.abs(newX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
+            if (Math.abs(resolvedX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
               state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
               return {
                 ...st,
-                footX: newX,
+                footX: resolvedX,
                 footY: resolvedY,
                 velocityX: 0,
                 velocityY: 0,
@@ -1531,7 +1586,7 @@
         state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
         return {
           ...st,
-          footX: newX,
+          footX: resolvedX,
           footY: LAVA_SURFACE_Y,
           velocityX: 0,
           velocityY: 0,
@@ -1542,10 +1597,21 @@
         };
       }
 
-      if (newX >= level.finishLineX) {
+      let finishPlatform = null;
+      for (const p of level.platforms) {
+        if (level.finishLineX >= p.startX && level.finishLineX <= p.endX) {
+          finishPlatform = p;
+        }
+      }
+      if (!finishPlatform && level.platforms.length > 0) {
+        finishPlatform = level.platforms[level.platforms.length - 1];
+      }
+      const finishTopY = finishPlatform ? finishPlatform.topY : DEFAULT_GROUND_Y;
+
+      if (resolvedX >= level.finishLineX && resolvedY <= finishTopY + 18) {
         return {
           ...st,
-          footX: newX,
+          footX: resolvedX,
           footY: resolvedY,
           velocityX: vx,
           velocityY: resolvedVy,
@@ -1563,7 +1629,7 @@
       const phaseAdvance = grounded ? dt * (vx / 22.0) : dt * 6.0;
       return {
         ...st,
-        footX: newX,
+        footX: resolvedX,
         footY: resolvedY,
         velocityX: vx,
         velocityY: resolvedVy,

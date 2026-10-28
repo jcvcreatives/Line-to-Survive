@@ -35,10 +35,12 @@ import kotlin.random.Random
 object PhysicsEngine {
 
   private const val MAX_SUBSTEP_DT = 1f / 120f
-  private const val FOOT_SUPPORT_HALF_WIDTH = 9f
-  private const val STEP_UP_TOLERANCE = 18f
-  private const val GROUND_SNAP_TOLERANCE = 13f
-  private const val FALL_CROSSING_TOLERANCE = 14f
+  private const val FOOT_SUPPORT_HALF_WIDTH = 12f
+  private const val LINE_ENDPOINT_MARGIN = 6f
+  private const val STEP_UP_TOLERANCE = 34f
+  private const val GROUND_SNAP_TOLERANCE = 22f
+  private const val FALL_CROSSING_TOLERANCE = 24f
+  private const val PLATFORM_MANTLE_TOLERANCE = 115f
   private const val MAX_CLIMBABLE_SLOPE_RADIANS = 1.18f // ~67 degrees
 
   data class PhysicsTickResult(
@@ -306,7 +308,7 @@ object PhysicsEngine {
     val vx = level.runSpeed * slopeFactor * boostMult
     val prevX = state.footX
     val prevY = state.footY
-    val newX = prevX + vx * dt
+    var resolvedX = prevX + vx * dt
 
     // Candidate vertical velocity: if leaving an upward drawn ramp, preserve upward launch velocity
     var vy = if (state.isGrounded) {
@@ -319,11 +321,24 @@ object PhysicsEngine {
       state.velocityY
     }
 
-    // Check if the stickman hits a knee-high steep hurdle wall -> auto-vault!
+    // Check if the stickman hits a knee-high steep hurdle wall or approaches a higher platform ledge -> auto-vault!
     if (state.isGrounded) {
-      val vaultHeight = findVaultWallHeight(prevX, newX + 8f, prevY, completedLines)
+      val vaultHeight = findVaultWallHeight(prevX, resolvedX + 8f, prevY, completedLines)
       if (vaultHeight != null) {
         vy = -sqrt(2f * WorldConstants.GRAVITY * (vaultHeight + 24f)).coerceIn(280f, 520f)
+      } else {
+        for (platform in platforms) {
+          if (
+            prevX <= platform.startX + 4f &&
+              resolvedX + 18f >= platform.startX &&
+              prevY > platform.topY + STEP_UP_TOLERANCE &&
+              prevY <= platform.topY + PLATFORM_MANTLE_TOLERANCE
+          ) {
+            val climbHeight = (prevY - platform.topY).coerceIn(24f, PLATFORM_MANTLE_TOLERANCE)
+            vy = -sqrt(2f * WorldConstants.GRAVITY * (climbHeight + 26f)).coerceIn(260f, 520f)
+            break
+          }
+        }
       }
     }
 
@@ -331,9 +346,9 @@ object PhysicsEngine {
     vy = (vy + WorldConstants.GRAVITY * gravityScale * dt).coerceAtMost(WorldConstants.MAX_FALL_SPEED)
     val freeFallY = prevY + vy * dt
 
-    // Gather all supporting surfaces under the stickman's foot span at newX
+    // Gather all supporting surfaces under the stickman's foot span at resolvedX
     val candidateHits = collectSupportingSurfaces(
-      footX = newX,
+      footX = resolvedX,
       platforms = platforms,
       completedLines = completedLines
     )
@@ -380,6 +395,29 @@ object PhysicsEngine {
       }
     }
 
+    // Solid platform enforcement: never allow the stickman to pass inside a platform below its top surface,
+    // and smoothly mantle onto the platform top if arriving via a bridge connected to the upper side wall.
+    for (platform in platforms) {
+      if (resolvedX + FOOT_SUPPORT_HALF_WIDTH >= platform.startX && resolvedX - FOOT_SUPPORT_HALF_WIDTH <= platform.endX) {
+        if (
+          resolvedY > platform.topY &&
+            (prevY <= platform.topY + PLATFORM_MANTLE_TOLERANCE || resolvedY <= platform.topY + PLATFORM_MANTLE_TOLERANCE)
+        ) {
+          resolvedY = platform.topY
+          resolvedVy = 0f
+          grounded = true
+          resolvedSlope = 0f
+          activeSurfaceTool = ChalkTool.WHITE
+        } else if (
+          resolvedY > platform.topY + PLATFORM_MANTLE_TOLERANCE &&
+            prevX + 6f <= platform.startX &&
+            resolvedX + 6f > platform.startX
+        ) {
+          resolvedX = platform.startX - 6f
+        }
+      }
+    }
+
     // Apply special chalk surface properties (Blue Bounce or Gold Boost)
     var updatedBoostTimer = nextBoostTimer
     var nextLandingSquash = (state.landingSquashTimer - dt).coerceAtLeast(0f)
@@ -403,9 +441,9 @@ object PhysicsEngine {
           val offset = (i - (cluster.count - 1) / 2f) * cluster.spacing
           val tx = cluster.x + offset
           val ty = cluster.y
-          if (abs(newX - tx) < 13f && resolvedY >= ty - 6f && resolvedY - WorldConstants.STICKMAN_HEIGHT <= ty + 8f) {
+          if (abs(resolvedX - tx) < 13f && resolvedY >= ty - 6f && resolvedY - WorldConstants.STICKMAN_HEIGHT <= ty + 8f) {
             return state.copy(
-              footX = newX,
+              footX = resolvedX,
               footY = resolvedY,
               velocityX = 0f,
               velocityY = 0f,
@@ -422,7 +460,7 @@ object PhysicsEngine {
     // Check if stickman fell into the bottom hazard pit
     if (resolvedY >= WorldConstants.LAVA_SURFACE_Y) {
       return state.copy(
-        footX = newX,
+        footX = resolvedX,
         footY = WorldConstants.LAVA_SURFACE_Y,
         velocityX = 0f,
         velocityY = 0f,
@@ -433,10 +471,12 @@ object PhysicsEngine {
       )
     }
 
-    // Check if stickman crossed the finish line
-    if (newX >= level.finishLineX) {
+    // Check if stickman crossed the finish line ON or ABOVE the finish platform surface
+    val finishPlatform = platforms.lastOrNull { level.finishLineX in it.startX..it.endX } ?: platforms.lastOrNull()
+    val finishTopY = finishPlatform?.topY ?: WorldConstants.DEFAULT_GROUND_Y
+    if (resolvedX >= level.finishLineX && resolvedY <= finishTopY + 18f) {
       return state.copy(
-        footX = newX,
+        footX = resolvedX,
         footY = resolvedY,
         velocityX = vx,
         velocityY = resolvedVy,
@@ -454,7 +494,7 @@ object PhysicsEngine {
     val phaseAdvance = if (grounded) dt * (vx / 22.0f) else dt * 6.0f
 
     return state.copy(
-      footX = newX,
+      footX = resolvedX,
       footY = resolvedY,
       velocityX = vx,
       velocityY = resolvedVy,
@@ -525,24 +565,35 @@ object PhysicsEngine {
         val dx = right.x - left.x
         val dy = right.y - left.y
 
-        if (maxFootX < left.x || minFootX > right.x) continue
+        if (maxFootX < left.x - LINE_ENDPOINT_MARGIN || minFootX > right.x + LINE_ENDPOINT_MARGIN) continue
 
-        if (dx < 2f) {
-          if (abs(dy) <= 24f) {
+        if (dx < 3f) {
+          if (abs(dy) <= 36f) {
             hits.add(SurfaceHit(y = min(left.y, right.y), slopeRadians = 0f, tool = tool))
           }
           continue
         }
 
         val slopeAngle = atan2(dy, dx)
-        if (abs(slopeAngle) > MAX_CLIMBABLE_SLOPE_RADIANS) {
+        if (abs(slopeAngle) > 1.44f && abs(dy) > 42f) {
           continue
         }
 
+        val clampedSlope = slopeAngle.coerceIn(-MAX_CLIMBABLE_SLOPE_RADIANS, MAX_CLIMBABLE_SLOPE_RADIANS)
         val sampleX = footX.coerceIn(left.x, right.x)
         val t = ((sampleX - left.x) / dx).coerceIn(0f, 1f)
-        val surfaceY = left.y + dy * t
-        hits.add(SurfaceHit(y = surfaceY, slopeRadians = slopeAngle, tool = tool))
+        var surfaceY = left.y + dy * t
+        for (platform in platforms) {
+          if (
+            sampleX >= platform.startX &&
+              sampleX <= platform.endX &&
+              surfaceY > platform.topY &&
+              surfaceY <= platform.topY + PLATFORM_MANTLE_TOLERANCE
+          ) {
+            surfaceY = platform.topY
+          }
+        }
+        hits.add(SurfaceHit(y = surfaceY, slopeRadians = clampedSlope, tool = tool))
       }
     }
 
