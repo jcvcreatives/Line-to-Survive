@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
@@ -33,7 +34,10 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -406,9 +410,15 @@ fun StartMenuOverlay(
   uiState: GameUiState,
   onPlayClick: () -> Unit,
   onSelectLevelClick: (Int) -> Unit,
-  onToggleSoundClick: () -> Unit
+  onToggleSoundClick: () -> Unit,
+  onSelectDifficultyClick: (com.example.game.model.DifficultyMode) -> Unit = {},
+  onSelectMapClick: (com.example.game.model.MapBiome) -> Unit = {}
 ) {
-  val selectedConfig = com.example.game.level.LevelCatalog.getLevelConfig(uiState.currentLevel)
+  val selectedConfig = com.example.game.level.LevelCatalog.getLevelConfig(
+    level = uiState.currentLevel,
+    difficulty = uiState.selectedDifficulty,
+    mapBiome = uiState.selectedMap
+  )
   val selectedStars = uiState.levelStars[uiState.currentLevel] ?: if (uiState.currentLevel < uiState.bestLevel) 3 else 0
   val isSelectedCompleted = (uiState.currentLevel < uiState.bestLevel) || (selectedStars > 0)
 
@@ -417,7 +427,7 @@ fun StartMenuOverlay(
       .fillMaxSize()
       .background(SketchCharcoalBg.copy(alpha = 0.82f))
       .windowInsetsPadding(WindowInsets.safeDrawing)
-      .padding(horizontal = 16.dp, vertical = 10.dp),
+      .padding(horizontal = 16.dp, vertical = 8.dp),
     contentAlignment = Alignment.Center
   ) {
     Card(
@@ -433,7 +443,7 @@ fun StartMenuOverlay(
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 20.dp, vertical = 14.dp),
+          .padding(horizontal = 18.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
       ) {
         // Top Header: Title + Best Level & Stars + Sound Toggle
@@ -450,11 +460,11 @@ fun StartMenuOverlay(
               imageVector = Icons.Default.Whatshot,
               contentDescription = null,
               tint = LavaOrange,
-              modifier = Modifier.size(28.dp)
+              modifier = Modifier.size(26.dp)
             )
             Text(
               text = stringResource(R.string.title_draw_to_survive),
-              style = MaterialTheme.typography.headlineLarge,
+              style = MaterialTheme.typography.headlineMedium,
               color = ChalkWhite,
               modifier = Modifier.testTag("start_title_text")
             )
@@ -470,7 +480,7 @@ fun StartMenuOverlay(
               border = BorderStroke(1.dp, LavaFlameYellow.copy(alpha = 0.55f))
             ) {
               Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
               ) {
@@ -478,11 +488,11 @@ fun StartMenuOverlay(
                   imageVector = Icons.Default.EmojiEvents,
                   contentDescription = null,
                   tint = LavaFlameYellow,
-                  modifier = Modifier.size(18.dp)
+                  modifier = Modifier.size(16.dp)
                 )
                 Text(
                   text = "${stringResource(R.string.label_best_level, uiState.bestLevel)} • ★ ${uiState.totalStarsEarned}/150",
-                  style = MaterialTheme.typography.labelLarge,
+                  style = MaterialTheme.typography.labelMedium,
                   color = LavaFlameYellow,
                   modifier = Modifier.testTag("best_level_text")
                 )
@@ -492,7 +502,7 @@ fun StartMenuOverlay(
             OutlinedButton(
               onClick = onToggleSoundClick,
               modifier = Modifier
-                .height(40.dp)
+                .height(36.dp)
                 .testTag("start_sound_toggle_button"),
               shape = CircleShape,
               border = BorderStroke(1.dp, PencilGraphite.copy(alpha = 0.6f))
@@ -505,13 +515,23 @@ fun StartMenuOverlay(
                 },
                 contentDescription = stringResource(R.string.action_sound_toggle),
                 tint = ChalkWhite,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(16.dp)
               )
             }
           }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // PART 4: Map Biome & Difficulty Selector Bar inside MAIN MENU
+        MapAndDifficultySelectorBar(
+          selectedMap = uiState.selectedMap,
+          selectedDifficulty = uiState.selectedDifficulty,
+          onSelectMap = onSelectMapClick,
+          onSelectDifficulty = onSelectDifficultyClick
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Candy Crush-Style 50-Level Winding Saga Map
         CandyCrushSagaMap(
@@ -522,26 +542,27 @@ fun StartMenuOverlay(
           modifier = Modifier
             .fillMaxWidth()
             .weight(1f, fill = false)
-            .height(230.dp)
+            .height(175.dp)
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Selected Level Scaling Formula Summary
+        // Selected Level Scaling Formula Summary + Quick Level Stepper
         SelectedLevelConfigBanner(
           config = selectedConfig,
           isCompleted = isSelectedCompleted,
-          stars = selectedStars
+          stars = selectedStars,
+          onStepLevel = onSelectLevelClick
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Large Play Button
         Button(
           onClick = onPlayClick,
           modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(48.dp)
             .testTag("play_button"),
           shape = RoundedCornerShape(16.dp),
           colors = ButtonDefaults.buttonColors(
@@ -552,12 +573,12 @@ fun StartMenuOverlay(
           Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = null,
-            modifier = Modifier.size(26.dp)
+            modifier = Modifier.size(24.dp)
           )
           Spacer(modifier = Modifier.width(8.dp))
           Text(
-            text = "${stringResource(R.string.action_play)} (LVL ${uiState.currentLevel})",
-            style = MaterialTheme.typography.headlineSmall
+            text = "${stringResource(R.string.action_play)} (LVL ${uiState.currentLevel} • ${uiState.selectedDifficulty.displayName.uppercase()})",
+            style = MaterialTheme.typography.titleLarge
           )
         }
       }
@@ -778,7 +799,8 @@ fun GameOverOverlay(
 }
 
 /**
- * Level Complete screen with Next Level and Replay buttons.
+ * Level Complete screen displaying earned stars (1-3) based on ink efficiency and collectible
+ * collection, along with Next Level, Retry, and Main Menu actions.
  */
 @Composable
 fun LevelCompleteOverlay(
@@ -787,18 +809,31 @@ fun LevelCompleteOverlay(
   onRetryClick: () -> Unit,
   onHomeClick: () -> Unit
 ) {
+  val earnedStars = uiState.starsEarned.coerceIn(1, 3)
+  val inkEfficiencyMet = uiState.earnedInkEfficiencyStar
+  val collectiblesMet = uiState.earnedCollectibleStar
+  val inkUsedInt = uiState.totalInkDrawn.roundToInt()
+  val parInkInt = uiState.levelDefinition.parInkUsage.roundToInt().coerceAtLeast(1)
+  val inkLeftPct = (uiState.inkRemainingRatio * 100f).roundToInt().coerceIn(0, 100)
+
+  val ratingSummary = when (earnedStars) {
+    3 -> "3 / 3 STARS • PERFECT ARCHITECT!"
+    2 -> "2 / 3 STARS • GREAT CROSSING!"
+    else -> "1 / 3 STARS • LEVEL CLEARED!"
+  }
+
   Box(
     modifier = Modifier
       .fillMaxSize()
-      .background(SketchCharcoalBg.copy(alpha = 0.82f))
+      .background(SketchCharcoalBg.copy(alpha = 0.84f))
       .windowInsetsPadding(WindowInsets.safeDrawing)
-      .padding(24.dp),
+      .padding(horizontal = 20.dp, vertical = 12.dp),
     contentAlignment = Alignment.Center
   ) {
     Card(
       modifier = Modifier
         .fillMaxWidth()
-        .widthIn(max = 480.dp)
+        .widthIn(max = 500.dp)
         .border(2.5.dp, FinishBannerGreen, RoundedCornerShape(26.dp))
         .testTag("level_complete_card"),
       shape = RoundedCornerShape(26.dp),
@@ -807,17 +842,10 @@ fun LevelCompleteOverlay(
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(28.dp),
+          .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
       ) {
-        Icon(
-          imageVector = Icons.Default.EmojiEvents,
-          contentDescription = null,
-          tint = LavaFlameYellow,
-          modifier = Modifier.size(52.dp)
-        )
-
         Text(
           text = stringResource(R.string.level_complete_title),
           style = MaterialTheme.typography.displayMedium,
@@ -826,18 +854,104 @@ fun LevelCompleteOverlay(
           modifier = Modifier.testTag("level_complete_title_text")
         )
 
-        Text(
-          text = stringResource(R.string.level_complete_subtitle),
-          style = MaterialTheme.typography.bodyLarge,
-          color = ChalkWhite,
-          textAlign = TextAlign.Center
-        )
+        // 3-Star Podium Display (1-3 Stars Earned)
+        Row(
+          modifier = Modifier
+            .padding(vertical = 2.dp)
+            .testTag("level_complete_stars_row"),
+          horizontalArrangement = Arrangement.spacedBy(14.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          for (starIndex in 1..3) {
+            val isEarned = starIndex <= earnedStars
+            val badgeSize = if (starIndex == 2) 54.dp else 46.dp
+            val iconSize = if (starIndex == 2) 34.dp else 28.dp
+            Box(
+              modifier = Modifier
+                .size(badgeSize)
+                .clip(CircleShape)
+                .background(
+                  if (isEarned) LavaFlameYellow.copy(alpha = 0.22f)
+                  else SketchCharcoalBg.copy(alpha = 0.7f)
+                )
+                .border(
+                  width = if (isEarned) 2.5.dp else 1.5.dp,
+                  color = if (isEarned) LavaFlameYellow else PencilGraphite.copy(alpha = 0.38f),
+                  shape = CircleShape
+                )
+                .testTag("level_complete_star_$starIndex"),
+              contentAlignment = Alignment.Center
+            ) {
+              Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = if (isEarned) "Star $starIndex Earned" else "Star $starIndex Locked",
+                tint = if (isEarned) LavaFlameYellow else PencilGraphite.copy(alpha = 0.35f),
+                modifier = Modifier.size(iconSize)
+              )
+            }
+          }
+        }
+
+        Surface(
+          color = SketchPaperCard,
+          shape = RoundedCornerShape(50),
+          border = BorderStroke(1.dp, LavaFlameYellow.copy(alpha = 0.6f))
+        ) {
+          Text(
+            text = ratingSummary,
+            style = MaterialTheme.typography.labelLarge,
+            color = LavaFlameYellow,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier
+              .padding(horizontal = 14.dp, vertical = 4.dp)
+              .testTag("level_complete_stars_text")
+          )
+        }
+
+        // Star Rating Criteria Breakdown (Finish + Ink Efficiency + Collectibles)
+        Surface(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("level_complete_stats_card"),
+          color = SketchCharcoalBg.copy(alpha = 0.78f),
+          shape = RoundedCornerShape(16.dp),
+          border = BorderStroke(1.dp, ChalkWhite.copy(alpha = 0.18f))
+        ) {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+          ) {
+            // Star 1: Crossing Completed
+            StarBreakdownRow(
+              earned = true,
+              label = "Crossing Complete",
+              detail = "LVL ${uiState.currentLevel} Finish Reached",
+              tag = "level_complete_crossing_row"
+            )
+            // Star 2: Ink Efficiency
+            StarBreakdownRow(
+              earned = inkEfficiencyMet,
+              label = "Ink Efficiency",
+              detail = "$inkUsedInt / $parInkInt Par ($inkLeftPct% Ink Left)",
+              tag = "level_complete_ink_efficiency_text"
+            )
+            // Star 3: Collectibles
+            StarBreakdownRow(
+              earned = collectiblesMet,
+              label = "Chalk Collectibles",
+              detail = "${uiState.allCollectiblesGotCount}/${uiState.allCollectiblesCount} Collected (Need ${uiState.collectibleTargetCount}+)",
+              tag = "level_complete_collectibles_text"
+            )
+          }
+        }
 
         Button(
           onClick = onNextLevelClick,
           modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(52.dp)
             .testTag("next_level_button"),
           shape = RoundedCornerShape(16.dp),
           colors = ButtonDefaults.buttonColors(
@@ -861,7 +975,7 @@ fun LevelCompleteOverlay(
             onClick = onRetryClick,
             modifier = Modifier
               .weight(1f)
-              .height(50.dp)
+              .height(48.dp)
               .testTag("complete_retry_button"),
             shape = RoundedCornerShape(14.dp),
             border = BorderStroke(1.5.dp, PencilGraphite)
@@ -879,7 +993,7 @@ fun LevelCompleteOverlay(
             onClick = onHomeClick,
             modifier = Modifier
               .weight(1f)
-              .height(50.dp)
+              .height(48.dp)
               .testTag("complete_home_button"),
             shape = RoundedCornerShape(14.dp),
             border = BorderStroke(1.5.dp, PencilGraphite)
@@ -897,3 +1011,44 @@ fun LevelCompleteOverlay(
     }
   }
 }
+
+@Composable
+private fun StarBreakdownRow(
+  earned: Boolean,
+  label: String,
+  detail: String,
+  tag: String
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .testTag(tag),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+      Icon(
+        imageVector = if (earned) Icons.Default.Star else Icons.Default.CheckCircle,
+        contentDescription = null,
+        tint = if (earned) LavaFlameYellow else PencilGraphite.copy(alpha = 0.4f),
+        modifier = Modifier.size(16.dp)
+      )
+      Text(
+        text = label,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = if (earned) ChalkWhite else PencilGraphite.copy(alpha = 0.7f)
+      )
+    }
+    Text(
+      text = detail,
+      fontSize = 11.sp,
+      fontWeight = FontWeight.SemiBold,
+      color = if (earned) FinishBannerGreen else LavaOrange.copy(alpha = 0.85f)
+    )
+  }
+}
+

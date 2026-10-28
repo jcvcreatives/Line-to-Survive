@@ -100,8 +100,8 @@ object SketchbookRenderer {
 
     val visibleWorldWidth = if (worldScale > 0f) size.width / worldScale else 1000f
 
-    // 1. Dark Slate Chalkboard Background + Subtle Graph Grid
-    drawSketchbookPaper(cameraX = cameraX, worldScale = worldScale)
+    // 1. Biome Background + Subtle Graph Grid
+    drawSketchbookPaper(cameraX = cameraX, worldScale = worldScale, mapBiome = level.mapBiome)
 
     // 2. Faint Guide Strokes on Level 1 / Early Levels
     if (completedLines.isEmpty()) {
@@ -110,12 +110,13 @@ object SketchbookRenderer {
       }
     }
 
-    // 3. Animated Lava Pit & Rising Flames Underneath Gaps
+    // 3. Animated Bottom Hazard Pit (Volcano Lava / Cryo Acid / Cyber Laser Floor)
     drawLavaPit(
       cameraX = cameraX,
       visibleWorldWidth = visibleWorldWidth,
       lavaAnimTime = lavaAnimTime,
       embers = embers,
+      mapBiome = level.mapBiome,
       toScreenX = ::toScreenX,
       toScreenY = ::toScreenY,
       worldScale = worldScale
@@ -145,7 +146,7 @@ object SketchbookRenderer {
       worldScale = worldScale
     )
 
-    // 6. Thumbtack & Dynamic Level Hazards (Swinging Pendulums & Vanishing Platforms)
+    // 6. Thumbtack & All 8 Modular Obstacles
     for (cluster in level.thumbtacks) {
       drawThumbtackCluster(cluster, ::toScreenX, ::toScreenY, worldScale)
     }
@@ -153,6 +154,9 @@ object SketchbookRenderer {
       drawDynamicHazard(
         hazard = hazard,
         animTime = lavaAnimTime,
+        runnerX = stickman.footX,
+        completedLines = completedLines,
+        mapBiome = level.mapBiome,
         toScreenX = ::toScreenX,
         toScreenY = ::toScreenY,
         worldScale = worldScale
@@ -230,9 +234,28 @@ object SketchbookRenderer {
     }
   }
 
-  private fun DrawScope.drawSketchbookPaper(cameraX: Float, worldScale: Float) {
+  private fun DrawScope.drawSketchbookPaper(
+    cameraX: Float,
+    worldScale: Float,
+    mapBiome: com.example.game.model.MapBiome = com.example.game.model.MapBiome.MAP_1_VOLCANO
+  ) {
+    val bgBrush = when (mapBiome) {
+      com.example.game.model.MapBiome.MAP_1_VOLCANO -> paperBackgroundBrush
+      com.example.game.model.MapBiome.MAP_2_CRYO_LAB -> Brush.verticalGradient(
+        colors = listOf(Color(0xFF0A1422), Color(0xFF102238), Color(0xFF0B2B3C))
+      )
+      com.example.game.model.MapBiome.MAP_3_CYBER_GRID -> Brush.verticalGradient(
+        colors = listOf(Color(0xFF110922), Color(0xFF1C1036), Color(0xFF280D3B))
+      )
+    }
+    val gridColor = when (mapBiome) {
+      com.example.game.model.MapBiome.MAP_1_VOLCANO -> SketchGridLine
+      com.example.game.model.MapBiome.MAP_2_CRYO_LAB -> Color(0xFF1D3E5E)
+      com.example.game.model.MapBiome.MAP_3_CYBER_GRID -> Color(0xFF3E1F68)
+    }
+
     drawRect(
-      brush = paperBackgroundBrush,
+      brush = bgBrush,
       size = size
     )
 
@@ -240,11 +263,10 @@ object SketchbookRenderer {
     val gridStepPx = (gridStepWorld * worldScale).coerceAtLeast(32f)
     val parallaxOffset = (cameraX * 0.35f * worldScale) % gridStepPx
 
-    // Vertical notebook graph lines
     var x = -parallaxOffset
     while (x < size.width) {
       drawLine(
-        color = SketchGridLine,
+        color = gridColor,
         start = Offset(x, 0f),
         end = Offset(x, size.height),
         strokeWidth = 1f
@@ -252,11 +274,10 @@ object SketchbookRenderer {
       x += gridStepPx
     }
 
-    // Horizontal notebook graph lines
     var y = 0f
     while (y < size.height) {
       drawLine(
-        color = SketchGridLine,
+        color = gridColor,
         start = Offset(0f, y),
         end = Offset(size.width, y),
         strokeWidth = 1f
@@ -309,7 +330,6 @@ object SketchbookRenderer {
     val right = toScreenX(platform.endX)
     val top = toScreenY(platform.topY)
 
-    // Render only a sleek floating chalk line for the Start / Finish foothold (no ground block!)
     val topPath1 = reusablePlatformPath.apply {
       reset()
       moveTo(left, top)
@@ -350,6 +370,7 @@ object SketchbookRenderer {
     visibleWorldWidth: Float,
     lavaAnimTime: Float,
     embers: List<EmberParticle>,
+    mapBiome: com.example.game.model.MapBiome = com.example.game.model.MapBiome.MAP_1_VOLCANO,
     toScreenX: (Float) -> Float,
     toScreenY: (Float) -> Float,
     worldScale: Float
@@ -358,14 +379,28 @@ object SketchbookRenderer {
     val startWorldX = cameraX - 60f
     val endWorldX = cameraX + visibleWorldWidth + 60f
 
-    // Ambient orange glow above the lava pit
+    val backColor = when (mapBiome) {
+      com.example.game.model.MapBiome.MAP_1_VOLCANO -> LavaDeepRed
+      com.example.game.model.MapBiome.MAP_2_CRYO_LAB -> Color(0xFF006080)
+      com.example.game.model.MapBiome.MAP_3_CYBER_GRID -> Color(0xFF9C0066)
+    }
+    val midColor = when (mapBiome) {
+      com.example.game.model.MapBiome.MAP_1_VOLCANO -> LavaOrange
+      com.example.game.model.MapBiome.MAP_2_CRYO_LAB -> Color(0xFF00B8D4)
+      com.example.game.model.MapBiome.MAP_3_CYBER_GRID -> Color(0xFFFF007F)
+    }
+    val coreColor = when (mapBiome) {
+      com.example.game.model.MapBiome.MAP_1_VOLCANO -> LavaFlameYellow
+      com.example.game.model.MapBiome.MAP_2_CRYO_LAB -> Color(0xFF84FFFF)
+      com.example.game.model.MapBiome.MAP_3_CYBER_GRID -> Color(0xFF00E5FF)
+    }
+
     drawRect(
       brush = lavaGlowBrush,
       topLeft = Offset(0f, toScreenY(lavaTopY - 75f)),
       size = Size(size.width, size.height - toScreenY(lavaTopY - 75f))
     )
 
-    // Back wave layer (deep red-orange)
     val backWavePath = reusableBackWavePath.apply {
       reset()
       moveTo(0f, size.height)
@@ -379,9 +414,8 @@ object SketchbookRenderer {
       lineTo(size.width, size.height)
       close()
     }
-    drawPath(path = backWavePath, color = LavaDeepRed)
+    drawPath(path = backWavePath, color = backColor)
 
-    // Middle flame tongues layer (bright orange)
     val midFlamePath = reusableMidFlamePath.apply {
       reset()
       moveTo(0f, size.height)
@@ -397,9 +431,8 @@ object SketchbookRenderer {
       lineTo(size.width, size.height)
       close()
     }
-    drawPath(path = midFlamePath, color = LavaOrange)
+    drawPath(path = midFlamePath, color = midColor)
 
-    // Front hot yellow core wave + sketchy white/yellow crest
     val coreWavePath = reusableCoreWavePath.apply {
       reset()
       moveTo(0f, size.height)
@@ -412,15 +445,14 @@ object SketchbookRenderer {
       lineTo(size.width, size.height)
       close()
     }
-    drawPath(path = coreWavePath, color = LavaFlameYellow.copy(alpha = 0.88f))
+    drawPath(path = coreWavePath, color = coreColor.copy(alpha = 0.88f))
 
-    // Rising embers
     for (ember in embers) {
       val sx = toScreenX(ember.worldX)
       val sy = toScreenY(ember.worldY)
       if (sx in -20f..(size.width + 20f)) {
         drawCircle(
-          color = (if (ember.isYellow) LavaFlameYellow else LavaOrange).copy(alpha = ember.alpha),
+          color = (if (ember.isYellow) coreColor else midColor).copy(alpha = ember.alpha),
           radius = ember.radius * worldScale,
           center = Offset(sx, sy)
         )
@@ -443,7 +475,6 @@ object SketchbookRenderer {
 
     if (postRightX < -50f || postLeftX > size.width + 50f) return
 
-    // Left and right finish poles
     drawLine(
       color = ChalkWhite,
       start = Offset(postLeftX, bottomY),
@@ -459,7 +490,6 @@ object SketchbookRenderer {
       cap = StrokeCap.Round
     )
 
-    // Checkered banner between poles
     val bannerHeight = 28f * worldScale
     val cols = 6
     val rows = 2
@@ -478,7 +508,6 @@ object SketchbookRenderer {
       }
     }
 
-    // Banner green outline
     drawRect(
       color = FinishBannerGreen,
       topLeft = Offset(postLeftX, topY),
@@ -623,7 +652,6 @@ object SketchbookRenderer {
         style = Stroke(width = 2.0f * worldScale)
       )
     } else {
-      // Glowing cyan/white chalk refill target ring — draw line here for additional chalk level!
       drawCircle(
         color = InkCyanAccent.copy(alpha = 0.22f * pulse),
         radius = 24f * worldScale,
@@ -635,7 +663,6 @@ object SketchbookRenderer {
         center = Offset(cx, cy),
         style = Stroke(width = 1.8f * worldScale)
       )
-      // Outer chalk stick shadow/outline
       drawLine(
         color = Color(0xFF0F172A),
         start = Offset(cx - 11f * worldScale, cy + 5.5f * worldScale),
@@ -643,7 +670,6 @@ object SketchbookRenderer {
         strokeWidth = 10.5f * worldScale,
         cap = StrokeCap.Round
       )
-      // Bright white chalk stick body
       drawLine(
         color = ChalkWhite,
         start = Offset(cx - 10f * worldScale, cy + 5f * worldScale),
@@ -651,7 +677,6 @@ object SketchbookRenderer {
         strokeWidth = 7.5f * worldScale,
         cap = StrokeCap.Round
       )
-      // Cyan chalk wrapper band in the middle of the chalk stick
       drawLine(
         color = InkCyanAccent,
         start = Offset(cx - 3f * worldScale, cy + 1.5f * worldScale),
@@ -674,7 +699,6 @@ object SketchbookRenderer {
       val ty = toScreenY(cluster.y)
       if (tx < -30f || tx > size.width + 30f) continue
 
-      // Pink cap + sharp steel spike pointing up
       drawCircle(
         color = Color(0xFFF39CAB).copy(alpha = 0.25f),
         radius = 13f * worldScale,
@@ -700,19 +724,67 @@ object SketchbookRenderer {
   private fun DrawScope.drawDynamicHazard(
     hazard: DynamicHazard,
     animTime: Float,
+    runnerX: Float = 0f,
+    completedLines: List<DrawnLine> = emptyList(),
+    mapBiome: com.example.game.model.MapBiome = com.example.game.model.MapBiome.MAP_1_VOLCANO,
     toScreenX: (Float) -> Float,
     toScreenY: (Float) -> Float,
     worldScale: Float
   ) {
     when (hazard.type) {
-      HazardType.VANISHING_PLATFORM -> drawVanishingPlatformHazard(
+      HazardType.LEDGE -> drawLedgeHazard(
+        hazard = hazard,
+        animTime = animTime,
+        mapBiome = mapBiome,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.PENDULUM -> drawSwingingPendulumHazard(
         hazard = hazard,
         animTime = animTime,
         toScreenX = toScreenX,
         toScreenY = toScreenY,
         worldScale = worldScale
       )
-      HazardType.SWINGING_PENDULUM -> drawSwingingPendulumHazard(
+      HazardType.LAVA_GEYSER -> drawLavaGeyserHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.FALLING_SPIKE -> drawFallingSpikeHazard(
+        hazard = hazard,
+        animTime = animTime,
+        runnerX = runnerX,
+        completedLines = completedLines,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.LASER_GATE -> drawLaserGateHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.SAW_TRACK -> drawSawTrackHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.NO_DRAW_ZONE -> drawNoDrawZoneHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.WIND_UPDRAFT -> drawWindUpdraftHazard(
         hazard = hazard,
         animTime = animTime,
         toScreenX = toScreenX,
@@ -722,21 +794,24 @@ object SketchbookRenderer {
     }
   }
 
-  private fun DrawScope.drawVanishingPlatformHazard(
+  private fun DrawScope.drawLedgeHazard(
     hazard: DynamicHazard,
     animTime: Float,
+    mapBiome: com.example.game.model.MapBiome,
     toScreenX: (Float) -> Float,
     toScreenY: (Float) -> Float,
     worldScale: Float
   ) {
-    val leftX = toScreenX(hazard.startX)
-    val rightX = toScreenX(hazard.endX)
+    val (lStartX, lEndX) = hazard.ledgeBoundsAt(animTime, mapBiome)
+    val leftX = toScreenX(lStartX)
+    val rightX = toScreenX(lEndX)
     val topY = toScreenY(hazard.topY)
     if (rightX < -80f || leftX > size.width + 80f) return
 
     val isSolid = hazard.isPlatformSolidAt(animTime)
     val isWarning = hazard.isPlatformWarningAt(animTime)
     val cycleProg = hazard.vanishingCycleProgressAt(animTime)
+    val isOrange = hazard.ledgeStyle == com.example.game.model.LedgeStyle.ORANGE_CRUMBLING
 
     if (isSolid) {
       val flicker = if (isWarning) {
@@ -744,18 +819,17 @@ object SketchbookRenderer {
       } else {
         1f
       }
-      val barColor = if (isWarning) {
-        LavaFlameYellow.copy(alpha = flicker)
-      } else {
-        InkCyanAccent.copy(alpha = 0.92f)
+      val barColor = when {
+        isWarning -> LavaFlameYellow.copy(alpha = flicker)
+        isOrange -> LavaOrange.copy(alpha = 0.94f)
+        else -> InkCyanAccent.copy(alpha = 0.94f)
       }
-      val glowColor = if (isWarning) {
-        LavaOrange.copy(alpha = 0.35f * flicker)
-      } else {
-        InkCyanAccent.copy(alpha = 0.26f)
+      val glowColor = when {
+        isWarning -> LavaOrange.copy(alpha = 0.35f * flicker)
+        isOrange -> LavaOrange.copy(alpha = 0.28f)
+        else -> InkCyanAccent.copy(alpha = 0.28f)
       }
 
-      // Soft spectral chalk glow under solid vanishing platform
       drawLine(
         color = glowColor,
         start = Offset(leftX, topY + 2f * worldScale),
@@ -764,7 +838,6 @@ object SketchbookRenderer {
         cap = StrokeCap.Round
       )
 
-      // Solid top chalk ledge
       drawLine(
         color = barColor,
         start = Offset(leftX, topY),
@@ -780,30 +853,332 @@ object SketchbookRenderer {
         cap = StrokeCap.Round
       )
 
-      // Remaining solid time progress bar underneath
-      val solidRemainingRatio = ((hazard.visibleRatio - cycleProg) / hazard.visibleRatio.coerceAtLeast(0.1f))
-        .coerceIn(0f, 1f)
-      val barSpan = (rightX - leftX) * solidRemainingRatio
-      drawLine(
-        color = if (isWarning) LavaOrange else FinishBannerGreen,
-        start = Offset(leftX, topY + 8f * worldScale),
-        end = Offset(leftX + barSpan, topY + 8f * worldScale),
-        strokeWidth = 2.8f * worldScale,
-        cap = StrokeCap.Round
-      )
+      if (isOrange) {
+        val solidRemainingRatio = ((hazard.visibleRatio - cycleProg) / hazard.visibleRatio.coerceAtLeast(0.1f))
+          .coerceIn(0f, 1f)
+        val barSpan = (rightX - leftX) * solidRemainingRatio
+        drawLine(
+          color = if (isWarning) LavaDeepRed else LavaFlameYellow,
+          start = Offset(leftX, topY + 8f * worldScale),
+          end = Offset(leftX + barSpan, topY + 8f * worldScale),
+          strokeWidth = 2.8f * worldScale,
+          cap = StrokeCap.Round
+        )
+      }
     } else {
-      // Vanished ghost state: dashed outline showing where platform will rematerialize
       val ghostDash = PathEffect.dashPathEffect(
         intervals = floatArrayOf(10f * worldScale, 8f * worldScale),
         phase = animTime * 24f * worldScale
       )
       drawLine(
-        color = InkCyanAccent.copy(alpha = 0.28f),
+        color = (if (isOrange) LavaOrange else InkCyanAccent).copy(alpha = 0.28f),
         start = Offset(leftX, topY),
         end = Offset(rightX, topY),
         strokeWidth = 3.5f * worldScale,
         cap = StrokeCap.Round,
         pathEffect = ghostDash
+      )
+    }
+  }
+
+  private fun DrawScope.drawLavaGeyserHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(hazard.x)
+    if (cx < -80f || cx > size.width + 80f) return
+
+    val baseY = toScreenY(WorldConstants.LAVA_SURFACE_Y)
+    val ratio = hazard.geyserEruptionRatioAt(animTime)
+    val isWarning = hazard.isGeyserWarningAt(animTime)
+    val halfW = (hazard.geyserWidth * 0.5f) * worldScale
+
+    // Warning bubble & target arch height indicator
+    val bubblePulse = 0.65f + 0.35f * sin(animTime * 14f + hazard.id)
+    drawCircle(
+      color = LavaFlameYellow.copy(alpha = if (isWarning || ratio > 0f) 0.78f else 0.38f),
+      radius = (12f + 6f * bubblePulse) * worldScale,
+      center = Offset(cx, baseY - 4f * worldScale)
+    )
+    drawCircle(
+      color = LavaOrange,
+      radius = (16f + 8f * bubblePulse) * worldScale,
+      center = Offset(cx, baseY - 4f * worldScale),
+      style = Stroke(width = 2.2f * worldScale)
+    )
+
+    if (ratio > 0.02f) {
+      val topY = toScreenY(hazard.geyserCurrentTopYAt(animTime))
+      drawLine(
+        color = LavaDeepRed.copy(alpha = 0.85f),
+        start = Offset(cx, baseY),
+        end = Offset(cx, topY),
+        strokeWidth = halfW * 2.2f,
+        cap = StrokeCap.Round
+      )
+      drawLine(
+        color = LavaOrange,
+        start = Offset(cx, baseY),
+        end = Offset(cx, topY),
+        strokeWidth = halfW * 1.5f,
+        cap = StrokeCap.Round
+      )
+      drawLine(
+        color = LavaFlameYellow,
+        start = Offset(cx, baseY),
+        end = Offset(cx, topY + 6f * worldScale),
+        strokeWidth = halfW * 0.75f,
+        cap = StrokeCap.Round
+      )
+      drawCircle(
+        color = LavaFlameYellow,
+        radius = halfW * 1.15f,
+        center = Offset(cx, topY)
+      )
+    }
+  }
+
+  private fun DrawScope.drawFallingSpikeHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    runnerX: Float,
+    completedLines: List<DrawnLine>,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(hazard.x)
+    if (cx < -60f || cx > size.width + 60f) return
+
+    val (tipWorldY, blocked) = hazard.fallingSpikeTipY(runnerX, completedLines)
+    val topWorldY = (tipWorldY - hazard.spikeHeight).coerceAtLeast(hazard.y)
+    val topY = toScreenY(topWorldY)
+    val tipY = toScreenY(tipWorldY)
+    val lavaY = toScreenY(WorldConstants.LAVA_SURFACE_Y)
+
+    // Red vertical warning laser line below the stalactite
+    val warnDash = PathEffect.dashPathEffect(
+      intervals = floatArrayOf(8f * worldScale, 8f * worldScale),
+      phase = -animTime * 35f * worldScale
+    )
+    drawLine(
+      color = LavaDeepRed.copy(alpha = if (blocked) 0.25f else 0.55f),
+      start = Offset(cx, tipY),
+      end = Offset(cx, lavaY),
+      strokeWidth = 2.0f * worldScale,
+      pathEffect = warnDash
+    )
+
+    // Stalactite cone body
+    val halfW = 13f * worldScale
+    val spikePath = reusableGuidePath.apply {
+      reset()
+      moveTo(cx - halfW, topY)
+      lineTo(cx + halfW, topY)
+      lineTo(cx, tipY)
+      close()
+    }
+    drawPath(path = spikePath, color = LavaDeepRed)
+    drawPath(
+      path = spikePath,
+      color = ChalkWhite,
+      style = Stroke(width = 2.2f * worldScale, join = StrokeJoin.Round)
+    )
+  }
+
+  private fun DrawScope.drawLaserGateHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(hazard.x)
+    if (cx < -60f || cx > size.width + 60f) return
+
+    val topY = toScreenY(hazard.topY)
+    val botY = toScreenY(hazard.bottomY)
+    val isActive = hazard.isLaserActiveAt(animTime)
+    val isCharging = hazard.isLaserChargingAt(animTime)
+
+    // Top & bottom emitter nodes
+    val nodeRadius = 10f * worldScale
+    drawCircle(color = SketchCharcoalBg, radius = nodeRadius, center = Offset(cx, topY))
+    drawCircle(color = ChalkWhite, radius = nodeRadius, center = Offset(cx, topY), style = Stroke(width = 2.5f * worldScale))
+    drawCircle(color = SketchCharcoalBg, radius = nodeRadius, center = Offset(cx, botY))
+    drawCircle(color = ChalkWhite, radius = nodeRadius, center = Offset(cx, botY), style = Stroke(width = 2.5f * worldScale))
+
+    if (isActive) {
+      drawLine(
+        color = LavaDeepRed.copy(alpha = 0.45f),
+        start = Offset(cx, topY),
+        end = Offset(cx, botY),
+        strokeWidth = 16f * worldScale,
+        cap = StrokeCap.Round
+      )
+      drawLine(
+        color = LavaOrange,
+        start = Offset(cx, topY),
+        end = Offset(cx, botY),
+        strokeWidth = 7.5f * worldScale,
+        cap = StrokeCap.Round
+      )
+      drawLine(
+        color = ChalkWhite,
+        start = Offset(cx, topY),
+        end = Offset(cx, botY),
+        strokeWidth = 2.6f * worldScale,
+        cap = StrokeCap.Round
+      )
+    } else {
+      val alpha = if (isCharging) 0.72f else 0.25f
+      val dash = PathEffect.dashPathEffect(
+        intervals = floatArrayOf(7f * worldScale, 7f * worldScale),
+        phase = animTime * 25f * worldScale
+      )
+      drawLine(
+        color = (if (isCharging) LavaFlameYellow else LavaDeepRed).copy(alpha = alpha),
+        start = Offset(cx, topY),
+        end = Offset(cx, botY),
+        strokeWidth = 2.4f * worldScale,
+        pathEffect = dash
+      )
+    }
+  }
+
+  private fun DrawScope.drawSawTrackHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val sx0 = toScreenX(hazard.trackStartX)
+    val sy0 = toScreenY(hazard.trackStartY)
+    val sx1 = toScreenX(hazard.trackEndX)
+    val sy1 = toScreenY(hazard.trackEndY)
+    if (maxOf(sx0, sx1) < -80f || minOf(sx0, sx1) > size.width + 80f) return
+
+    // Dotted linear track
+    val trackDash = PathEffect.dashPathEffect(
+      intervals = floatArrayOf(8f * worldScale, 6f * worldScale),
+      phase = 0f
+    )
+    drawLine(
+      color = PencilGraphite.copy(alpha = 0.55f),
+      start = Offset(sx0, sy0),
+      end = Offset(sx1, sy1),
+      strokeWidth = 3.0f * worldScale,
+      cap = StrokeCap.Round,
+      pathEffect = trackDash
+    )
+    drawCircle(color = ChalkWhite, radius = 4.5f * worldScale, center = Offset(sx0, sy0))
+    drawCircle(color = ChalkWhite, radius = 4.5f * worldScale, center = Offset(sx1, sy1))
+
+    // Spinning red buzzsaw
+    val sawPos = hazard.sawPositionAt(animTime)
+    val cx = toScreenX(sawPos.x)
+    val cy = toScreenY(sawPos.y)
+    val r = hazard.bobRadius * worldScale
+
+    drawCircle(
+      color = LavaDeepRed.copy(alpha = 0.30f),
+      radius = r * 1.38f,
+      center = Offset(cx, cy)
+    )
+    val teeth = 10
+    val spin = animTime * 7.5f
+    for (i in 0 until teeth) {
+      val a = spin + i * (2f * PI.toFloat() / teeth)
+      drawLine(
+        color = ChalkWhite,
+        start = Offset(cx + cos(a) * (r * 0.78f), cy + sin(a) * (r * 0.78f)),
+        end = Offset(cx + cos(a) * (r * 1.34f), cy + sin(a) * (r * 1.34f)),
+        strokeWidth = 3.0f * worldScale,
+        cap = StrokeCap.Round
+      )
+    }
+    drawCircle(color = LavaDeepRed, radius = r, center = Offset(cx, cy))
+    drawCircle(color = ChalkWhite, radius = r, center = Offset(cx, cy), style = Stroke(width = 2.4f * worldScale))
+    drawCircle(color = LavaFlameYellow, radius = r * 0.34f, center = Offset(cx, cy))
+  }
+
+  private fun DrawScope.drawNoDrawZoneHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val left = toScreenX(hazard.startX)
+    val right = toScreenX(hazard.endX)
+    if (right < -60f || left > size.width + 60f) return
+
+    val top = toScreenY(hazard.topY)
+    val bottom = toScreenY(hazard.bottomY)
+    val w = (right - left).coerceAtLeast(4f)
+    val h = (bottom - top).coerceAtLeast(4f)
+    val pulse = 0.14f + 0.06f * sin(animTime * 4f + hazard.id)
+
+    drawRect(
+      color = LavaDeepRed.copy(alpha = pulse),
+      topLeft = Offset(left, top),
+      size = Size(w, h)
+    )
+    val borderDash = PathEffect.dashPathEffect(
+      intervals = floatArrayOf(12f * worldScale, 8f * worldScale),
+      phase = animTime * 22f * worldScale
+    )
+    drawRect(
+      color = LavaOrange.copy(alpha = 0.78f),
+      topLeft = Offset(left, top),
+      size = Size(w, h),
+      style = Stroke(width = 2.4f * worldScale, pathEffect = borderDash)
+    )
+    // Diagonal warning X inside the No-Draw Zone
+    val cx = (left + right) * 0.5f
+    val cy = (top + bottom) * 0.5f
+    val xSize = 16f * worldScale
+    drawLine(LavaDeepRed.copy(alpha = 0.7f), Offset(cx - xSize, cy - xSize), Offset(cx + xSize, cy + xSize), 3.2f * worldScale, StrokeCap.Round)
+    drawLine(LavaDeepRed.copy(alpha = 0.7f), Offset(cx + xSize, cy - xSize), Offset(cx - xSize, cy + xSize), 3.2f * worldScale, StrokeCap.Round)
+  }
+
+  private fun DrawScope.drawWindUpdraftHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val left = toScreenX(hazard.startX)
+    val right = toScreenX(hazard.endX)
+    if (right < -60f || left > size.width + 60f) return
+
+    val top = toScreenY(hazard.topY)
+    val bottom = toScreenY(hazard.bottomY)
+    val w = (right - left).coerceAtLeast(4f)
+    val h = (bottom - top).coerceAtLeast(4f)
+
+    drawRect(
+      color = InkCyanAccent.copy(alpha = 0.09f),
+      topLeft = Offset(left, top),
+      size = Size(w, h)
+    )
+    // Rising wind streamlines
+    for (col in 0..2) {
+      val sx = left + w * (0.22f + col * 0.28f)
+      val cycle = ((animTime * 1.9f + col * 0.37f) % 1f)
+      val streakBot = bottom - cycle * (h - 35f * worldScale)
+      val streakTop = (streakBot - 42f * worldScale).coerceAtLeast(top)
+      drawLine(
+        color = InkCyanAccent.copy(alpha = 0.65f),
+        start = Offset(sx, streakBot),
+        end = Offset(sx, streakTop),
+        strokeWidth = 2.6f * worldScale,
+        cap = StrokeCap.Round
       )
     }
   }
@@ -824,7 +1199,6 @@ object SketchbookRenderer {
 
     if (pivotX + maxReachPx < -60f || pivotX - maxReachPx > size.width + 60f) return
 
-    // 1. Faint dashed swing-arc telegraph so player can curve chalk lines safely around it
     val arcPath = reusableGuidePath.apply {
       reset()
       val steps = 16
@@ -849,7 +1223,6 @@ object SketchbookRenderer {
       )
     )
 
-    // 2. Ceiling anchor ring & taut pendulum chain/rod
     drawCircle(
       color = SketchCharcoalBg,
       radius = 8.5f * worldScale,
@@ -869,7 +1242,6 @@ object SketchbookRenderer {
       cap = StrokeCap.Round
     )
 
-    // 3. Spiked wrecking bob with fiery aura & chalk outline
     val bobR = hazard.bobRadius * worldScale
     drawCircle(
       color = LavaOrange.copy(alpha = 0.28f),

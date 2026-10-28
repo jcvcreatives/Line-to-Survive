@@ -43,7 +43,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.game.level.LevelCatalog
+import com.example.game.model.DifficultyMode
 import com.example.game.model.LevelConfig
+import com.example.game.model.MapBiome
 import com.example.ui.theme.ChalkWhite
 import com.example.ui.theme.FinishBannerGreen
 import com.example.ui.theme.InkCyanAccent
@@ -55,11 +57,119 @@ import com.example.ui.theme.SketchCharcoalBg
 import com.example.ui.theme.SketchPaperCard
 
 /**
- * Candy Crush-style 50-Level Winding Saga Map showing:
- * - Completed levels (green/gold node + 1..3 stars + checkmark)
- * - Current unlocked frontier level (pulsing fiery orange node + "NEXT" flame badge)
- * - Locked future levels (padlock node along dashed trail)
- * - Winding S-curve road connecting all 50 levels across 5 themed worlds
+ * PART 4: Map & Difficulty Selector inside the MAIN MENU modal so any Map theme
+ * (`MAP_1_VOLCANO`, `MAP_2_CRYO_LAB`, `MAP_3_CYBER_GRID`) and Difficulty mode
+ * (`Easy / Normal / Hard / Nightmare`) can be switched and previewed immediately.
+ */
+@Composable
+fun MapAndDifficultySelectorBar(
+  selectedMap: MapBiome,
+  selectedDifficulty: DifficultyMode,
+  onSelectMap: (MapBiome) -> Unit,
+  onSelectDifficulty: (DifficultyMode) -> Unit,
+  modifier: Modifier = Modifier
+) {
+  Surface(
+    modifier = modifier
+      .fillMaxWidth()
+      .testTag("map_difficulty_selector_bar"),
+    color = SketchPaperCard.copy(alpha = 0.95f),
+    shape = RoundedCornerShape(14.dp),
+    border = BorderStroke(1.dp, ChalkWhite.copy(alpha = 0.22f))
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 10.dp, vertical = 6.dp),
+      verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+      // 1. Map Biome Selector Row
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = "MAP:",
+          fontSize = 11.sp,
+          fontWeight = FontWeight.ExtraBold,
+          color = PencilGraphite
+        )
+        for (biome in MapBiome.entries) {
+          val isSelected = biome == selectedMap
+          val accent = when (biome) {
+            MapBiome.MAP_1_VOLCANO -> LavaOrange
+            MapBiome.MAP_2_CRYO_LAB -> InkCyanAccent
+            MapBiome.MAP_3_CYBER_GRID -> Color(0xFFE040FB)
+          }
+          Surface(
+            onClick = { onSelectMap(biome) },
+            modifier = Modifier
+              .weight(1f)
+              .testTag("select_map_${biome.id}"),
+            shape = RoundedCornerShape(50),
+            color = if (isSelected) accent.copy(alpha = 0.24f) else SketchCharcoalBg.copy(alpha = 0.85f),
+            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) accent else ChalkWhite.copy(alpha = 0.24f))
+          ) {
+            Text(
+              text = biome.shortLabel,
+              fontSize = 11.sp,
+              fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+              color = if (isSelected) accent else ChalkWhite.copy(alpha = 0.8f),
+              textAlign = TextAlign.Center,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+          }
+        }
+      }
+
+      // 2. Difficulty Mode Selector Row
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = "DIFF:",
+          fontSize = 11.sp,
+          fontWeight = FontWeight.ExtraBold,
+          color = PencilGraphite
+        )
+        for (diff in DifficultyMode.entries) {
+          val isSelected = diff == selectedDifficulty
+          val accent = when (diff) {
+            DifficultyMode.EASY -> FinishBannerGreen
+            DifficultyMode.NORMAL -> InkCyanAccent
+            DifficultyMode.HARD -> LavaFlameYellow
+            DifficultyMode.NIGHTMARE -> LavaDeepRed
+          }
+          Surface(
+            onClick = { onSelectDifficulty(diff) },
+            modifier = Modifier
+              .weight(1f)
+              .testTag("select_difficulty_${diff.id}"),
+            shape = RoundedCornerShape(50),
+            color = if (isSelected) accent.copy(alpha = 0.24f) else SketchCharcoalBg.copy(alpha = 0.85f),
+            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) accent else ChalkWhite.copy(alpha = 0.24f))
+          ) {
+            Text(
+              text = diff.displayName,
+              fontSize = 11.sp,
+              fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+              color = if (isSelected) accent else ChalkWhite.copy(alpha = 0.8f),
+              textAlign = TextAlign.Center,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Candy Crush-style 50-Level Winding Saga Map.
+ * Every node (1..50) is tappable so the user can test any level immediately!
  */
 @Composable
 fun CandyCrushSagaMap(
@@ -79,47 +189,54 @@ fun CandyCrushSagaMap(
       .background(SketchCharcoalBg.copy(alpha = 0.92f))
       .border(1.5.dp, ChalkWhite.copy(alpha = 0.22f), RoundedCornerShape(20.dp))
       .verticalScroll(scrollState)
-      .padding(horizontal = 14.dp, vertical = 14.dp)
+      .padding(horizontal = 14.dp, vertical = 10.dp)
       .testTag("saga_map_scroll"),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
     rows.forEachIndexed { rowIndex, rowLevels ->
       val firstLevelInRow = rowLevels.first()
-      // Show World Banner whenever a row starts a new 10-level World (or contains level 1, 11, 21, 31, 41)
       val milestoneLevel = rowLevels.firstOrNull { (it - 1) % 10 == 0 }
       if (milestoneLevel != null) {
         val cfg = LevelCatalog.getLevelConfig(milestoneLevel)
+        val worldEnd = (milestoneLevel + 9).coerceAtMost(LevelCatalog.TOTAL_LEVELS)
+        var worldStars = 0
+        var worldCleared = 0
+        for (l in milestoneLevel..worldEnd) {
+          val st = levelStars[l] ?: if (l < bestLevel) 2 else 0
+          if (st > 0 || l < bestLevel) {
+            worldCleared++
+            worldStars += st.coerceIn(1, 3)
+          }
+        }
+        val worldTotalPossibleStars = (worldEnd - milestoneLevel + 1) * 3
         WorldBiomeBanner(
           worldIndex = cfg.worldIndex,
           worldTitle = cfg.worldTitle,
-          levelRangeText = "LEVELS $milestoneLevel–${(milestoneLevel + 9).coerceAtMost(50)}"
+          levelRangeText = "LVLS $milestoneLevel–$worldEnd • ★ $worldStars/$worldTotalPossibleStars ($worldCleared/${worldEnd - milestoneLevel + 1})"
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
       }
 
       val isReversedRow = (rowIndex % 2 == 1)
-      val orderedRow = if (isReversedRow) rowLevels.reversed() else rowLevels
       val nextRowFirstLevel = rows.getOrNull(rowIndex + 1)?.firstOrNull()
-      val isRowUnlocked = firstLevelInRow <= bestLevel
+      val isRowUnlocked = firstLevelInRow <= bestLevel || rowLevels.any { (levelStars[it] ?: 0) > 0 }
 
       Box(
         modifier = Modifier
           .fillMaxWidth()
-          .height(98.dp)
+          .height(94.dp)
           .drawBehind {
             val w = size.width
             val cy = size.height * 0.44f
             val colXs = listOf(w * 0.17f, w * 0.50f, w * 0.83f)
             val dashEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
 
-            // Horizontal S-curve segment across the 3 nodes in this row
             if (rowLevels.size >= 2) {
               val startCol = if (isReversedRow) 2 else 0
               val endCol = if (isReversedRow) 3 - rowLevels.size else rowLevels.size - 1
               val x0 = colXs[startCol]
               val x1 = colXs[endCol]
 
-              // Outer road track
               drawLine(
                 color = Color(0xFF2B2F3C),
                 start = Offset(x0, cy),
@@ -127,7 +244,6 @@ fun CandyCrushSagaMap(
                 strokeWidth = 18f,
                 cap = StrokeCap.Round
               )
-              // Inner chalk path
               drawLine(
                 color = if (isRowUnlocked) FinishBannerGreen.copy(alpha = 0.78f) else PencilGraphite.copy(alpha = 0.35f),
                 start = Offset(x0, cy),
@@ -138,7 +254,6 @@ fun CandyCrushSagaMap(
               )
             }
 
-            // Vertical turn connector to the next row
             if (nextRowFirstLevel != null) {
               val turnCol = if (isReversedRow) (3 - rowLevels.size).coerceIn(0, 2) else (rowLevels.size - 1).coerceIn(0, 2)
               val turnX = colXs[turnCol]
@@ -176,9 +291,9 @@ fun CandyCrushSagaMap(
             }
 
             if (lvl != null) {
-              val stars = levelStars[lvl] ?: if (lvl < bestLevel) 3 else 0
+              val stars = levelStars[lvl] ?: if (lvl < bestLevel) 2 else 0
               val isCompleted = (lvl < bestLevel) || (stars > 0)
-              val isUnlocked = lvl <= bestLevel
+              val isUnlocked = (lvl <= bestLevel) || isCompleted
               val isCurrentFrontier = (lvl == bestLevel) && !isCompleted
               val isSelected = (lvl == selectedLevel)
               val verticalWave = if (colIndex == 1) (-4).dp else 4.dp
@@ -226,7 +341,7 @@ private fun WorldBiomeBanner(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 12.dp, vertical = 6.dp),
+        .padding(horizontal = 12.dp, vertical = 5.dp),
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
@@ -239,7 +354,8 @@ private fun WorldBiomeBanner(
       Text(
         text = levelRangeText,
         style = MaterialTheme.typography.labelSmall,
-        color = ChalkWhite.copy(alpha = 0.85f)
+        color = LavaFlameYellow,
+        fontWeight = FontWeight.Bold
       )
     }
   }
@@ -256,29 +372,33 @@ private fun SagaLevelNode(
   onClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  val displayStars = if (isCompleted) stars.coerceIn(1, 3) else 0
+  val isPerfectThreeStar = isCompleted && displayStars == 3
+
   val nodeFill = when {
+    isPerfectThreeStar -> Color(0xFF1A5E3A)
     isCompleted -> Color(0xFF134E32)
-    isCurrentFrontier -> LavaOrange
+    isCurrentFrontier || isSelected -> LavaOrange
     else -> Color(0xFF252834)
   }
   val borderColor = when {
     isSelected -> InkCyanAccent
     isCurrentFrontier -> LavaFlameYellow
+    isPerfectThreeStar -> LavaFlameYellow
     isCompleted -> FinishBannerGreen
     else -> PencilGraphite.copy(alpha = 0.38f)
   }
-  val borderWidth = if (isSelected || isCurrentFrontier) 3.dp else 2.dp
+  val borderWidth = if (isSelected || isCurrentFrontier || isPerfectThreeStar) 3.dp else 2.dp
 
   Column(
     modifier = modifier
-      .width(76.dp)
+      .width(78.dp)
       .clip(RoundedCornerShape(14.dp))
-      .clickable(enabled = isUnlocked) { onClick() }
+      .clickable { onClick() }
       .padding(vertical = 2.dp)
       .testTag("select_level_${level}_button"),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    // Top badge for current frontier or selected node
     if (isCurrentFrontier) {
       Surface(
         color = LavaFlameYellow,
@@ -304,27 +424,40 @@ private fun SagaLevelNode(
           )
         }
       }
+    } else if (isCompleted) {
+      Surface(
+        color = if (isPerfectThreeStar) LavaFlameYellow else FinishBannerGreen,
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.padding(bottom = 2.dp)
+      ) {
+        Text(
+          text = "$displayStars★",
+          fontSize = 8.sp,
+          fontWeight = FontWeight.Black,
+          color = SketchCharcoalBg,
+          modifier = Modifier.padding(horizontal = 5.dp, vertical = 0.5.dp)
+        )
+      }
     } else {
       Spacer(modifier = Modifier.height(14.dp))
     }
 
-    // Circular Candy Crush Medallion
     Box(
       modifier = Modifier
-        .size(48.dp)
+        .size(44.dp)
         .clip(CircleShape)
         .background(nodeFill)
         .border(borderWidth, borderColor, CircleShape)
         .testTag("map_node_level_$level"),
       contentAlignment = Alignment.Center
     ) {
-      if (!isUnlocked) {
+      if (!isUnlocked && !isSelected) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
           Icon(
             imageVector = Icons.Default.Lock,
-            contentDescription = "Locked Level $level",
+            contentDescription = "Level $level",
             tint = PencilGraphite.copy(alpha = 0.65f),
-            modifier = Modifier.size(15.dp)
+            modifier = Modifier.size(13.dp)
           )
           Text(
             text = "$level",
@@ -345,60 +478,78 @@ private fun SagaLevelNode(
             Icon(
               imageVector = Icons.Default.Check,
               contentDescription = "Completed",
-              tint = FinishBannerGreen,
-              modifier = Modifier.size(12.dp)
+              tint = if (isPerfectThreeStar) LavaFlameYellow else FinishBannerGreen,
+              modifier = Modifier.size(11.dp)
             )
           }
         }
       }
     }
 
-    // Bottom 3-Star bar for Completed / Unlocked nodes
-    Row(
+    // Star Rating Row under each Saga Node
+    Surface(
+      color = if (isCompleted) SketchPaperCard.copy(alpha = 0.92f) else Color.Transparent,
+      shape = RoundedCornerShape(50),
+      border = if (isCompleted) {
+        BorderStroke(1.dp, if (isPerfectThreeStar) LavaFlameYellow.copy(alpha = 0.7f) else FinishBannerGreen.copy(alpha = 0.45f))
+      } else null,
       modifier = Modifier
-        .padding(top = 3.dp)
-        .height(14.dp),
-      horizontalArrangement = Arrangement.spacedBy(2.dp),
-      verticalAlignment = Alignment.CenterVertically
+        .padding(top = 2.dp)
+        .height(16.dp)
+        .testTag("map_node_stars_$level")
     ) {
-      if (isCompleted) {
-        val displayStars = stars.coerceIn(1, 3)
-        for (s in 1..3) {
-          Icon(
-            imageVector = Icons.Default.Star,
-            contentDescription = null,
-            tint = if (s <= displayStars) LavaFlameYellow else PencilGraphite.copy(alpha = 0.3f),
-            modifier = Modifier.size(12.dp)
+      Row(
+        modifier = Modifier.padding(horizontal = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        if (isCompleted) {
+          for (s in 1..3) {
+            Icon(
+              imageVector = Icons.Default.Star,
+              contentDescription = if (s <= displayStars) "Earned Star $s" else "Locked Star $s",
+              tint = if (s <= displayStars) LavaFlameYellow else PencilGraphite.copy(alpha = 0.32f),
+              modifier = Modifier.size(11.dp)
+            )
+          }
+        } else if (isCurrentFrontier || isSelected) {
+          Text(
+            text = "☆☆☆",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            color = LavaFlameYellow
+          )
+        } else {
+          Text(
+            text = "☆☆☆",
+            fontSize = 9.sp,
+            color = PencilGraphite.copy(alpha = 0.45f)
           )
         }
-      } else if (isCurrentFrontier) {
-        Text(
-          text = "OPEN",
-          fontSize = 9.sp,
-          fontWeight = FontWeight.Bold,
-          color = LavaFlameYellow
-        )
-      } else {
-        Text(
-          text = "LOCKED",
-          fontSize = 8.sp,
-          color = PencilGraphite.copy(alpha = 0.45f)
-        )
       }
     }
   }
 }
 
 /**
- * Compact inspector bar displaying the selected level's scaling parameters from `getLevelConfig(level)`.
+ * Compact inspector bar displaying the selected level's scaling parameters, star rating record,
+ * obstacle pool, and quick level stepper buttons (`-1`, `+1`, `+10`) so any level 1..50 can be tested rapidly.
  */
 @Composable
 fun SelectedLevelConfigBanner(
   config: LevelConfig,
   isCompleted: Boolean,
   stars: Int,
+  onStepLevel: (Int) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
+  val displayStars = if (isCompleted) stars.coerceIn(1, 3) else 0
+  val starsBadgeText = if (isCompleted) {
+    "★".repeat(displayStars) + "☆".repeat(3 - displayStars)
+  } else {
+    "☆☆☆"
+  }
+
   Surface(
     modifier = modifier
       .fillMaxWidth()
@@ -410,36 +561,101 @@ fun SelectedLevelConfigBanner(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 14.dp, vertical = 8.dp),
+        .padding(horizontal = 12.dp, vertical = 7.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(4.dp)
+      verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Text(
-          text = "LVL ${config.level}: ${config.levelTitle.uppercase()}",
-          style = MaterialTheme.typography.titleMedium,
-          color = LavaFlameYellow,
-          fontWeight = FontWeight.ExtraBold
-        )
-        Text(
-          text = if (isCompleted) "COMPLETED (${"★".repeat(stars.coerceIn(1, 3))})" else "READY TO RUN",
-          style = MaterialTheme.typography.labelMedium,
-          color = if (isCompleted) FinishBannerGreen else InkCyanAccent,
-          fontWeight = FontWeight.Bold
-        )
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          Text(
+            text = "LVL ${config.level}: ${config.levelTitle.uppercase()}",
+            style = MaterialTheme.typography.titleSmall,
+            color = LavaFlameYellow,
+            fontWeight = FontWeight.ExtraBold
+          )
+          Surface(
+            color = SketchCharcoalBg,
+            shape = RoundedCornerShape(50),
+            border = BorderStroke(
+              1.dp,
+              if (isCompleted) LavaFlameYellow.copy(alpha = 0.75f) else PencilGraphite.copy(alpha = 0.4f)
+            )
+          ) {
+            Text(
+              text = starsBadgeText,
+              fontSize = 10.sp,
+              fontWeight = FontWeight.Black,
+              color = if (isCompleted) LavaFlameYellow else PencilGraphite,
+              modifier = Modifier
+                .padding(horizontal = 7.dp, vertical = 1.dp)
+                .testTag("selected_level_stars_badge")
+            )
+          }
+        }
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(4.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Surface(
+            onClick = { onStepLevel((config.level - 1).coerceIn(1, 50)) },
+            color = SketchCharcoalBg,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, ChalkWhite.copy(alpha = 0.3f))
+          ) {
+            Text(
+              text = "◀",
+              fontSize = 10.sp,
+              color = ChalkWhite,
+              modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+            )
+          }
+          Surface(
+            onClick = { onStepLevel((config.level + 1).coerceIn(1, 50)) },
+            color = SketchCharcoalBg,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, ChalkWhite.copy(alpha = 0.3f))
+          ) {
+            Text(
+              text = "▶",
+              fontSize = 10.sp,
+              color = ChalkWhite,
+              modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+            )
+          }
+          Surface(
+            onClick = { onStepLevel(if (config.level + 10 > 50) 1 else config.level + 10) },
+            color = SketchCharcoalBg,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, InkCyanAccent.copy(alpha = 0.45f))
+          ) {
+            Text(
+              text = "+10",
+              fontSize = 10.sp,
+              fontWeight = FontWeight.Bold,
+              color = InkCyanAccent,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+          }
+        }
       }
 
       val hazardCount = LevelCatalog.getHazards(config.level, config).size
+      val obstacleNames = config.obstaclesAllowed.joinToString("+") { it.name.take(5) }
       Text(
-        text = "Dist: ${config.levelLength.toInt()}px • Speed: ${String.format("%.1f", config.baseSpeed)}x • Gaps: ${config.minGap.toInt()}–${config.maxGap.toInt()}px • ΔY: ±${config.maxDeltaY.toInt()}px • Decay: ${String.format("%.1f", config.lineLifespan)}s • Hazards: $hazardCount",
+        text = "Dist: ${config.levelLength.toInt()}px • Spd: ${String.format("%.1f", config.baseSpeed)}x • Pool: [$obstacleNames] ($hazardCount) • ${config.mapBiome.shortLabel} (${config.difficultyMode.displayName})",
         style = MaterialTheme.typography.bodySmall,
+        fontSize = 11.sp,
         color = ChalkWhite.copy(alpha = 0.9f),
         textAlign = TextAlign.Center
       )
     }
   }
 }
+

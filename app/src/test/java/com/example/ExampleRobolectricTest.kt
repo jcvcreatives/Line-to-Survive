@@ -105,13 +105,19 @@ class ExampleRobolectricTest {
     }
     composeTestRule.waitForIdle()
     assertEquals(ScreenState.LEVEL_COMPLETE, viewModel.uiState.value.screenState)
+    assertTrue("Earned stars must be between 1 and 3", viewModel.uiState.value.starsEarned in 1..3)
     composeTestRule.onNodeWithTag("level_complete_title_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("level_complete_stars_row").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("level_complete_stars_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("level_complete_ink_efficiency_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("level_complete_collectibles_text").assertIsDisplayed()
     composeTestRule.onNodeWithTag("next_level_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(ScreenState.PLAYING, viewModel.uiState.value.screenState)
     assertEquals(2, viewModel.uiState.value.currentLevel)
     assertTrue(repository.getBestLevel() >= 2)
+    assertTrue("Completed Level 1 star rating should be persisted", (repository.getAllLevelStars()[1] ?: 0) in 1..3)
     soundManager.release()
   }
 

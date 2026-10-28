@@ -40,6 +40,101 @@ object WorldConstants {
 }
 
 /**
+ * PART 1: Scalable Difficulty Modes (`DIFFICULTY_MODES` config object).
+ */
+enum class DifficultyMode(
+  val id: String,
+  val displayName: String,
+  val speedMult: Float,
+  val inkDrainMult: Float,
+  val hazardSpeedMult: Float,
+  val incomingFreq: Float
+) {
+  EASY(
+    id = "EASY",
+    displayName = "Easy",
+    speedMult = 0.8f,
+    inkDrainMult = 0.7f,
+    hazardSpeedMult = 0.8f,
+    incomingFreq = 0.6f
+  ),
+  NORMAL(
+    id = "NORMAL",
+    displayName = "Normal",
+    speedMult = 1.0f,
+    inkDrainMult = 1.0f,
+    hazardSpeedMult = 1.0f,
+    incomingFreq = 1.0f
+  ),
+  HARD(
+    id = "HARD",
+    displayName = "Hard",
+    speedMult = 1.25f,
+    inkDrainMult = 1.3f,
+    hazardSpeedMult = 1.3f,
+    incomingFreq = 1.4f
+  ),
+  NIGHTMARE(
+    id = "NIGHTMARE",
+    displayName = "Nightmare",
+    speedMult = 1.5f,
+    inkDrainMult = 1.6f,
+    hazardSpeedMult = 1.6f,
+    incomingFreq = 1.8f
+  );
+
+  companion object {
+    val DIFFICULTY_MODES: Map<String, DifficultyMode> = entries.associateBy { it.id }
+  }
+}
+
+/**
+ * PART 1: Biome / Map Registry (`MAPS_CONFIG`), decoupling visual themes and environmental physics
+ * from level numbers.
+ */
+enum class MapBiome(
+  val id: String,
+  val displayName: String,
+  val shortLabel: String,
+  val description: String,
+  val gravityMult: Float,
+  val slipSpeedMult: Float,
+  val hasMovingPlatforms: Boolean
+) {
+  MAP_1_VOLCANO(
+    id = "MAP_1_VOLCANO",
+    displayName = "Map 1: Volcano",
+    shortLabel = "Volcano",
+    description = "Lava pit at bottom, dark cavern background, ember particles",
+    gravityMult = 1.0f,
+    slipSpeedMult = 1.0f,
+    hasMovingPlatforms = false
+  ),
+  MAP_2_CRYO_LAB(
+    id = "MAP_2_CRYO_LAB",
+    displayName = "Map 2: Cryo Lab",
+    shortLabel = "Cryo Lab",
+    description = "Acid/Freezing water at bottom, slippery cyan platforms, low gravity",
+    gravityMult = 0.76f,
+    slipSpeedMult = 1.12f,
+    hasMovingPlatforms = false
+  ),
+  MAP_3_CYBER_GRID(
+    id = "MAP_3_CYBER_GRID",
+    displayName = "Map 3: Cyber Grid",
+    shortLabel = "Cyber Grid",
+    description = "Laser floor, neon grid background, moving platforms",
+    gravityMult = 1.0f,
+    slipSpeedMult = 1.04f,
+    hasMovingPlatforms = true
+  );
+
+  companion object {
+    val MAPS_CONFIG: Map<String, MapBiome> = entries.associateBy { it.id }
+  }
+}
+
+/**
  * Switchable chalk tools introducing the evolved mechanics:
  * - WHITE: Standard chalk floor + steep strokes act as knee-high vault hurdles
  * - SPRING: Blue bouncy trampoline chalk that launches the stickman into a high arc
@@ -181,14 +276,70 @@ data class ScriptedCallout(
 )
 
 /**
- * Core scaling parameters for a level (1..50) calculated by `getLevelConfig(level)`:
- * - [levelLength]: Distance to finish line (`800px` in Level 1, `+150px` per level)
- * - [baseSpeed]: Character speed multiplier (`3.0` in Level 1 scaling linearly to `8.5` at Level 50)
- * - [runSpeed]: World horizontal velocity in px/sec derived from [baseSpeed]
- * - [minGap], [maxGap]: Gap width range (`80px–140px` in Level 1 scaling to `180px–380px` in Level 50)
- * - [maxDeltaY]: Platform elevation variance (`0px` in Levels 1–3, scaling up to `±160px` by Level 50)
- * - [maxInkPerLevel], [inkRechargeRate]: Tighter ink capacity & regen relative to gap sizes
- * - [lineLifespan]: Decay timer (`5.0s` in Level 1 decreasing linearly to `1.8s` by Level 50)
+ * Pendulum configuration styles for `PENDULUM` obstacle.
+ */
+enum class PendulumStyle {
+  SINGLE,
+  DOUBLE_SYNC,
+  FAST_SHORT
+}
+
+/**
+ * Ledge configuration styles for `LEDGE` obstacle.
+ */
+enum class LedgeStyle {
+  CYAN_STATIC,
+  CYAN_BOUNCY,
+  ORANGE_CRUMBLING
+}
+
+/**
+ * PART 2: Modular Obstacle Pool (8 Obstacle Types for Recycling & Combining):
+ * 1. [PENDULUM]: Swinging red spiked ball on a tether (`single`, `double_sync`, or `fast_short`).
+ * 2. [LEDGE]: Cyan (static/bouncy) and Orange (crumbling/temporary) mini-platforms.
+ * 3. [LAVA_GEYSER]: Warning bubble at the bottom lava surface that shoots a vertical fireball pillar upward every 2.5s.
+ * 4. [FALLING_SPIKE]: Ceiling stalactites/meteors with a red vertical warning line that drop when the player approaches.
+ * 5. [LASER_GATE]: Vertical red laser beam between two nodes that toggles ON/OFF every 1.5s.
+ * 6. [SAW_TRACK]: Spinning red buzzsaw moving horizontally or vertically along a dotted track line.
+ * 7. [NO_DRAW_ZONE]: Translucent red rectangular static field where `Chalk` cannot be drawn.
+ * 8. [WIND_UPDRAFT]: Vertical particle columns that push the stickman upward toward overhead hazards unless blocked by a drawn ceiling.
+ */
+enum class HazardType {
+  PENDULUM,
+  LEDGE,
+  LAVA_GEYSER,
+  FALLING_SPIKE,
+  LASER_GATE,
+  SAW_TRACK,
+  NO_DRAW_ZONE,
+  WIND_UPDRAFT;
+
+  companion object {
+    val SWINGING_PENDULUM: HazardType get() = PENDULUM
+    val VANISHING_PLATFORM: HazardType get() = LEDGE
+  }
+}
+
+/**
+ * Data-driven level blueprint entry in `LEVEL_DEFINITIONS` (Levels 1..50).
+ */
+data class LevelBlueprint(
+  val level: Int,
+  val tier: Int,
+  val title: String,
+  val subtitle: String,
+  val obstaclesAllowed: List<HazardType>,
+  val spawnRate: Float,
+  val incomingEventsAllowed: List<CalloutMoveType>,
+  val pendulumStyle: PendulumStyle = PendulumStyle.SINGLE,
+  val ledgeStyle: LedgeStyle = LedgeStyle.CYAN_STATIC,
+  val lengthMultiplier: Float = 1.0f,
+  val isBossOrMilestone: Boolean = false,
+  val hasMagnetFinale: Boolean = false
+)
+
+/**
+ * Core scaling parameters for a level (1..50) calculated by `getLevelConfig(level)`.
  */
 data class LevelConfig(
   val level: Int,
@@ -206,39 +357,55 @@ data class LevelConfig(
   val inkRechargeRate: Float,
   val parInkUsage: Float,
   val maxStrokeLength: Float,
-  val lineLifespan: Float
+  val lineLifespan: Float,
+  val obstaclesAllowed: List<HazardType> = emptyList(),
+  val incomingEventsAllowed: List<CalloutMoveType> = emptyList(),
+  val spawnRate: Float = 1.0f,
+  val difficultyMode: DifficultyMode = DifficultyMode.NORMAL,
+  val mapBiome: MapBiome = MapBiome.MAP_1_VOLCANO
 )
 
 /**
- * Dynamic obstacle types generated by `getHazards(level)`:
- * - [SWINGING_PENDULUM]: Overhead spiked wrecking ball that swings across the sky in a sinusoidal arc.
- * - [VANISHING_PLATFORM]: Temporary spectral chalk foothold that phases in and out of existence on a cycle.
- */
-enum class HazardType {
-  SWINGING_PENDULUM,
-  VANISHING_PLATFORM
-}
-
-/**
- * Dynamic obstacle scaled by level number (`1..50`) via `LevelCatalog.getHazards(level)`.
+ * Modular dynamic obstacle scaled by level number (`1..50`) and difficulty via `LevelCatalog.getHazards(...)`.
  */
 data class DynamicHazard(
   val id: Int,
   val type: HazardType,
   val x: Float,
   val y: Float,
-  // Swinging Pendulum parameters
+  // 1. PENDULUM parameters
   val armLength: Float = 170f,
   val bobRadius: Float = 20f,
   val maxAngleRadians: Float = 0.65f,
   val angularSpeed: Float = 2.2f,
-  // Vanishing Platform parameters
+  val pendulumStyle: PendulumStyle = PendulumStyle.SINGLE,
+  // 2. LEDGE / Rect zone parameters
   val startX: Float = x - 65f,
   val endX: Float = x + 65f,
   val topY: Float = y,
+  val bottomY: Float = y + 18f,
   val cycleSeconds: Float = 3.6f,
   val visibleRatio: Float = 0.65f,
-  // Shared phase offset (radians for pendulum, seconds for vanishing platform)
+  val ledgeStyle: LedgeStyle = LedgeStyle.ORANGE_CRUMBLING,
+  val movesInBiome: Boolean = false,
+  // 3. LAVA_GEYSER parameters (2.5s cycle: bubble warning -> vertical fireball pillar)
+  val geyserTargetTopY: Float = 220f,
+  val geyserWidth: Float = 34f,
+  // 4. FALLING_SPIKE parameters (ceiling stalactite that drops when player approaches)
+  val triggerLeadX: Float = 165f,
+  val spikeDropSpeed: Float = 420f,
+  val spikeHeight: Float = 44f,
+  // 5. LASER_GATE parameters (vertical beam between topY and bottomY toggling every 1.5s)
+  val laserHalfPeriodSeconds: Float = 1.5f,
+  // 6. SAW_TRACK parameters (buzzsaw moving along track between (trackStartX, trackStartY) and (trackEndX, trackEndY))
+  val trackStartX: Float = x - 90f,
+  val trackStartY: Float = y,
+  val trackEndX: Float = x + 90f,
+  val trackEndY: Float = y,
+  val trackSpeed: Float = 2.0f,
+  // 8. WIND_UPDRAFT parameters (upward vertical acceleration)
+  val updraftAcceleration: Float = 1480f,
+  // Shared phase offset
   val phaseOffset: Float = 0f
 ) {
   val width: Float get() = endX - startX
@@ -262,14 +429,126 @@ data class DynamicHazard(
   }
 
   fun isPlatformSolidAt(timeSeconds: Float): Boolean {
-    if (type != HazardType.VANISHING_PLATFORM) return false
+    if (type != HazardType.LEDGE) return false
+    if (ledgeStyle == LedgeStyle.CYAN_STATIC || ledgeStyle == LedgeStyle.CYAN_BOUNCY) return true
     return vanishingCycleProgressAt(timeSeconds) < visibleRatio
   }
 
   fun isPlatformWarningAt(timeSeconds: Float): Boolean {
+    if (type != HazardType.LEDGE || ledgeStyle == LedgeStyle.CYAN_STATIC || ledgeStyle == LedgeStyle.CYAN_BOUNCY) {
+      return false
+    }
     if (!isPlatformSolidAt(timeSeconds)) return false
     val prog = vanishingCycleProgressAt(timeSeconds)
     return prog >= (visibleRatio - 0.18f).coerceAtLeast(0.1f)
+  }
+
+  fun ledgeBoundsAt(timeSeconds: Float, biome: MapBiome): Pair<Float, Float> {
+    if (!movesInBiome && !biome.hasMovingPlatforms) {
+      return startX to endX
+    }
+    val sway = sin(timeSeconds * 2.1f + phaseOffset) * 28f
+    return (startX + sway) to (endX + sway)
+  }
+
+  /**
+   * LAVA_GEYSER cycle: shoots a vertical fireball pillar upward every 2.5s (scaled by cycleSeconds).
+   * Returns `0f` when dormant/bubbling, or `0f..1f` eruption height ratio when active.
+   */
+  fun geyserEruptionRatioAt(timeSeconds: Float): Float {
+    val safeCycle = cycleSeconds.coerceAtLeast(1.0f)
+    val prog = vanishingCycleProgressAt(timeSeconds)
+    // First 58% of cycle is warning bubble at lava surface; remaining 42% is vertical fireball eruption
+    if (prog < 0.58f) return 0f
+    val eruptProg = (prog - 0.58f) / 0.42f
+    return sin(eruptProg * Math.PI.toFloat()).coerceIn(0f, 1f)
+  }
+
+  fun isGeyserWarningAt(timeSeconds: Float): Boolean {
+    if (type != HazardType.LAVA_GEYSER) return false
+    val prog = vanishingCycleProgressAt(timeSeconds)
+    return prog in 0.25f..0.58f
+  }
+
+  fun geyserCurrentTopYAt(timeSeconds: Float): Float {
+    val ratio = geyserEruptionRatioAt(timeSeconds)
+    return WorldConstants.LAVA_SURFACE_Y - (WorldConstants.LAVA_SURFACE_Y - geyserTargetTopY) * ratio
+  }
+
+  /**
+   * LASER_GATE toggles ON/OFF every `laserHalfPeriodSeconds` (default 1.5s).
+   */
+  fun isLaserActiveAt(timeSeconds: Float): Boolean {
+    if (type != HazardType.LASER_GATE) return false
+    val fullPeriod = (laserHalfPeriodSeconds * 2f).coerceAtLeast(0.8f)
+    val t = ((timeSeconds + phaseOffset) % fullPeriod).let { if (it < 0f) it + fullPeriod else it }
+    return t < laserHalfPeriodSeconds
+  }
+
+  fun isLaserChargingAt(timeSeconds: Float): Boolean {
+    if (type != HazardType.LASER_GATE) return false
+    val fullPeriod = (laserHalfPeriodSeconds * 2f).coerceAtLeast(0.8f)
+    val t = ((timeSeconds + phaseOffset) % fullPeriod).let { if (it < 0f) it + fullPeriod else it }
+    return t >= fullPeriod - 0.45f
+  }
+
+  /**
+   * SAW_TRACK position along its dotted linear track at [timeSeconds].
+   */
+  fun sawPositionAt(timeSeconds: Float): Vec2 {
+    val wave = 0.5f + 0.5f * sin(timeSeconds * trackSpeed + phaseOffset)
+    return Vec2(
+      x = trackStartX + (trackEndX - trackStartX) * wave,
+      y = trackStartY + (trackEndY - trackStartY) * wave
+    )
+  }
+
+  /**
+   * FALLING_SPIKE tip Y position given the runner's current [runnerX], or blocked by an overhead drawn line.
+   */
+  fun fallingSpikeTipY(runnerX: Float, completedLines: List<DrawnLine>): Pair<Float, Boolean> {
+    val distancePastTrigger = runnerX - (x - triggerLeadX)
+    val rawTipY = if (distancePastTrigger <= 0f) {
+      y + spikeHeight
+    } else {
+      val fallFraction = (distancePastTrigger / 175f).coerceIn(0f, 1.35f)
+      y + spikeHeight + fallFraction * (WorldConstants.LAVA_SURFACE_Y - y)
+    }
+
+    // Check if an overhead player-drawn Chalk roof/shield blocks the falling spike
+    var shieldY: Float? = null
+    for (line in completedLines) {
+      for (seg in line.segments) {
+        val leftX = minOf(seg.start.x, seg.end.x) - 14f
+        val rightX = maxOf(seg.start.x, seg.end.x) + 14f
+        if (x in leftX..rightX) {
+          val dx = (seg.end.x - seg.start.x)
+          val segY = if (kotlin.math.abs(dx) < 1f) {
+            minOf(seg.start.y, seg.end.y)
+          } else {
+            val t = ((x - seg.start.x) / dx).coerceIn(0f, 1f)
+            seg.start.y + (seg.end.y - seg.start.y) * t
+          }
+          if (segY >= y + 20f && (shieldY == null || segY < shieldY)) {
+            shieldY = segY
+          }
+        }
+      }
+    }
+
+    return if (shieldY != null && rawTipY >= shieldY) {
+      shieldY to true
+    } else {
+      rawTipY.coerceAtMost(WorldConstants.LAVA_SURFACE_Y) to false
+    }
+  }
+
+  /**
+   * Returns true if [point] lies inside a `NO_DRAW_ZONE` rectangle.
+   */
+  fun containsNoDrawPoint(point: Vec2): Boolean {
+    if (type != HazardType.NO_DRAW_ZONE) return false
+    return point.x in startX..endX && point.y in topY..bottomY
   }
 }
 
@@ -295,6 +574,9 @@ data class LevelDefinition(
   val maxGap: Float = 140f,
   val maxDeltaY: Float = 0f,
   val worldTitle: String = "World 1: Chalkboard Meadows",
+  val difficultyMode: DifficultyMode = DifficultyMode.NORMAL,
+  val mapBiome: MapBiome = MapBiome.MAP_1_VOLCANO,
+  val obstaclesAllowed: List<HazardType> = emptyList(),
   val platforms: List<Platform>,
   val guideStrokes: List<GuideStroke> = emptyList(),
   val chalkBits: List<ChalkBit> = emptyList(),
@@ -381,6 +663,8 @@ data class GameUiState(
   val currentLevel: Int = 1,
   val bestLevel: Int = 1,
   val levelStars: Map<Int, Int> = emptyMap(),
+  val selectedDifficulty: DifficultyMode = DifficultyMode.NORMAL,
+  val selectedMap: MapBiome = MapBiome.MAP_1_VOLCANO,
   val levelDefinition: LevelDefinition,
   val stickman: StickmanState,
   val cameraX: Float = 0f,
@@ -429,6 +713,28 @@ data class GameUiState(
 
   val totalBitsInLevel: Int
     get() = chalkBits.count { !it.isStar }
+
+  val allCollectiblesGotCount: Int
+    get() = chalkBits.count { it.collected }
+
+  val allCollectiblesCount: Int
+    get() = chalkBits.size
+
+  val collectibleTargetCount: Int
+    get() = if (allCollectiblesCount == 0) 0 else maxOf(1, (allCollectiblesCount + 1) / 2)
+
+  val earnedInkEfficiencyStar: Boolean
+    get() = totalInkDrawn <= levelDefinition.parInkUsage
+
+  val earnedCollectibleStar: Boolean
+    get() = allCollectiblesCount == 0 || allCollectiblesGotCount >= collectibleTargetCount
+
+  fun calculateEarnedStars(): Int {
+    var stars = 1 // 1st star: Crossing completed
+    if (earnedInkEfficiencyStar) stars++ // 2nd star: Ink efficiency within par budget
+    if (earnedCollectibleStar) stars++ // 3rd star: Collectibles target met
+    return stars.coerceIn(1, 3)
+  }
 }
 
 /**

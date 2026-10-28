@@ -1,6 +1,0 @@
-{
-  "summary":  "Architectural and implementation plan to port the Draw to Survive (Chalk Runner Evolved) game UI, level catalog, and full Matter.js 2D rigid-body physics engine into a standalone, single-file index.html in the root directory for GitHub Pages and web browsers.",
-  "updatedAt":  "2026-10-28T07:32:17.564616424Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

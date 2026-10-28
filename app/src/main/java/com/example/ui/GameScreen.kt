@@ -174,13 +174,11 @@ fun DrawToSurviveScreen(
             uiState = uiState,
             onPlayClick = { viewModel.startGame() },
             onSelectLevelClick = { level ->
-              if (uiState.currentLevel == level) {
-                viewModel.startGame(level)
-              } else {
-                viewModel.selectMapLevel(level)
-              }
+              viewModel.selectMapLevel(level)
             },
-            onToggleSoundClick = { viewModel.toggleSound() }
+            onToggleSoundClick = { viewModel.toggleSound() },
+            onSelectDifficultyClick = { diff -> viewModel.selectDifficulty(diff) },
+            onSelectMapClick = { map -> viewModel.selectMapBiome(map) }
           )
         }
 

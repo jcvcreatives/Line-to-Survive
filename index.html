@@ -743,27 +743,38 @@
           </div>
         </div>
 
-        <div style="height: 8px;"></div>
+        <div style="height: 6px;"></div>
+
+        <!-- PART 4: Map (Biome) & Difficulty Selector inside MAIN MENU -->
+        <div id="mapDifficultySelectorBar" style="width: 100%; background: rgba(24, 25, 31, 0.92); border: 1.5px solid rgba(64, 196, 255, 0.35); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 900; color: var(--ink-cyan-accent); min-width: 68px;">MAP BIOME:</span>
+            <button type="button" class="tool-chip map-chip active" data-map="MAP_1_VOLCANO" style="height: 26px; padding: 0 9px; font-size: 11px;">VOLCANO</button>
+            <button type="button" class="tool-chip map-chip" data-map="MAP_2_CRYO_LAB" style="height: 26px; padding: 0 9px; font-size: 11px;">CRYO LAB</button>
+            <button type="button" class="tool-chip map-chip" data-map="MAP_3_CYBER_GRID" style="height: 26px; padding: 0 9px; font-size: 11px;">CYBER GRID</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 900; color: var(--lava-flame-yellow); min-width: 68px;">DIFFICULTY:</span>
+            <button type="button" class="tool-chip diff-chip" data-diff="EASY" style="height: 26px; padding: 0 9px; font-size: 11px;">EASY</button>
+            <button type="button" class="tool-chip diff-chip active" data-diff="NORMAL" style="height: 26px; padding: 0 9px; font-size: 11px;">NORMAL</button>
+            <button type="button" class="tool-chip diff-chip" data-diff="HARD" style="height: 26px; padding: 0 9px; font-size: 11px;">HARD</button>
+            <button type="button" class="tool-chip diff-chip" data-diff="NIGHTMARE" style="height: 26px; padding: 0 9px; font-size: 11px;">NIGHTMARE</button>
+          </div>
+        </div>
+
+        <div style="height: 6px;"></div>
 
         <!-- Candy Crush-Style 50-Level Winding Saga Map -->
         <div class="saga-map-scroll" id="sagaMapContainer"></div>
 
+        <div style="height: 6px;"></div>
+
+        <!-- Selected Level Scaling Formula Inspector + Quick Level Steppers (1-50) -->
+        <div class="level-config-banner" id="selectedLevelBanner"></div>
+
         <div style="height: 8px;"></div>
 
-        <!-- Selected Level Scaling Formula Inspector -->
-        <div class="level-config-banner" id="selectedLevelBanner">
-          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-weight: 800; font-size: 14px;">
-            <span id="selectedLevelTitle" style="color: var(--lava-flame-yellow);">LVL 1: HOMEROOM SKETCH</span>
-            <span id="selectedLevelStatus" style="color: var(--ink-cyan-accent); font-size: 12px;">READY TO RUN</span>
-          </div>
-          <div id="selectedLevelMetrics" style="font-size: 12px; color: rgba(247, 248, 242, 0.9);">
-            Dist: 800px • Speed: 3.0x • Gaps: 80–140px • ΔY: ±0px • Decay: 5.0s
-          </div>
-        </div>
-
-        <div style="height: 10px;"></div>
-
-        <button class="action-btn play-orange" id="btnStartGame" style="height: 52px; font-size: 20px;">
+        <button class="action-btn play-orange" id="btnStartGame" style="height: 50px; font-size: 19px;">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           <span id="btnStartGameLabel">PLAY (LVL 1)</span>
         </button>
@@ -824,16 +835,20 @@
     <!-- 5. LEVEL COMPLETE OVERLAY (Matches LevelCompleteOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="levelCompleteOverlay" hidden>
       <div class="modal-card complete-card">
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="#FFCA28">
-          <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
-        </svg>
+        <h2 class="display-title" style="color: var(--finish-banner-green); font-size: 30px;">LEVEL COMPLETE!</h2>
 
-        <h2 class="display-title" style="color: var(--finish-banner-green);">LEVEL COMPLETE!</h2>
-        <p class="body-large" style="color: var(--chalk-white);">
-          Awesome sketching! You survived the lava crossing.
-        </p>
+        <!-- 3-Star Podium Display (1-3 Stars Earned) -->
+        <div id="levelCompleteStarsRow" style="display: flex; align-items: center; justify-content: center; gap: 14px; margin: 2px 0;"></div>
 
-        <button class="action-btn green-primary" id="btnNextLevel">
+        <!-- Rating Summary Pill -->
+        <div id="levelCompleteStarsBadge" style="background: #1E2028; border: 1.5px solid rgba(255, 202, 40, 0.65); border-radius: 999px; padding: 4px 14px; font-family: var(--font-mono); font-size: 11px; font-weight: 900; color: var(--lava-flame-yellow); letter-spacing: 0.5px;">
+          3 / 3 STARS • PERFECT ARCHITECT!
+        </div>
+
+        <!-- Ink Efficiency & Collectibles Breakdown Card -->
+        <div id="levelCompleteStatsCard" style="width: 100%; background: rgba(24, 25, 31, 0.85); border: 1px solid rgba(247, 248, 242, 0.18); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 11px;"></div>
+
+        <button class="action-btn green-primary" id="btnNextLevel" style="height: 52px;">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
           <span>NEXT LEVEL</span>
         </button>
@@ -873,7 +888,6 @@
     const DEFAULT_LINE_LIFETIME = 7.5;
     const MAX_CLIMBABLE_SLOPE_RADIANS = 1.18;
 
-    // Color.kt exact hex values
     const COLORS = {
       SketchCharcoalBg: '#18191F',
       SketchPaperSurface: '#23252E',
@@ -893,6 +907,62 @@
       SPRING: { id: 'SPRING', name: 'Bounce',    cost: 1.25, core: COLORS.InkCyanAccent,   halo: 'rgba(64, 196, 255, 0.42)' },
       BOOST:  { id: 'BOOST',  name: 'Turbo',     cost: 1.5,  core: COLORS.LavaFlameYellow, halo: 'rgba(255, 87, 34, 0.48)' },
       CUTTER: { id: 'CUTTER', name: 'Cut/Erase', cost: 0.0,  core: COLORS.LavaOrange,      halo: 'rgba(213, 0, 0, 0.40)' }
+    };
+
+    /* ----------- PART 1: SCALABLE MULTI-MAP & DIFFICULTY CONFIG ---------- */
+    const DIFFICULTY_MODES = {
+      EASY:      { id: 'EASY',      label: 'Easy',      speedMult: 0.80, inkDrainMult: 0.70, hazardSpeedMult: 0.80, incomingFreq: 0.60 },
+      NORMAL:    { id: 'NORMAL',    label: 'Normal',    speedMult: 1.00, inkDrainMult: 1.00, hazardSpeedMult: 1.00, incomingFreq: 1.00 },
+      HARD:      { id: 'HARD',      label: 'Hard',      speedMult: 1.25, inkDrainMult: 1.30, hazardSpeedMult: 1.30, incomingFreq: 1.40 },
+      NIGHTMARE: { id: 'NIGHTMARE', label: 'Nightmare', speedMult: 1.50, inkDrainMult: 1.60, hazardSpeedMult: 1.60, incomingFreq: 1.80 }
+    };
+
+    const MAPS_CONFIG = {
+      MAP_1_VOLCANO: {
+        id: 'MAP_1_VOLCANO',
+        title: 'Volcano Cavern',
+        shortLabel: 'VOLCANO',
+        gravityMult: 1.0,
+        platformFriction: 1.0,
+        movingPlatforms: false,
+        bgTop: '#18191F',
+        bgMid: '#23252E',
+        bgBottom: '#1E1718',
+        gridColor: '#2A2D38',
+        pitBack: '#D50000',
+        pitMid: '#FF5722',
+        pitCore: 'rgba(255, 202, 40, 0.88)'
+      },
+      MAP_2_CRYO_LAB: {
+        id: 'MAP_2_CRYO_LAB',
+        title: 'Cryo Lab',
+        shortLabel: 'CRYO LAB',
+        gravityMult: 0.76,
+        platformFriction: 0.55,
+        movingPlatforms: false,
+        bgTop: '#0E1B2A',
+        bgMid: '#15263B',
+        bgBottom: '#0B2430',
+        gridColor: '#1E3A56',
+        pitBack: '#0097A7',
+        pitMid: '#00E5FF',
+        pitCore: 'rgba(132, 255, 255, 0.88)'
+      },
+      MAP_3_CYBER_GRID: {
+        id: 'MAP_3_CYBER_GRID',
+        title: 'Cyber Grid',
+        shortLabel: 'CYBER GRID',
+        gravityMult: 1.0,
+        platformFriction: 1.0,
+        movingPlatforms: true,
+        bgTop: '#120A28',
+        bgMid: '#1C1136',
+        bgBottom: '#260B2C',
+        gridColor: '#391E5A',
+        pitBack: '#AA00FF',
+        pitMid: '#FF1744',
+        pitCore: 'rgba(255, 128, 171, 0.88)'
+      }
     };
 
     /* ----------------------- WEB AUDIO SYNTHESIZER ----------------------- */
@@ -949,56 +1019,111 @@
 
     const sound = new SoundManager();
 
-    /* -------------------------- 50-LEVEL CATALOG ------------------------- */
+    /* ------------ PART 3: LEVEL 1 TO 50 PROGRESSION MATRIX --------------- */
     const TOTAL_LEVELS = 50;
     const WORLD_THEMES = [
-      "World 1: Chalkboard Meadows",
-      "World 2: Ember Sketch Caverns",
-      "World 3: Neon Blueprint Peaks",
-      "World 4: Molten Magma Foundry",
-      "World 5: Inferno Citadel"
-    ];
-    const LEVEL_NAMES = [
-      "Homeroom Sketch", "Flatline Sprint", "Chalk Dust Dash", "Stepping Stones", "First Elevation",
-      "Scribbler Ambush", "Bounce Pad Basics", "Thumbtack Alley", "Turbo Chalk Trial", "Meadow Boss Run",
-      "Ember Cavern Entry", "Falling Stalactites", "Crumbling Bridges", "Double Gap Leap", "Low Gravity Vault",
-      "Crimson Scribblers", "Razor Tack Ridge", "High Ledge Climb", "Gold Ink Express", "Cavern Guardian",
-      "Blueprint Ascent", "Drafting Table Drop", "Steep Vector Ramp", "Architect's Gap", "Skyline Hurdles",
-      "Shockwave Snip", "Pendulum Cliffs", "Wind Tunnel Sketch", "Vertigo Spire", "Blueprint Overlord",
-      "Magma Foundry Gate", "Smelting Crucible", "Slag Pit Crossing", "Piston Ledges", "Superheated Ink",
-      "Blazing Gauntlet", "Anvil Drop Canyon", "Molten Cascade", "Forge Master's Path", "Foundry Core",
-      "Inferno Ramparts", "Obsidian Chasm", "Supersonic Sketch", "Vanishing Chalk", "Volcanic Updraft",
-      "Demon Scribbler Pack", "Hellfire Spire", "Abyssal Leap", "Final Crucible", "Grandmaster of Survival"
+      "Tier 1: The Basics & Tool Mastery",
+      "Tier 2: Verticality & Evasion",
+      "Tier 3: High-Speed Combos",
+      "Tier 4: Environmental Chaos",
+      "Tier 5: Master Gauntlet"
     ];
 
-    function getLevelConfig(level) {
+    const LEVEL_DEFINITIONS = [
+      // TIER 1: THE BASICS & TOOL MASTERY (Levels 1-10)
+      { level: 1,  title: "Homeroom Sketch",         obstacles: ["LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 2,  title: "Flatline Sprint",         obstacles: ["LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 3,  title: "Chalk Dust Dash",         obstacles: ["LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 4,  title: "Stepping Stones",         obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 5,  title: "First Elevation",         obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 6,  title: "Crumbling Bridges",       obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 7,  title: "Bounce Pad Basics",       obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 8,  title: "Twin Pendulum Vault",     obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 9,  title: "Turbo Chalk Trial",       obstacles: ["PENDULUM", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "BOOST" },
+      { level: 10, title: "Magma Crossing",          obstacles: ["PENDULUM", "LEDGE", "LAVA_GEYSER"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", isMiniBoss: true },
+      // TIER 2: VERTICALITY & EVASION (Levels 11-20)
+      { level: 11, title: "Ember Cavern Entry",      obstacles: ["LAVA_GEYSER", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 12, title: "Geyser High Arch",        obstacles: ["LAVA_GEYSER", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_BOUNCY" },
+      { level: 13, title: "Fire & Pendulums",        obstacles: ["LAVA_GEYSER", "PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 14, title: "Falling Stalactites",     obstacles: ["FALLING_SPIKE", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC", recommendedTool: "WHITE" },
+      { level: 15, title: "Overhead Chalk Shield",   obstacles: ["FALLING_SPIKE", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC", recommendedTool: "WHITE" },
+      { level: 16, title: "Meteor Shower Bridge",    obstacles: ["FALLING_SPIKE", "LAVA_GEYSER"], pendulumStyle: "SINGLE", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "WHITE" },
+      { level: 17, title: "Razor Tack Ridge",        obstacles: ["PENDULUM", "FALLING_SPIKE", "LEDGE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 18, title: "High Ledge Climb",        obstacles: ["LEDGE", "LAVA_GEYSER"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 19, title: "Gold Ink Express",        obstacles: ["PENDULUM", "LEDGE", "LAVA_GEYSER"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "CYAN_STATIC", recommendedTool: "BOOST" },
+      { level: 20, title: "Cavern Guardian",         obstacles: ["PENDULUM", "LAVA_GEYSER", "FALLING_SPIKE", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", isMiniBoss: true },
+      // TIER 3: HIGH-SPEED COMBOS (Levels 21-30)
+      { level: 21, title: "Blueprint Ascent",        obstacles: ["LASER_GATE", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC", recommendedTool: "BOOST" },
+      { level: 22, title: "Laser Timing Gate",       obstacles: ["LASER_GATE", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC", recommendedTool: "BOOST" },
+      { level: 23, title: "Beam & Pendulum",         obstacles: ["LASER_GATE", "PENDULUM"], pendulumStyle: "SINGLE", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "BOOST" },
+      { level: 24, title: "Pulse Gate Sprint",       obstacles: ["LASER_GATE", "LAVA_GEYSER", "LEDGE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "BOOST" },
+      { level: 25, title: "Skyline Saw Track",       obstacles: ["SAW_TRACK", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC" },
+      { level: 26, title: "Shockwave Snip",          obstacles: ["SAW_TRACK", "PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "CUTTER" },
+      { level: 27, title: "Pendulum & Buzzsaw",      obstacles: ["SAW_TRACK", "PENDULUM", "LASER_GATE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 28, title: "Dual Track Saws",         obstacles: ["SAW_TRACK", "FALLING_SPIKE", "LEDGE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "CYAN_BOUNCY" },
+      { level: 29, title: "Vertigo Spire",           obstacles: ["SAW_TRACK", "LASER_GATE", "LAVA_GEYSER"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 30, title: "Sawblade Sanctuary",      obstacles: ["SAW_TRACK", "LASER_GATE", "PENDULUM", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", isMiniBoss: true },
+      // TIER 4: ENVIRONMENTAL CHAOS (Levels 31-40)
+      { level: 31, title: "Static Field Entry",      obstacles: ["NO_DRAW_ZONE", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 32, title: "Bounce Over Null Zone",   obstacles: ["NO_DRAW_ZONE", "PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 33, title: "Dead Air Crossing",       obstacles: ["NO_DRAW_ZONE", "LAVA_GEYSER", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "SPRING" },
+      { level: 34, title: "Null Laser Corridor",     obstacles: ["NO_DRAW_ZONE", "LASER_GATE", "SAW_TRACK"], pendulumStyle: "FAST_SHORT", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "SPRING" },
+      { level: 35, title: "Wind Tunnel Sketch",      obstacles: ["WIND_UPDRAFT", "PENDULUM", "LEDGE"], pendulumStyle: "SINGLE", ledgeStyle: "CYAN_STATIC", recommendedTool: "WHITE" },
+      { level: 36, title: "Updraft Ceiling Guard",   obstacles: ["WIND_UPDRAFT", "FALLING_SPIKE", "LEDGE"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "WHITE" },
+      { level: 37, title: "Gale Force Saws",         obstacles: ["WIND_UPDRAFT", "SAW_TRACK", "PENDULUM"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 38, title: "Thermal Cyclone",         obstacles: ["WIND_UPDRAFT", "NO_DRAW_ZONE", "LAVA_GEYSER"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "CYAN_BOUNCY" },
+      { level: 39, title: "Forge Master's Path",     obstacles: ["WIND_UPDRAFT", "LASER_GATE", "SAW_TRACK", "FALLING_SPIKE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 40, title: "Reactor Core",            obstacles: ["NO_DRAW_ZONE", "WIND_UPDRAFT", "LASER_GATE", "SAW_TRACK", "PENDULUM"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", isMiniBoss: true },
+      // TIER 5: MASTER GAUNTLET (Levels 41-50)
+      { level: 41, title: "Quad Hazard Remix I",     obstacles: ["PENDULUM", "LAVA_GEYSER", "LASER_GATE", "SAW_TRACK"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 42, title: "Quad Hazard Remix II",    obstacles: ["FALLING_SPIKE", "NO_DRAW_ZONE", "WIND_UPDRAFT", "LEDGE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "CYAN_BOUNCY" },
+      { level: 43, title: "Quad Hazard Remix III",   obstacles: ["SAW_TRACK", "LASER_GATE", "NO_DRAW_ZONE", "LAVA_GEYSER"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 44, title: "Quad Hazard Remix IV",    obstacles: ["WIND_UPDRAFT", "PENDULUM", "FALLING_SPIKE", "SAW_TRACK"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING" },
+      { level: 45, title: "Precision Corridor I",    obstacles: ["NO_DRAW_ZONE", "LASER_GATE", "PENDULUM", "LEDGE"], pendulumStyle: "FAST_SHORT", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "CUTTER" },
+      { level: 46, title: "Precision Corridor II",   obstacles: ["WIND_UPDRAFT", "SAW_TRACK", "FALLING_SPIKE", "LAVA_GEYSER"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "CUTTER" },
+      { level: 47, title: "Precision Corridor III",  obstacles: ["NO_DRAW_ZONE", "WIND_UPDRAFT", "LASER_GATE", "SAW_TRACK"], pendulumStyle: "FAST_SHORT", ledgeStyle: "CYAN_BOUNCY", recommendedTool: "CUTTER" },
+      { level: 48, title: "Precision Corridor IV",   obstacles: ["PENDULUM", "LAVA_GEYSER", "FALLING_SPIKE", "NO_DRAW_ZONE", "SAW_TRACK"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", recommendedTool: "CUTTER" },
+      { level: 49, title: "The Final Ascent",        obstacles: ["PENDULUM", "LEDGE", "LAVA_GEYSER", "FALLING_SPIKE", "LASER_GATE", "SAW_TRACK", "WIND_UPDRAFT"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", lengthMultiplier: 2.0 },
+      { level: 50, title: "Inferno Overlord",        obstacles: ["PENDULUM", "LEDGE", "LAVA_GEYSER", "FALLING_SPIKE", "LASER_GATE", "SAW_TRACK", "NO_DRAW_ZONE", "WIND_UPDRAFT"], pendulumStyle: "DOUBLE_SYNC", ledgeStyle: "ORANGE_CRUMBLING", isMiniBoss: true, magnetFinaleCount: 20 }
+    ];
+
+    function getLevelBlueprint(level) {
+      const clamped = Math.max(1, Math.min(TOTAL_LEVELS, level));
+      return LEVEL_DEFINITIONS[clamped - 1];
+    }
+
+    function getLevelConfig(level, difficultyKey = (state && state.selectedDifficulty) || 'NORMAL', mapKey = (state && state.selectedMap) || 'MAP_1_VOLCANO') {
       const clampedLevel = Math.max(1, Math.min(TOTAL_LEVELS, level));
       const t = (clampedLevel - 1) / (TOTAL_LEVELS - 1);
+      const blueprint = getLevelBlueprint(clampedLevel);
+      const diff = DIFFICULTY_MODES[difficultyKey] || DIFFICULTY_MODES.NORMAL;
+      const mapCfg = MAPS_CONFIG[mapKey] || MAPS_CONFIG.MAP_1_VOLCANO;
       const worldIdx = Math.floor((clampedLevel - 1) / 10);
       const worldTitle = WORLD_THEMES[Math.min(WORLD_THEMES.length - 1, worldIdx)];
-      const levelTitle = LEVEL_NAMES[clampedLevel - 1] || `Chalk Trial #${clampedLevel}`;
+      const levelTitle = blueprint.title;
 
       // 1. Level Length: 800px in Level 1, +150px per level
       const levelLength = 800 + (clampedLevel - 1) * 150;
       // 2. Character Run Speed (baseSpeed): 3.0 in Level 1 -> 8.5 in Level 50
-      const baseSpeed = 3.0 + t * (8.5 - 3.0);
-      const runSpeed = 175 + t * (340 - 175);
+      const baseSpeed = (3.0 + t * (8.5 - 3.0)) * diff.speedMult;
+      const runSpeed = (175 + t * (340 - 175)) * diff.speedMult;
       // 3. Gap Width Range (minGap, maxGap): 80..140 in Level 1 -> 180..380 in Level 50
       const minGap = 80 + t * (180 - 80);
       const maxGap = 140 + t * (380 - 140);
       // 4. Platform Elevation Variance (deltaY): 0px in Levels 1..3 -> ±160px by Level 50
       const maxDeltaY = clampedLevel <= 3 ? 0 : ((clampedLevel - 3) / 47) * 160;
-      // 5. Max Ink Capacity & Regen Rate: tighter relative to gap size
+      // 5. Max Ink Capacity & Regen Rate
       const maxInkPerLevel = 1000 - t * 320;
       const inkRechargeRate = 120 - t * 52;
       const parInkUsage = maxInkPerLevel * 1.6;
-      const maxStrokeLength = Math.max(1800, levelLength * 1.25);
+      const maxStrokeLength = Math.max(1800, levelLength * 1.25 * (blueprint.lengthMultiplier || 1));
       // 6. Line Lifespan (Decay Timer): 5.0s in Level 1 -> 1.8s by Level 50
       const lineLifespan = 5.0 - t * (5.0 - 1.8);
 
+      const obsSummary = blueprint.obstacles.join(' + ');
       const levelSubtitle = clampedLevel <= 3
-        ? `No ground platforms! Draw your line to the floating chalk (+CHALK) to reach the Finish!`
-        : `Speed ${baseSpeed.toFixed(1)}x • ΔY ±${Math.round(maxDeltaY)}px • Lines decay in ${lineLifespan.toFixed(1)}s!`;
+        ? `No ground platforms! Draw your line to floating chalk (+CHALK) to reach the Finish!`
+        : `${mapCfg.title} (${diff.label}) • ${obsSummary} • Decay ${lineLifespan.toFixed(1)}s`;
 
       return {
         level: clampedLevel,
@@ -1016,67 +1141,83 @@
         inkRechargeRate,
         parInkUsage,
         maxStrokeLength,
-        lineLifespan
+        lineLifespan,
+        blueprint
       };
     }
 
-    function getHazards(level, config = getLevelConfig(level)) {
+    function getHazards(level, config = getLevelConfig(level), difficultyKey = (state && state.selectedDifficulty) || 'NORMAL', mapKey = (state && state.selectedMap) || 'MAP_1_VOLCANO') {
       const clampedLevel = Math.max(1, Math.min(TOTAL_LEVELS, level));
       if (clampedLevel <= 1) return [];
 
       const t = (clampedLevel - 1) / (TOTAL_LEVELS - 1);
+      const blueprint = getLevelBlueprint(clampedLevel);
+      const diff = DIFFICULTY_MODES[difficultyKey] || DIFFICULTY_MODES.NORMAL;
+      const hazardSpeedMult = diff.hazardSpeedMult;
       const startPlatformEnd = 520;
-      const finishX = startPlatformEnd + config.levelLength;
+      const effectiveLength = config.levelLength * (blueprint.lengthMultiplier || 1);
+      const finishX = startPlatformEnd + effectiveLength;
 
-      // Frequency scaling: spacing tightens from 680px (L2) down to 310px (L50)
       const baseHazardSpacing = 680 - t * 370;
-
-      // Difficulty scaling for Swinging Pendulums
-      const pendulumAngularSpeed = 1.85 + t * 2.50;
+      const pendulumAngularSpeed = (1.85 + t * 2.50) * hazardSpeedMult;
       const pendulumMaxAngle = 0.52 + t * 0.50;
       const pendulumBobRadius = 18 + t * 8;
-
-      // Difficulty scaling for Vanishing Platforms
       const platformWidth = 150 - t * 58;
-      const platformCycleSeconds = 4.2 - t * 2.3;
+      const platformCycleSeconds = Math.max(1.2, (4.2 - t * 2.3) / hazardSpeedMult);
       const platformVisibleRatio = 0.72 - t * 0.30;
 
+      const pool = blueprint.obstacles.length > 0 ? blueprint.obstacles : ['LEDGE'];
       const hazards = [];
       let cursorX = startPlatformEnd + 240;
       let hazardIndex = 0;
 
       while (cursorX < finishX - 180) {
-        const isPendulum = clampedLevel <= 3
-          ? false
-          : (clampedLevel <= 6
-            ? (hazardIndex % 2 === 1)
-            : (((clampedLevel + hazardIndex) % 2 === 0) || (clampedLevel >= 25 && hazardIndex % 3 === 0)));
-
+        const chosenType = pool[(hazardIndex + clampedLevel) % pool.length];
         const elevationShift = config.maxDeltaY <= 0.5
           ? 0
           : Math.sin(clampedLevel * 1.1 + hazardIndex * 1.45) * (config.maxDeltaY * 0.65);
         const phaseOffset = ((clampedLevel * 0.65) + (hazardIndex * 1.15)) % 6.28;
+        const baseId = clampedLevel * 1000 + hazardIndex * 10;
 
-        if (isPendulum) {
-          const armLen = Math.max(150, Math.min(195, 160 + (hazardIndex % 3) * 14));
+        if (chosenType === 'PENDULUM') {
+          const style = blueprint.pendulumStyle || 'SINGLE';
+          const armLen = style === 'FAST_SHORT'
+            ? 122
+            : Math.max(150, Math.min(195, 160 + (hazardIndex % 3) * 14));
+          const speedMult = style === 'FAST_SHORT' ? 1.35 : 1.0;
           const pivotY = Math.max(70, Math.min(210, DEFAULT_GROUND_Y - armLen - 78 + elevationShift * 0.55));
           hazards.push({
-            id: clampedLevel * 1000 + hazardIndex,
-            type: 'SWINGING_PENDULUM',
+            id: baseId,
+            type: 'PENDULUM',
             x: cursorX,
             y: pivotY,
             armLength: armLen,
             bobRadius: pendulumBobRadius,
             maxAngleRadians: pendulumMaxAngle,
-            angularSpeed: pendulumAngularSpeed,
-            phaseOffset
+            angularSpeed: pendulumAngularSpeed * speedMult,
+            phaseOffset,
+            pendulumStyle: style
           });
-        } else {
+          if (style === 'DOUBLE_SYNC' && cursorX + 115 < finishX - 160) {
+            hazards.push({
+              id: baseId + 1,
+              type: 'PENDULUM',
+              x: cursorX + 108,
+              y: pivotY,
+              armLength: armLen,
+              bobRadius: pendulumBobRadius * 0.92,
+              maxAngleRadians: pendulumMaxAngle,
+              angularSpeed: pendulumAngularSpeed,
+              phaseOffset: phaseOffset + 0.35,
+              pendulumStyle: style
+            });
+          }
+        } else if (chosenType === 'LEDGE') {
           const topY = Math.max(195, Math.min(455, DEFAULT_GROUND_Y - 12 + elevationShift));
           const halfW = platformWidth * 0.5;
           hazards.push({
-            id: clampedLevel * 1000 + hazardIndex,
-            type: 'VANISHING_PLATFORM',
+            id: baseId,
+            type: 'LEDGE',
             x: cursorX,
             y: topY,
             startX: cursorX - halfW,
@@ -1084,7 +1225,90 @@
             topY,
             cycleSeconds: platformCycleSeconds,
             visibleRatio: platformVisibleRatio,
+            phaseOffset,
+            ledgeStyle: blueprint.ledgeStyle || 'CYAN_STATIC'
+          });
+        } else if (chosenType === 'LAVA_GEYSER') {
+          const peakY = Math.max(165, Math.min(310, DEFAULT_GROUND_Y - 135 + elevationShift * 0.4));
+          hazards.push({
+            id: baseId,
+            type: 'LAVA_GEYSER',
+            x: cursorX,
+            y: LAVA_SURFACE_Y,
+            topY: peakY,
+            width: 38,
+            cycleSeconds: Math.max(1.5, 2.5 / hazardSpeedMult),
+            visibleRatio: 0.44,
             phaseOffset
+          });
+        } else if (chosenType === 'FALLING_SPIKE') {
+          const ceilY = Math.max(64, Math.min(140, 88 + (hazardIndex % 3) * 14));
+          hazards.push({
+            id: baseId,
+            type: 'FALLING_SPIKE',
+            x: cursorX,
+            y: ceilY,
+            topY: ceilY,
+            height: 44,
+            bobRadius: 18,
+            angularSpeed: 310 * hazardSpeedMult,
+            phaseOffset
+          });
+        } else if (chosenType === 'LASER_GATE') {
+          const topNodeY = Math.max(120, Math.min(250, DEFAULT_GROUND_Y - 210 + elevationShift * 0.45));
+          const botNodeY = Math.min(LAVA_SURFACE_Y - 24, topNodeY + 215);
+          hazards.push({
+            id: baseId,
+            type: 'LASER_GATE',
+            x: cursorX,
+            y: (topNodeY + botNodeY) * 0.5,
+            topY: topNodeY,
+            height: botNodeY - topNodeY,
+            cycleSeconds: Math.max(1.6, 3.0 / hazardSpeedMult),
+            visibleRatio: 0.50,
+            phaseOffset
+          });
+        } else if (chosenType === 'SAW_TRACK') {
+          const centerY = Math.max(210, Math.min(430, DEFAULT_GROUND_Y - 45 + elevationShift * 0.5));
+          const isHorizontal = (hazardIndex % 2 === 0);
+          hazards.push({
+            id: baseId,
+            type: 'SAW_TRACK',
+            x: cursorX,
+            y: centerY,
+            bobRadius: 22 + t * 5,
+            trackRadiusX: isHorizontal ? 72 : 0,
+            trackRadiusY: isHorizontal ? 0 : 64,
+            angularSpeed: (2.3 + t * 1.4) * hazardSpeedMult,
+            phaseOffset
+          });
+        } else if (chosenType === 'NO_DRAW_ZONE') {
+          const zoneW = Math.max(120, Math.min(185, 130 + t * 45));
+          const zoneH = 230;
+          const centerY = Math.max(240, Math.min(395, DEFAULT_GROUND_Y - 75 + elevationShift * 0.35));
+          hazards.push({
+            id: baseId,
+            type: 'NO_DRAW_ZONE',
+            x: cursorX,
+            y: centerY,
+            startX: cursorX - zoneW * 0.5,
+            endX: cursorX + zoneW * 0.5,
+            topY: centerY - zoneH * 0.5,
+            height: zoneH
+          });
+        } else if (chosenType === 'WIND_UPDRAFT') {
+          const zoneW = 92;
+          const topY = Math.max(115, Math.min(220, DEFAULT_GROUND_Y - 240));
+          hazards.push({
+            id: baseId,
+            type: 'WIND_UPDRAFT',
+            x: cursorX,
+            y: (topY + LAVA_SURFACE_Y) * 0.5,
+            startX: cursorX - zoneW * 0.5,
+            endX: cursorX + zoneW * 0.5,
+            topY,
+            height: LAVA_SURFACE_Y - topY,
+            updraftForce: (660 + t * 220) * hazardSpeedMult
           });
         }
 
@@ -1112,19 +1336,101 @@
     }
 
     function isVanishingPlatformSolid(hazard, timeSeconds) {
-      if (hazard.type !== 'VANISHING_PLATFORM') return false;
+      if (hazard.type !== 'LEDGE' && hazard.type !== 'VANISHING_PLATFORM') return false;
+      if (hazard.ledgeStyle === 'CYAN_STATIC' || hazard.ledgeStyle === 'CYAN_BOUNCY') return true;
       return getVanishingCycleProgress(hazard, timeSeconds) < hazard.visibleRatio;
     }
 
     function isVanishingPlatformWarning(hazard, timeSeconds) {
+      if (hazard.ledgeStyle === 'CYAN_STATIC' || hazard.ledgeStyle === 'CYAN_BOUNCY') return false;
       if (!isVanishingPlatformSolid(hazard, timeSeconds)) return false;
       const prog = getVanishingCycleProgress(hazard, timeSeconds);
       return prog >= Math.max(0.1, hazard.visibleRatio - 0.18);
     }
 
-    function getLevelDefinition(levelNumber) {
+    function getLedgeTopY(hazard, timeSeconds, mapKey = (state && state.selectedMap) || 'MAP_1_VOLCANO') {
+      const mapCfg = MAPS_CONFIG[mapKey] || MAPS_CONFIG.MAP_1_VOLCANO;
+      if (!mapCfg.movingPlatforms) return hazard.topY;
+      return hazard.topY + Math.sin(timeSeconds * 2.1 + (hazard.phaseOffset || 0)) * 24;
+    }
+
+    function getGeyserPlumeTopY(hazard, timeSeconds) {
+      const prog = getVanishingCycleProgress(hazard, timeSeconds);
+      const activeRatio = Math.max(0.25, hazard.visibleRatio || 0.44);
+      if (prog > activeRatio) return LAVA_SURFACE_Y;
+      const norm = prog / activeRatio;
+      const heightFrac = Math.sin(norm * Math.PI);
+      return LAVA_SURFACE_Y - (LAVA_SURFACE_Y - hazard.topY) * heightFrac;
+    }
+
+    function isGeyserWarning(hazard, timeSeconds) {
+      const prog = getVanishingCycleProgress(hazard, timeSeconds);
+      return prog > 0.78 || prog < 0.08;
+    }
+
+    function isLaserActive(hazard, timeSeconds) {
+      return getVanishingCycleProgress(hazard, timeSeconds) < (hazard.visibleRatio || 0.5);
+    }
+
+    function isLaserWarning(hazard, timeSeconds) {
+      const prog = getVanishingCycleProgress(hazard, timeSeconds);
+      return prog >= 0.82;
+    }
+
+    function getSawPos(hazard, timeSeconds) {
+      const phase = timeSeconds * hazard.angularSpeed + (hazard.phaseOffset || 0);
+      return {
+        x: hazard.x + Math.sin(phase) * (hazard.trackRadiusX || 0),
+        y: hazard.y + Math.cos(phase) * (hazard.trackRadiusY || 0)
+      };
+    }
+
+    function getFallingSpikeTipY(hazard, stickmanX, completedLines) {
+      const distAfterTrigger = stickmanX - (hazard.x - 190);
+      if (distAfterTrigger <= 0) return hazard.topY + (hazard.height || 44);
+      const elapsed = distAfterTrigger / 210;
+      const rawTipY = hazard.topY + (hazard.height || 44) + 0.5 * 820 * elapsed * elapsed;
+      const shieldY = findCeilingShieldY(hazard.x, hazard.topY, LAVA_SURFACE_Y, completedLines);
+      if (shieldY !== null) return Math.min(rawTipY, shieldY - 4);
+      return Math.min(LAVA_SURFACE_Y + 20, rawTipY);
+    }
+
+    function findCeilingShieldY(worldX, minY, maxY, completedLines) {
+      let bestY = null;
+      for (const line of completedLines) {
+        if (line.tool === 'CUTTER') continue;
+        for (const seg of (line.segments || [])) {
+          const minX = Math.min(seg.start.x, seg.end.x) - 14;
+          const maxX = Math.max(seg.start.x, seg.end.x) + 14;
+          if (worldX >= minX && worldX <= maxX) {
+            const dx = seg.end.x - seg.start.x;
+            const t = Math.abs(dx) < 1 ? 0.5 : Math.max(0, Math.min(1, (worldX - seg.start.x) / dx));
+            const segY = seg.start.y + (seg.end.y - seg.start.y) * t;
+            if (segY >= minY && segY <= maxY) {
+              if (bestY === null || segY < bestY) bestY = segY;
+            }
+          }
+        }
+      }
+      return bestY;
+    }
+
+    function isPointInNoDrawZone(worldPt, hazards) {
+      for (const h of (hazards || [])) {
+        if (h.type === 'NO_DRAW_ZONE') {
+          if (worldPt.x >= h.startX && worldPt.x <= h.endX && worldPt.y >= h.topY && worldPt.y <= h.topY + h.height) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function getLevelDefinition(levelNumber, difficultyKey = (state && state.selectedDifficulty) || 'NORMAL', mapKey = (state && state.selectedMap) || 'MAP_1_VOLCANO') {
       const clamped = Math.max(1, Math.min(TOTAL_LEVELS, levelNumber));
-      const cfg = getLevelConfig(clamped);
+      const cfg = getLevelConfig(clamped, difficultyKey, mapKey);
+      const blueprint = cfg.blueprint || getLevelBlueprint(clamped);
+      const diff = DIFFICULTY_MODES[difficultyKey] || DIFFICULTY_MODES.NORMAL;
       const groundY = DEFAULT_GROUND_Y;
 
       if (clamped === 1) {
@@ -1149,6 +1455,8 @@
           maxGap: cfg.maxGap,
           maxDeltaY: cfg.maxDeltaY,
           worldTitle: cfg.worldTitle,
+          mapBiome: mapKey,
+          difficulty: difficultyKey,
           platforms: [
             { startX: 20, endX: startEndX, topY: groundY, label: "START" },
             { startX: finishX - 30, endX: finishX + 260, topY: groundY, label: "FINISH" }
@@ -1177,7 +1485,7 @@
           ],
           thumbtacks: [],
           scribblers: [],
-          hazards: getHazards(1, cfg),
+          hazards: getHazards(1, cfg, difficultyKey, mapKey),
           calloutScript: [
             { triggerX: 760, type: "BLITZ" }
           ]
@@ -1192,12 +1500,14 @@
       const spawnX = 110;
       let currentY = groundY;
       const startPlatformEnd = 520;
-      const finishX = startPlatformEnd + cfg.levelLength;
+      const effectiveLevelLength = cfg.levelLength * (blueprint.lengthMultiplier || 1);
+      const finishX = startPlatformEnd + effectiveLevelLength;
       const finishPlatformEnd = finishX + 260;
 
       let cursorX = startPlatformEnd;
       let segmentIndex = 0;
       const guidePts = [{ x: startPlatformEnd - 20, y: currentY - 4 }];
+      const calloutStepInterval = Math.max(2, Math.round(5 / diff.incomingFreq));
 
       while (cursorX < finishX - cfg.minGap * 0.6) {
         const hashRatio = ((clamped * 37 + segmentIndex * 73) % 101) / 100;
@@ -1223,7 +1533,7 @@
           guidePts.push({ x: cursorX, y: currentY });
         }
 
-        if (segmentIndex > 0 && segmentIndex % 5 === 0) {
+        if (segmentIndex > 0 && segmentIndex % calloutStepInterval === 0) {
           calloutScript.push({
             triggerX: Math.max(spawnX + 180, cursorX - 90),
             type: calloutTypes[(clamped + segmentIndex) % calloutTypes.length]
@@ -1236,6 +1546,25 @@
       const finishTopY = cfg.maxDeltaY <= 0.5
         ? groundY
         : Math.max(230, Math.min(440, groundY + Math.sin(clamped * 2.7) * (cfg.maxDeltaY * 0.55)));
+
+      // Level 50 Grand Finale: x20 MAGNET star/pill arch before the finish flag!
+      const magnetCount = blueprint.magnetFinaleCount || 0;
+      if (magnetCount > 0) {
+        const finaleStartX = Math.max(startPlatformEnd + 300, finishX - 620);
+        const span = Math.max(260, (finishX - 60) - finaleStartX);
+        for (let m = 0; m < magnetCount; m++) {
+          const frac = m / Math.max(1, magnetCount - 1);
+          const bx = finaleStartX + span * frac;
+          const archY = finishTopY - 36 - Math.sin(frac * Math.PI) * 95;
+          chalkBits.push({
+            id: clamped * 10000 + m,
+            x: bx,
+            y: Math.max(150, Math.min(445, archY)),
+            inkAmount: m % 2 === 0 ? 340 : 240,
+            isStar: m % 2 === 0
+          });
+        }
+      }
 
       if (clamped <= 3 && guidePts.length >= 2) {
         guidePts.push({ x: finishX + 15, y: finishTopY - 4 });
@@ -1264,17 +1593,19 @@
         maxStrokeLength: cfg.maxStrokeLength,
         lineLifespan: cfg.lineLifespan,
         baseSpeed: cfg.baseSpeed,
-        levelLength: cfg.levelLength,
+        levelLength: effectiveLevelLength,
         minGap: cfg.minGap,
         maxGap: cfg.maxGap,
         maxDeltaY: cfg.maxDeltaY,
         worldTitle: cfg.worldTitle,
+        mapBiome: mapKey,
+        difficulty: difficultyKey,
         platforms,
         guideStrokes,
         chalkBits,
         thumbtacks: [],
         scribblers: [],
-        hazards: getHazards(clamped, cfg),
+        hazards: getHazards(clamped, cfg, difficultyKey, mapKey),
         calloutScript
       };
     }
@@ -1397,6 +1728,8 @@
       screenState: 'START_MENU',
       currentLevel: 1,
       bestLevel: Math.max(1, Math.min(TOTAL_LEVELS, parseInt(localStorage.getItem('dts_best_level') || '1', 10))),
+      selectedDifficulty: 'NORMAL',
+      selectedMap: 'MAP_1_VOLCANO',
       levelStars: (() => {
         try {
           return JSON.parse(localStorage.getItem('dts_level_stars') || '{}') || {};
@@ -1404,7 +1737,7 @@
           return {};
         }
       })(),
-      level: getLevelDefinition(1),
+      level: null,
       selectedTool: 'WHITE',
       stickman: null,
       cameraX: 0,
@@ -1425,9 +1758,10 @@
       showInstructionBanner: true,
       gameOverReason: 'Burned in the lava pit! Draw a sturdy bridge across the gap.'
     };
+    state.level = getLevelDefinition(1, state.selectedDifficulty, state.selectedMap);
 
     function resetLevel(levelNum) {
-      const lvl = getLevelDefinition(levelNum);
+      const lvl = getLevelDefinition(levelNum, state.selectedDifficulty, state.selectedMap);
       state.currentLevel = levelNum;
       state.level = lvl;
       state.stickman = {
@@ -1540,7 +1874,7 @@
     const FALL_CROSSING_TOLERANCE = 24;
     const PLATFORM_MANTLE_TOLERANCE = 115;
 
-    function collectSupportingSurfaces(footX, platforms, completedLines, hazards = [], animTime = 0) {
+    function collectSupportingSurfaces(footX, platforms, completedLines, hazards = [], animTime = 0, mapKey = (state && state.selectedMap) || 'MAP_1_VOLCANO') {
       const hits = [];
       const minFootX = footX - FOOT_SUPPORT_HALF_WIDTH;
       const maxFootX = footX + FOOT_SUPPORT_HALF_WIDTH;
@@ -1552,9 +1886,11 @@
       }
 
       for (const h of hazards) {
-        if (h.type === 'VANISHING_PLATFORM' && isVanishingPlatformSolid(h, animTime)) {
+        if ((h.type === 'LEDGE' || h.type === 'VANISHING_PLATFORM') && isVanishingPlatformSolid(h, animTime)) {
           if (maxFootX >= h.startX && minFootX <= h.endX) {
-            hits.push({ y: h.topY, slopeRadians: 0, tool: 'WHITE' });
+            const surfaceY = getLedgeTopY(h, animTime, mapKey);
+            const toolType = h.ledgeStyle === 'CYAN_BOUNCY' ? 'SPRING' : 'WHITE';
+            hits.push({ y: surfaceY, slopeRadians: 0, tool: toolType });
           }
         }
       }
@@ -1622,6 +1958,7 @@
       const nextBoostTimer = Math.max(0, st.boostTimer - dt);
       const nextLowGravTimer = Math.max(0, st.lowGravityTimer - dt);
       const nextBlitzTimer = Math.max(0, st.blitzTimer - dt);
+      const mapCfg = MAPS_CONFIG[level.mapBiome] || MAPS_CONFIG.MAP_1_VOLCANO;
 
       const slopeFactor = (st.isGrounded && st.slopeRadians < 0)
         ? Math.max(0.62, Math.min(1, Math.cos(Math.max(-1.05, st.slopeRadians))))
@@ -1659,21 +1996,42 @@
         }
       }
 
-      const gravScale = nextLowGravTimer > 0 ? 0.48 : 1.0;
-      vy = Math.min(MAX_FALL_SPEED, vy + GRAVITY * gravScale * dt);
+      // WIND_UPDRAFT upward lift (unless blocked by an overhead Chalk ceiling)
+      let updraftAccel = 0;
+      for (const h of (level.hazards || [])) {
+        if (h.type === 'WIND_UPDRAFT') {
+          if (resolvedX >= h.startX && resolvedX <= h.endX && prevY >= h.topY && prevY <= h.topY + h.height) {
+            const shieldY = findCeilingShieldY(resolvedX, h.topY - 20, prevY - STICKMAN_HEIGHT * 0.6, completedLines);
+            if (shieldY === null) {
+              updraftAccel -= (h.updraftForce || 680);
+            }
+          }
+        }
+      }
+
+      const gravScale = (nextLowGravTimer > 0 ? 0.48 : 1.0) * (mapCfg.gravityMult || 1.0);
+      vy = Math.max(-520, Math.min(MAX_FALL_SPEED, vy + (GRAVITY * gravScale + updraftAccel) * dt));
       const freeFallY = prevY + vy * dt;
 
-      const candidateHits = collectSupportingSurfaces(resolvedX, level.platforms, completedLines, level.hazards || [], state.lavaAnimTime);
-      let resolvedY = freeFallY;
+      // Overhead ceiling clamp if rising under a drawn Chalk roof
+      const overheadCeilingY = findCeilingShieldY(resolvedX, 20, prevY - STICKMAN_HEIGHT * 0.45, completedLines);
+      let clampedFreeFallY = freeFallY;
+      if (overheadCeilingY !== null && vy < 0 && (freeFallY - STICKMAN_HEIGHT) < overheadCeilingY + 6) {
+        clampedFreeFallY = Math.max(prevY, overheadCeilingY + STICKMAN_HEIGHT + 6);
+        vy = Math.max(0, vy);
+      }
+
+      const candidateHits = collectSupportingSurfaces(resolvedX, level.platforms, completedLines, level.hazards || [], state.lavaAnimTime, level.mapBiome);
+      let resolvedY = clampedFreeFallY;
       let resolvedVy = vy;
       let grounded = false;
       let resolvedSlope = 0;
       let activeTool = 'WHITE';
 
-      if (st.isGrounded && vy >= -100) {
+      if (st.isGrounded && vy >= -100 && updraftAccel >= 0) {
         let best = null;
         for (const h of candidateHits) {
-          if (h.y >= prevY - STEP_UP_TOLERANCE && h.y <= Math.max(prevY, freeFallY) + GROUND_SNAP_TOLERANCE) {
+          if (h.y >= prevY - STEP_UP_TOLERANCE && h.y <= Math.max(prevY, clampedFreeFallY) + GROUND_SNAP_TOLERANCE) {
             if (!best || h.y < best.y) best = h;
           }
         }
@@ -1689,7 +2047,7 @@
       if (!grounded && vy >= 0) {
         let best = null;
         for (const h of candidateHits) {
-          if (prevY <= h.y + FALL_CROSSING_TOLERANCE && freeFallY >= h.y - FALL_CROSSING_TOLERANCE) {
+          if (prevY <= h.y + FALL_CROSSING_TOLERANCE && clampedFreeFallY >= h.y - FALL_CROSSING_TOLERANCE) {
             if (!best || h.y < best.y) best = h;
           }
         }
@@ -1702,8 +2060,6 @@
         }
       }
 
-      // Solid platform enforcement: never allow the stickman to pass inside a platform below its top surface,
-      // and smoothly mantle onto the platform top if arriving via a bridge connected to the upper side wall.
       for (const p of level.platforms) {
         if (resolvedX + FOOT_SUPPORT_HALF_WIDTH >= p.startX && resolvedX - FOOT_SUPPORT_HALF_WIDTH <= p.endX) {
           if (
@@ -1741,14 +2097,15 @@
         }
       }
 
-      if (updatedBoost <= 0 && nextBlitzTimer <= 0) {
+      const isTurboImmune = updatedBoost > 0 || nextBlitzTimer > 0;
+      if (!isTurboImmune) {
         for (const cluster of level.thumbtacks) {
           for (let i = 0; i < cluster.count; i++) {
             const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
             const tx = cluster.x + offset;
             const ty = cluster.y;
             if (Math.abs(resolvedX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
-              state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
+              state.gameOverReason = "Impaled on thumbtacks! Draw a bridge over the spikes.";
               return {
                 ...st,
                 footX: resolvedX,
@@ -1765,7 +2122,7 @@
         }
 
         for (const hazard of (level.hazards || [])) {
-          if (hazard.type === 'SWINGING_PENDULUM') {
+          if (hazard.type === 'PENDULUM' || hazard.type === 'SWINGING_PENDULUM') {
             const bobPos = getPendulumBobPos(hazard, state.lavaAnimTime);
             const hitR = hazard.bobRadius + 10;
             const dFoot = Math.hypot(resolvedX - bobPos.x, (resolvedY - 12) - bobPos.y);
@@ -1785,12 +2142,91 @@
                 deathTimer: 0.01
               };
             }
+          } else if (hazard.type === 'LAVA_GEYSER') {
+            const plumeTopY = getGeyserPlumeTopY(hazard, state.lavaAnimTime);
+            if (plumeTopY < LAVA_SURFACE_Y - 14) {
+              const halfW = (hazard.width || 38) * 0.5 + 8;
+              if (Math.abs(resolvedX - hazard.x) <= halfW && resolvedY >= plumeTopY + 6) {
+                state.gameOverReason = "Roasted by a Lava Geyser! Draw a high arched bridge over the bubble.";
+                return {
+                  ...st,
+                  footX: resolvedX,
+                  footY: resolvedY,
+                  velocityX: 0,
+                  velocityY: 0,
+                  isGrounded: false,
+                  isAlive: false,
+                  landingSquashTimer: 0,
+                  deathTimer: 0.01
+                };
+              }
+            }
+          } else if (hazard.type === 'FALLING_SPIKE') {
+            const tipY = getFallingSpikeTipY(hazard, resolvedX, completedLines);
+            const spikeTopY = tipY - (hazard.height || 44);
+            const shieldY = findCeilingShieldY(hazard.x, hazard.topY, resolvedY - STICKMAN_HEIGHT, completedLines);
+            const blocked = shieldY !== null && tipY <= shieldY + 6;
+            if (!blocked && Math.abs(resolvedX - hazard.x) <= (hazard.bobRadius || 18) + 8) {
+              const headY = resolvedY - STICKMAN_HEIGHT + 8;
+              if (tipY >= headY && spikeTopY <= resolvedY) {
+                state.gameOverReason = "Crushed by a Falling Stalactite! Draw an overhead Chalk roof shield.";
+                return {
+                  ...st,
+                  footX: resolvedX,
+                  footY: resolvedY,
+                  velocityX: 0,
+                  velocityY: 0,
+                  isGrounded: false,
+                  isAlive: false,
+                  landingSquashTimer: 0,
+                  deathTimer: 0.01
+                };
+              }
+            }
+          } else if (hazard.type === 'LASER_GATE') {
+            if (isLaserActive(hazard, state.lavaAnimTime)) {
+              const beamBottomY = hazard.topY + (hazard.height || 215);
+              if (Math.abs(resolvedX - hazard.x) <= 13 && resolvedY >= hazard.topY + 6 && (resolvedY - STICKMAN_HEIGHT) <= beamBottomY - 6) {
+                state.gameOverReason = "Zapped by a Laser Gate! Time your crossing or dash through with Turbo.";
+                return {
+                  ...st,
+                  footX: resolvedX,
+                  footY: resolvedY,
+                  velocityX: 0,
+                  velocityY: 0,
+                  isGrounded: false,
+                  isAlive: false,
+                  landingSquashTimer: 0,
+                  deathTimer: 0.01
+                };
+              }
+            }
+          } else if (hazard.type === 'SAW_TRACK') {
+            const sawPos = getSawPos(hazard, state.lavaAnimTime);
+            const hitR = (hazard.bobRadius || 22) + 9;
+            const dFoot = Math.hypot(resolvedX - sawPos.x, (resolvedY - 12) - sawPos.y);
+            const dTorso = Math.hypot(resolvedX - sawPos.x, (resolvedY - STICKMAN_HEIGHT * 0.5) - sawPos.y);
+            const dHead = Math.hypot(resolvedX - sawPos.x, (resolvedY - STICKMAN_HEIGHT + 10) - sawPos.y);
+            if (dFoot <= hitR || dTorso <= hitR || dHead <= hitR) {
+              state.gameOverReason = "Sliced by a Track Buzzsaw! Ramp over or duck underneath the track.";
+              return {
+                ...st,
+                footX: resolvedX,
+                footY: resolvedY,
+                velocityX: 0,
+                velocityY: 0,
+                isGrounded: false,
+                isAlive: false,
+                landingSquashTimer: 0,
+                deathTimer: 0.01
+              };
+            }
           }
         }
       }
 
       if (resolvedY >= LAVA_SURFACE_Y) {
-        state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
+        state.gameOverReason = "Burned in the hazard pit! Draw a sturdy bridge across the gap.";
         return {
           ...st,
           footX: resolvedX,
@@ -1895,6 +2331,12 @@
             state.stickman.blitzTimer = 1.35;
           } else if (moveType === 'GRAVITY') {
             state.stickman.lowGravityTimer = 2.6;
+          } else if (moveType === 'WIPEOUT') {
+            for (const line of state.completedLines) {
+              if (line.tool !== 'BOOST') {
+                line.ageSeconds = Math.max(line.ageSeconds, line.maxLifetime - 0.65);
+              }
+            }
           }
         }
       }
@@ -2038,7 +2480,7 @@
         if (d <= 42 || touchedByLine) {
           bit.collected = true;
           collectedBonus += bit.inkAmount;
-          state.comboCount += 1;
+          state.comboCount += (bit.isStar && state.currentLevel === 50) ? 20 : 1;
           sound.playPickup(bit.isStar);
           spawnLineSparks([{ x: bit.x, y: bit.y }]);
         } else if (d <= magnetRadius && d > 1) {
@@ -2072,11 +2514,18 @@
         syncOverlays();
       } else if (state.stickman.hasReachedFinish) {
         state.screenState = 'LEVEL_COMPLETE';
-        const inkRatio = state.currentInk / Math.max(1, state.level.maxInkPerLevel);
         const totalBits = state.chalkBits.length;
         const collectedBits = state.chalkBits.filter(b => b.collected).length;
-        const bitRatio = totalBits > 0 ? (collectedBits / totalBits) : 1;
-        const earnedStars = (inkRatio >= 0.42 && bitRatio >= 0.5) ? 3 : ((inkRatio >= 0.18 || bitRatio >= 0.25) ? 2 : 1);
+        const targetBits = totalBits === 0 ? 0 : Math.max(1, Math.floor((totalBits + 1) / 2));
+        const inkEfficiencyMet = state.totalInkDrawn <= state.level.parInkUsage;
+        const collectiblesMet = totalBits === 0 || collectedBits >= targetBits;
+        let earnedStars = 1;
+        if (inkEfficiencyMet) earnedStars++;
+        if (collectiblesMet) earnedStars++;
+        state.lastEarnedStars = earnedStars;
+        state.lastInkEfficiencyMet = inkEfficiencyMet;
+        state.lastCollectiblesMet = collectiblesMet;
+
         const prevStars = state.levelStars[state.currentLevel] || 0;
         if (earnedStars > prevStars) {
           state.levelStars[state.currentLevel] = earnedStars;
@@ -2284,7 +2733,7 @@
         if (touched) {
           bit.collected = true;
           bonusInk += bit.inkAmount;
-          state.comboCount += 1;
+          state.comboCount += (bit.isStar && state.currentLevel === 50) ? 20 : 1;
           sound.playPickup(bit.isStar);
           spawnLineSparks([{ x: bit.x, y: bit.y }]);
         }
@@ -2300,6 +2749,12 @@
 
       if (state.selectedTool === 'CUTTER') {
         performCutAndShockwave(worldPt);
+        return;
+      }
+
+      // NO_DRAW_ZONE blocks WHITE (Chalk) tool; Bounce & Turbo remain allowed!
+      if (state.selectedTool === 'WHITE' && isPointInNoDrawZone(worldPt, state.level.hazards)) {
+        sound.playCut();
         return;
       }
 
@@ -2329,11 +2784,17 @@
       const pts = state.activeStrokePoints;
       if (pts.length === 0) return;
 
+      if (state.selectedTool === 'WHITE' && isPointInNoDrawZone(candidate, state.level.hazards)) {
+        finishActiveStroke();
+        return;
+      }
+
       const last = pts[pts.length - 1];
       const d = distance(last, candidate);
       if (d < MIN_POINT_DISTANCE) return;
 
-      const toolCost = Math.max(1, TOOLS[state.selectedTool].cost);
+      const diffCfg = DIFFICULTY_MODES[state.selectedDifficulty || 'NORMAL'] || DIFFICULTY_MODES.NORMAL;
+      const toolCost = Math.max(0.5, TOOLS[state.selectedTool].cost * diffCfg.inkDrainMult);
       const currentStrokeLen = calculatePolylineLength(pts);
       const maxRemainingStroke = Math.max(0, state.level.maxStrokeLength - currentStrokeLen);
       const maxInkLength = state.currentInk / toolCost;
@@ -2408,6 +2869,7 @@
       const worldScale = Math.max(0.1, h / WORLD_HEIGHT);
       const camX = state.cameraX;
       const visW = w / worldScale;
+      const biomeCfg = MAPS_CONFIG[state.selectedMap || 'MAP_1_VOLCANO'] || MAPS_CONFIG.MAP_1_VOLCANO;
 
       const toScreenX = (wx) => (wx - camX) * worldScale;
       const toScreenY = (wy) => wy * worldScale;
@@ -2415,17 +2877,17 @@
       ctx.save();
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Dark Slate Chalkboard Background + Subtle Parallax Graph Grid
+      // 1. Biome Background + Subtle Parallax Graph Grid
       const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-      bgGrad.addColorStop(0, COLORS.SketchCharcoalBg);
-      bgGrad.addColorStop(0.5, COLORS.SketchPaperSurface);
-      bgGrad.addColorStop(1, '#1E1718');
+      bgGrad.addColorStop(0, biomeCfg.bgTop);
+      bgGrad.addColorStop(0.5, biomeCfg.bgMid);
+      bgGrad.addColorStop(1, biomeCfg.bgBottom);
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
       const gridStepPx = Math.max(32, 100 * worldScale);
       const parallaxOffset = (camX * 0.35 * worldScale) % gridStepPx;
-      ctx.strokeStyle = COLORS.SketchGridLine;
+      ctx.strokeStyle = biomeCfg.gridColor;
       ctx.lineWidth = 1;
       for (let x = -parallaxOffset; x < w; x += gridStepPx) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
@@ -2464,8 +2926,8 @@
         }
       }
 
-      // 3. Animated Lava Pit & Rising Flames Underneath Gaps
-      drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h);
+      // 3. Animated Biome Hazard Pit Underneath Gaps
+      drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h, biomeCfg);
 
       // 4. Sketchbook Platforms
       for (const platform of state.level.platforms) {
@@ -2479,7 +2941,7 @@
       const finishGroundY = finishPlat ? finishPlat.topY : DEFAULT_GROUND_Y;
       drawFinishLine(state.level.finishLineX, finishGroundY, toScreenX, toScreenY, worldScale, w);
 
-      // 6. Thumbtack & Dynamic Level Hazards (Swinging Pendulums & Vanishing Platforms)
+      // 6. Thumbtack & Modular Obstacle Pool (All 8 Obstacle Types)
       for (const cluster of state.level.thumbtacks) {
         drawThumbtackCluster(cluster, toScreenX, toScreenY, worldScale, w);
       }
@@ -2530,22 +2992,23 @@
       ctx.restore();
     }
 
-    function drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h) {
+    function drawLavaPit(camX, visW, toScreenX, toScreenY, worldScale, w, h, biomeCfg) {
       const lavaTopY = LAVA_SURFACE_Y;
       const startWX = camX - 60;
       const endWX = camX + visW + 60;
+      const bCfg = biomeCfg || MAPS_CONFIG.MAP_1_VOLCANO;
 
-      // Ambient orange glow above lava
+      // Ambient glow above hazard floor
       const glowTop = toScreenY(lavaTopY - 75);
       const glowGrad = ctx.createLinearGradient(0, glowTop, 0, h);
-      glowGrad.addColorStop(0, 'rgba(255, 87, 34, 0)');
-      glowGrad.addColorStop(0.5, 'rgba(255, 87, 34, 0.18)');
-      glowGrad.addColorStop(1, 'rgba(213, 0, 0, 0.55)');
+      glowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      glowGrad.addColorStop(0.5, bCfg.pitMid + '33');
+      glowGrad.addColorStop(1, bCfg.pitDeep + '99');
       ctx.fillStyle = glowGrad;
       ctx.fillRect(0, glowTop, w, h - glowTop);
 
-      // Back wave (LavaDeepRed)
-      ctx.fillStyle = COLORS.LavaDeepRed;
+      // Back wave
+      ctx.fillStyle = bCfg.pitDeep;
       ctx.beginPath();
       ctx.moveTo(0, h);
       for (let wx = startWX; wx <= endWX; wx += 20) {
@@ -2557,8 +3020,8 @@
       ctx.closePath();
       ctx.fill();
 
-      // Middle flame tongues (LavaOrange)
-      ctx.fillStyle = COLORS.LavaOrange;
+      // Middle flame/wave tongues
+      ctx.fillStyle = bCfg.pitMid;
       ctx.beginPath();
       ctx.moveTo(0, h);
       let idx = 0;
@@ -2571,8 +3034,8 @@
       ctx.closePath();
       ctx.fill();
 
-      // Front hot yellow core wave (LavaFlameYellow)
-      ctx.fillStyle = 'rgba(255, 202, 40, 0.88)';
+      // Front core wave
+      ctx.fillStyle = bCfg.pitCore;
       ctx.beginPath();
       ctx.moveTo(0, h);
       for (let wx = startWX; wx <= endWX; wx += 18) {
@@ -2583,17 +3046,17 @@
       ctx.closePath();
       ctx.fill();
 
-      // Rising embers
+      // Rising embers / cryo crystals / cyber sparks
       for (const ember of state.embers) {
         const sx = toScreenX(ember.worldX);
         const sy = toScreenY(ember.worldY);
         if (sx >= -20 && sx <= w + 20) {
-          ctx.fillStyle = ember.isYellow
-            ? `rgba(255, 202, 40, ${ember.alpha})`
-            : `rgba(255, 87, 34, ${ember.alpha})`;
+          ctx.fillStyle = ember.isYellow ? bCfg.pitCore : bCfg.pitMid;
+          ctx.globalAlpha = ember.alpha;
           ctx.beginPath();
           ctx.arc(sx, sy, ember.radius * worldScale, 0, Math.PI * 2);
           ctx.fill();
+          ctx.globalAlpha = 1;
         }
       }
     }
@@ -2805,12 +3268,14 @@
     }
 
     function drawDynamicHazard(hazard, animTime, toScreenX, toScreenY, worldScale, w) {
-      if (hazard.type === 'VANISHING_PLATFORM') {
+      if (hazard.type === 'VANISHING_PLATFORM' || hazard.type === 'LEDGE') {
         const leftX = toScreenX(hazard.startX);
         const rightX = toScreenX(hazard.endX);
-        const topY = toScreenY(hazard.topY);
+        const topY = toScreenY(getLedgeTopY(hazard, animTime));
         if (rightX < -80 || leftX > w + 80) return;
 
+        const isOrange = hazard.ledgeStyle === 'ORANGE_CRUMBLING';
+        const isBouncy = hazard.ledgeStyle === 'CYAN_BOUNCY';
         const isSolid = isVanishingPlatformSolid(hazard, animTime);
         const isWarning = isVanishingPlatformWarning(hazard, animTime);
         const cycleProg = getVanishingCycleProgress(hazard, animTime);
@@ -2819,14 +3284,21 @@
         if (isSolid) {
           const flicker = isWarning ? (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(animTime * 28))) : 1.0;
           ctx.lineCap = 'round';
-          ctx.strokeStyle = isWarning ? `rgba(255, 87, 34, ${0.35 * flicker})` : 'rgba(64, 196, 255, 0.26)';
+          const haloCol = isWarning
+            ? `rgba(255, 87, 34, ${0.38 * flicker})`
+            : (isOrange ? 'rgba(255, 138, 0, 0.34)' : (isBouncy ? 'rgba(0, 230, 118, 0.32)' : 'rgba(64, 196, 255, 0.28)'));
+          const coreCol = isWarning
+            ? `rgba(255, 202, 40, ${flicker})`
+            : (isOrange ? 'rgba(255, 138, 0, 0.94)' : 'rgba(64, 196, 255, 0.94)');
+
+          ctx.strokeStyle = haloCol;
           ctx.lineWidth = 14 * worldScale;
           ctx.beginPath();
           ctx.moveTo(leftX, topY + 2 * worldScale);
           ctx.lineTo(rightX, topY + 2 * worldScale);
           ctx.stroke();
 
-          ctx.strokeStyle = isWarning ? `rgba(255, 202, 40, ${flicker})` : 'rgba(64, 196, 255, 0.92)';
+          ctx.strokeStyle = coreCol;
           ctx.lineWidth = 6 * worldScale;
           ctx.beginPath();
           ctx.moveTo(leftX, topY);
@@ -2840,16 +3312,27 @@
           ctx.lineTo(rightX - 3 * worldScale, topY - 1.2 * worldScale);
           ctx.stroke();
 
-          const solidRemRatio = Math.max(0, Math.min(1, (hazard.visibleRatio - cycleProg) / Math.max(0.1, hazard.visibleRatio)));
-          const barSpan = (rightX - leftX) * solidRemRatio;
-          ctx.strokeStyle = isWarning ? COLORS.LavaOrange : COLORS.FinishBannerGreen;
-          ctx.lineWidth = 2.8 * worldScale;
-          ctx.beginPath();
-          ctx.moveTo(leftX, topY + 8 * worldScale);
-          ctx.lineTo(leftX + barSpan, topY + 8 * worldScale);
-          ctx.stroke();
+          if (isOrange) {
+            const solidRemRatio = Math.max(0, Math.min(1, (hazard.visibleRatio - cycleProg) / Math.max(0.1, hazard.visibleRatio)));
+            const barSpan = (rightX - leftX) * solidRemRatio;
+            ctx.strokeStyle = isWarning ? COLORS.LavaOrange : COLORS.LavaFlameYellow;
+            ctx.lineWidth = 2.8 * worldScale;
+            ctx.beginPath();
+            ctx.moveTo(leftX, topY + 8 * worldScale);
+            ctx.lineTo(leftX + barSpan, topY + 8 * worldScale);
+            ctx.stroke();
+          } else if (isBouncy) {
+            const midX = (leftX + rightX) * 0.5;
+            ctx.strokeStyle = COLORS.FinishBannerGreen;
+            ctx.lineWidth = 2.5 * worldScale;
+            ctx.beginPath();
+            ctx.moveTo(midX - 7 * worldScale, topY + 9 * worldScale);
+            ctx.lineTo(midX, topY + 3 * worldScale);
+            ctx.lineTo(midX + 7 * worldScale, topY + 9 * worldScale);
+            ctx.stroke();
+          }
         } else {
-          ctx.strokeStyle = 'rgba(64, 196, 255, 0.28)';
+          ctx.strokeStyle = 'rgba(255, 138, 0, 0.28)';
           ctx.lineWidth = 3.5 * worldScale;
           ctx.lineCap = 'round';
           ctx.setLineDash([10 * worldScale, 8 * worldScale]);
@@ -2860,7 +3343,7 @@
           ctx.stroke();
         }
         ctx.restore();
-      } else if (hazard.type === 'SWINGING_PENDULUM') {
+      } else if (hazard.type === 'SWINGING_PENDULUM' || hazard.type === 'PENDULUM') {
         const pivotX = toScreenX(hazard.x);
         const pivotY = toScreenY(hazard.y);
         const bobWorld = getPendulumBobPos(hazard, animTime);
@@ -2870,7 +3353,6 @@
         if (pivotX + maxReachPx < -60 || pivotX - maxReachPx > w + 60) return;
 
         ctx.save();
-        // 1. Faint dashed swing-arc telegraph
         ctx.strokeStyle = 'rgba(255, 87, 34, 0.25)';
         ctx.lineWidth = 2.2 * worldScale;
         ctx.lineCap = 'round';
@@ -2888,7 +3370,6 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // 2. Ceiling anchor ring & chain
         ctx.fillStyle = COLORS.SketchCharcoalBg;
         ctx.beginPath(); ctx.arc(pivotX, pivotY, 8.5 * worldScale, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = COLORS.ChalkWhite;
@@ -2899,7 +3380,6 @@
         ctx.lineWidth = 3.6 * worldScale;
         ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bobX, bobY); ctx.stroke();
 
-        // 3. Spiked wrecking bob
         const bobR = hazard.bobRadius * worldScale;
         ctx.fillStyle = 'rgba(255, 87, 34, 0.28)';
         ctx.beginPath(); ctx.arc(bobX, bobY, bobR * 1.45, 0, Math.PI * 2); ctx.fill();
@@ -2923,6 +3403,200 @@
         ctx.strokeStyle = COLORS.ChalkWhite;
         ctx.lineWidth = 2.8 * worldScale;
         ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      } else if (hazard.type === 'LAVA_GEYSER') {
+        const gx = toScreenX(hazard.x);
+        if (gx < -80 || gx > w + 80) return;
+        const baseScreenY = toScreenY(LAVA_SURFACE_Y);
+        const plumeTopWorld = getGeyserPlumeTopY(hazard, animTime);
+        const warning = isGeyserWarning(hazard, animTime);
+
+        ctx.save();
+        const bubbleR = (warning ? (14 + 6 * Math.sin(animTime * 24)) : 10) * worldScale;
+        ctx.fillStyle = warning ? 'rgba(255, 202, 40, 0.85)' : 'rgba(255, 87, 34, 0.55)';
+        ctx.beginPath(); ctx.arc(gx, baseScreenY - 4 * worldScale, bubbleR, 0, Math.PI * 2); ctx.fill();
+
+        if (warning) {
+          ctx.strokeStyle = 'rgba(255, 202, 40, 0.42)';
+          ctx.lineWidth = 2.2 * worldScale;
+          ctx.setLineDash([8 * worldScale, 8 * worldScale]);
+          ctx.beginPath();
+          ctx.moveTo(gx, baseScreenY);
+          ctx.lineTo(gx, toScreenY(LAVA_SURFACE_Y - hazard.geyserMaxHeight));
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        if (plumeTopWorld !== null) {
+          const topScreenY = toScreenY(plumeTopWorld);
+          const colW = (hazard.width || 46) * worldScale;
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = 'rgba(255, 87, 34, 0.38)';
+          ctx.lineWidth = colW * 1.35;
+          ctx.beginPath(); ctx.moveTo(gx, baseScreenY); ctx.lineTo(gx, topScreenY); ctx.stroke();
+
+          ctx.strokeStyle = COLORS.LavaDeepRed;
+          ctx.lineWidth = colW * 0.85;
+          ctx.beginPath(); ctx.moveTo(gx, baseScreenY); ctx.lineTo(gx, topScreenY); ctx.stroke();
+
+          ctx.strokeStyle = COLORS.LavaFlameYellow;
+          ctx.lineWidth = colW * 0.42;
+          ctx.beginPath(); ctx.moveTo(gx, baseScreenY); ctx.lineTo(gx, topScreenY); ctx.stroke();
+
+          ctx.fillStyle = COLORS.LavaFlameYellow;
+          ctx.beginPath(); ctx.arc(gx, topScreenY, colW * 0.55, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      } else if (hazard.type === 'FALLING_SPIKE') {
+        const sx = toScreenX(hazard.x);
+        if (sx < -60 || sx > w + 60) return;
+        const tipWorldY = getFallingSpikeTipY(hazard, state.stickman ? state.stickman.footX : 0, animTime);
+        const tipY = toScreenY(tipWorldY);
+        const baseY = toScreenY(tipWorldY - 42);
+        const halfW = 15 * worldScale;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(213, 0, 0, 0.38)';
+        ctx.lineWidth = 2 * worldScale;
+        ctx.setLineDash([8 * worldScale, 8 * worldScale]);
+        ctx.beginPath();
+        ctx.moveTo(sx, tipY);
+        ctx.lineTo(sx, toScreenY(LAVA_SURFACE_Y));
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.moveTo(sx - halfW, baseY);
+        ctx.lineTo(sx + halfW, baseY);
+        ctx.lineTo(sx, tipY);
+        ctx.closePath();
+        ctx.fillStyle = COLORS.LavaDeepRed;
+        ctx.fill();
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 2.4 * worldScale;
+        ctx.stroke();
+        ctx.restore();
+      } else if (hazard.type === 'LASER_GATE') {
+        const lx = toScreenX(hazard.x);
+        if (lx < -60 || lx > w + 60) return;
+        const topY = toScreenY(hazard.y);
+        const botY = toScreenY(hazard.height || (LAVA_SURFACE_Y - 18));
+        const active = isLaserActive(hazard, animTime);
+        const warning = isLaserWarning(hazard, animTime);
+
+        ctx.save();
+        ctx.fillStyle = COLORS.SketchCharcoalBg;
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 2.4 * worldScale;
+        ctx.beginPath(); ctx.arc(lx, topY, 9 * worldScale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(lx, botY, 9 * worldScale, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        if (active) {
+          ctx.strokeStyle = 'rgba(213, 0, 0, 0.38)';
+          ctx.lineWidth = 18 * worldScale;
+          ctx.beginPath(); ctx.moveTo(lx, topY); ctx.lineTo(lx, botY); ctx.stroke();
+
+          ctx.strokeStyle = COLORS.LavaDeepRed;
+          ctx.lineWidth = 7.5 * worldScale;
+          ctx.beginPath(); ctx.moveTo(lx, topY); ctx.lineTo(lx, botY); ctx.stroke();
+
+          ctx.strokeStyle = COLORS.ChalkWhite;
+          ctx.lineWidth = 2.5 * worldScale;
+          ctx.beginPath(); ctx.moveTo(lx, topY); ctx.lineTo(lx, botY); ctx.stroke();
+        } else {
+          ctx.strokeStyle = warning ? 'rgba(255, 202, 40, 0.72)' : 'rgba(64, 196, 255, 0.35)';
+          ctx.lineWidth = 2.2 * worldScale;
+          ctx.setLineDash([7 * worldScale, 7 * worldScale]);
+          ctx.beginPath(); ctx.moveTo(lx, topY); ctx.lineTo(lx, botY); ctx.stroke();
+        }
+        ctx.restore();
+      } else if (hazard.type === 'SAW_TRACK') {
+        const ax = toScreenX(hazard.startX);
+        const ay = toScreenY(hazard.y);
+        const bx = toScreenX(hazard.endX);
+        const by = toScreenY(hazard.trackEndY);
+        if (Math.max(ax, bx) < -80 || Math.min(ax, bx) > w + 80) return;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(216, 219, 208, 0.42)';
+        ctx.lineWidth = 2.5 * worldScale;
+        ctx.setLineDash([9 * worldScale, 7 * worldScale]);
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        ctx.setLineDash([]);
+
+        const sawWorld = getSawPos(hazard, animTime);
+        const sx = toScreenX(sawWorld.x);
+        const sy = toScreenY(sawWorld.y);
+        const r = (hazard.bobRadius || 24) * worldScale;
+
+        ctx.fillStyle = 'rgba(213, 0, 0, 0.28)';
+        ctx.beginPath(); ctx.arc(sx, sy, r * 1.38, 0, Math.PI * 2); ctx.fill();
+
+        const teeth = 10;
+        const spin = animTime * 7.5;
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 3 * worldScale;
+        for (let i = 0; i < teeth; i++) {
+          const ang = spin + i * (Math.PI * 2 / teeth);
+          ctx.beginPath();
+          ctx.moveTo(sx + Math.cos(ang) * r * 0.75, sy + Math.sin(ang) * r * 0.75);
+          ctx.lineTo(sx + Math.cos(ang) * r * 1.32, sy + Math.sin(ang) * r * 1.32);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = COLORS.LavaDeepRed;
+        ctx.beginPath(); ctx.arc(sx, sy, r * 0.88, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = COLORS.SketchCharcoalBg;
+        ctx.beginPath(); ctx.arc(sx, sy, r * 0.32, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (hazard.type === 'NO_DRAW_ZONE') {
+        const left = toScreenX(hazard.startX);
+        const right = toScreenX(hazard.endX);
+        const top = toScreenY(hazard.topY);
+        const bot = toScreenY(hazard.topY + hazard.height);
+        if (right < -60 || left > w + 60) return;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(213, 0, 0, 0.16)';
+        ctx.fillRect(left, top, right - left, bot - top);
+
+        ctx.strokeStyle = 'rgba(255, 87, 34, 0.72)';
+        ctx.lineWidth = 2.4 * worldScale;
+        ctx.setLineDash([10 * worldScale, 8 * worldScale]);
+        ctx.strokeRect(left, top, right - left, bot - top);
+        ctx.setLineDash([]);
+
+        ctx.font = `900 ${Math.max(9, Math.round(10 * worldScale))}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255, 138, 128, 0.92)';
+        ctx.fillText('NO CHALK ZONE (USE BOUNCE)', (left + right) * 0.5, top + 16 * worldScale);
+        ctx.restore();
+      } else if (hazard.type === 'WIND_UPDRAFT') {
+        const left = toScreenX(hazard.startX);
+        const right = toScreenX(hazard.endX);
+        const top = toScreenY(hazard.topY);
+        const bot = toScreenY(hazard.topY + hazard.height);
+        if (right < -60 || left > w + 60) return;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(64, 196, 255, 0.10)';
+        ctx.fillRect(left, top, right - left, bot - top);
+
+        ctx.strokeStyle = 'rgba(64, 196, 255, 0.58)';
+        ctx.lineWidth = 2.2 * worldScale;
+        ctx.lineCap = 'round';
+        const cols = 4;
+        for (let c = 0; c < cols; c++) {
+          const sx = left + (right - left) * ((c + 0.5) / cols);
+          const flow = ((animTime * 190 + c * 45) % Math.max(40, hazard.height)) * worldScale;
+          const sy = bot - flow;
+          if (sy - 26 * worldScale >= top) {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx, sy - 26 * worldScale);
+            ctx.stroke();
+          }
+        }
         ctx.restore();
       }
     }
@@ -3754,22 +4428,44 @@
       const stars = state.levelStars[levelNumber] || 0;
       const isCompleted = stars > 0 || levelNumber < state.bestLevel;
       const starDisplay = isCompleted ? '★'.repeat(Math.max(1, stars)) + '☆'.repeat(3 - Math.max(1, stars)) : '☆☆☆';
-      const statusBadge = isCompleted ? `COMPLETED ${starDisplay}` : 'CURRENT FRONTIER';
+      const statusBadge = isCompleted ? `COMPLETED ${starDisplay}` : (levelNumber === state.bestLevel ? 'CURRENT FRONTIER' : 'READY TO TEST');
       const hazardCount = getHazards(cfg.level, cfg).length;
+      const obstacleTags = (cfg.obstacles || []).join(' + ');
+      const diffCfg = DIFFICULTY_MODES[state.selectedDifficulty || 'NORMAL'] || DIFFICULTY_MODES.NORMAL;
+      const mapCfg = MAPS_CONFIG[state.selectedMap || 'MAP_1_VOLCANO'] || MAPS_CONFIG.MAP_1_VOLCANO;
       const bannerEl = document.getElementById('selectedLevelBanner');
       if (bannerEl) {
         bannerEl.innerHTML = `
           <div>
-            <div class="cfg-title">LVL ${cfg.level}: ${cfg.levelTitle}</div>
-            <div class="cfg-meta">${cfg.worldTitle} • Dist ${Math.round(cfg.levelLength)}px • Speed ${cfg.baseSpeed.toFixed(1)}x • Gaps ${Math.round(cfg.minGap)}-${Math.round(cfg.maxGap)}px • ΔY ±${Math.round(cfg.maxDeltaY)}px • Decay ${cfg.lineLifespan.toFixed(1)}s • Hazards ${hazardCount}</div>
+            <div class="cfg-title">LVL ${cfg.level}: ${cfg.levelTitle} <span style="color:#40C4FF;">[${obstacleTags}]</span></div>
+            <div class="cfg-meta">${mapCfg.shortLabel} • ${diffCfg.label} (${diffCfg.speedMult}x Spd / ${diffCfg.inkDrainMult}x Ink) • Dist ${Math.round(cfg.levelLength)}px • Speed ${cfg.baseSpeed.toFixed(1)}x • Hazards ${hazardCount} • ${cfg.focusDesc || ''}</div>
           </div>
           <div style="text-align:right;font-size:10px;font-weight:900;color:${isCompleted ? '#34D399' : '#FBBF24'};">${statusBadge}</div>
         `;
       }
       const btnLabel = document.getElementById('btnStartGameLabel');
       if (btnLabel) {
-        btnLabel.textContent = `PLAY LEVEL ${cfg.level}`;
+        btnLabel.textContent = `PLAY LEVEL ${cfg.level} (${diffCfg.label} • ${mapCfg.shortLabel})`;
       }
+      const quickBadge = document.getElementById('quickLevelBadge');
+      if (quickBadge) {
+        quickBadge.textContent = `LVL ${cfg.level}/50`;
+      }
+    }
+
+    function syncSelectorButtonsDOM() {
+      document.querySelectorAll('#mapSelectorBtns .map-btn').forEach(btn => {
+        const active = btn.dataset.map === state.selectedMap;
+        btn.style.background = active ? '#FF5722' : '#1E293B';
+        btn.style.color = active ? '#FFF' : '#CBD5E1';
+        btn.style.borderColor = active ? '#FFCA28' : 'rgba(255,255,255,0.22)';
+      });
+      document.querySelectorAll('#difficultySelectorBtns .diff-btn').forEach(btn => {
+        const active = btn.dataset.diff === state.selectedDifficulty;
+        btn.style.background = active ? '#0284C7' : '#1E293B';
+        btn.style.color = active ? '#FFF' : '#CBD5E1';
+        btn.style.borderColor = active ? '#38BDF8' : 'rgba(255,255,255,0.22)';
+      });
     }
 
     function renderSagaMap() {
@@ -3783,6 +4479,7 @@
         bestTextEl.textContent = `FRONTIER: LVL ${state.bestLevel}/50  •  COMPLETED: ${completedCount}/50  •  ★ ${totalStars}/150`;
       }
 
+      syncSelectorButtonsDOM();
       updateSelectedLevelBanner(pickedStartLevel);
 
       const worldAccents = ['#34D399', '#38BDF8', '#FBBF24', '#F97316', '#F43F5E'];
@@ -3803,13 +4500,19 @@
           const wStart = worldHeaderLvl;
           const wEnd = Math.min(TOTAL_LEVELS, wStart + 9);
           let wDone = 0;
+          let wStars = 0;
           for (let l = wStart; l <= wEnd; l++) {
-            if ((state.levelStars[l] || 0) > 0 || l < state.bestLevel) wDone++;
+            const st = state.levelStars[l] || (l < state.bestLevel ? 2 : 0);
+            if (st > 0 || l < state.bestLevel) {
+              wDone++;
+              wStars += Math.max(1, Math.min(3, st));
+            }
           }
+          const wMaxStars = (wEnd - wStart + 1) * 3;
           html += `
             <div class="saga-world-banner" style="border-color:${accent}88;">
               <span style="color:${accent};">★ ${cfg.worldTitle.toUpperCase()} (LVLS ${wStart}–${wEnd})</span>
-              <span style="color:#F8FAFC;">${wDone}/${wEnd - wStart + 1} CLEAR</span>
+              <span style="color:#FBBF24;">★ ${wStars}/${wMaxStars} (${wDone}/${wEnd - wStart + 1} CLEAR)</span>
             </div>
           `;
         }
@@ -3820,32 +4523,33 @@
           const cfg = getLevelConfig(lvl);
           const stars = state.levelStars[lvl] || (lvl < state.bestLevel ? 2 : 0);
           const isCompleted = stars > 0 || lvl < state.bestLevel;
-          const isUnlocked = lvl <= state.bestLevel || isCompleted;
+          const displayStars = isCompleted ? Math.max(1, Math.min(3, stars)) : 0;
+          const isPerfectThreeStar = isCompleted && displayStars === 3;
           const isCurrentFrontier = (lvl === state.bestLevel && !isCompleted);
           const isSelected = (lvl === pickedStartLevel);
 
-          const stateClass = isCompleted ? 'completed' : (isCurrentFrontier ? 'frontier' : (isUnlocked ? 'completed' : 'locked'));
+          const stateClass = isCompleted ? 'completed' : (isCurrentFrontier ? 'frontier' : 'completed');
           const selClass = isSelected ? 'selected' : '';
+          const perfectStyle = isPerfectThreeStar ? 'border-color:#FFCA28;box-shadow:0 0 12px rgba(255,202,40,0.35);' : '';
           const badgeHtml = isCompleted
-            ? `<div class="saga-badge-pill" style="background:#059669;color:#fff;">✓</div>`
+            ? `<div class="saga-badge-pill" style="background:${isPerfectThreeStar ? '#FFCA28' : '#059669'};color:${isPerfectThreeStar ? '#0F172A' : '#fff'};">${displayStars}★</div>`
             : (isCurrentFrontier ? `<div class="saga-badge-pill" style="background:#EA580C;color:#fff;">NEXT</div>` : '');
 
-          let starsHtml = '';
+          let starsHtml = '<div class="saga-stars">';
           if (isCompleted) {
-            starsHtml = '<div class="saga-stars">';
             for (let s = 1; s <= 3; s++) {
-              starsHtml += `<span class="${s <= stars ? 'star-on' : 'star-off'}">★</span>`;
+              starsHtml += `<span class="${s <= displayStars ? 'star-on' : 'star-off'}">★</span>`;
             }
-            starsHtml += '</div>';
           } else {
-            starsHtml = `<div class="saga-stars"><span style="color:${isUnlocked ? '#FDE047' : '#64748B'};font-size:9px;font-weight:800;">${Math.round(cfg.levelLength)}m</span></div>`;
+            starsHtml += `<span class="star-off">☆☆☆</span>`;
           }
+          starsHtml += '</div>';
 
           html += `
             <div class="saga-node-wrap">
-              <button type="button" class="saga-medallion ${stateClass} ${selClass}" data-level="${lvl}" ${!isUnlocked ? 'disabled' : ''} title="Level ${lvl}: ${cfg.title}">
+              <button type="button" class="saga-medallion ${stateClass} ${selClass}" style="${perfectStyle}" data-level="${lvl}" title="Level ${lvl}: ${cfg.title}">
                 ${badgeHtml}
-                <span>${isUnlocked ? lvl : '🔒'}</span>
+                <span>${lvl}</span>
                 <span class="sub-spd">${cfg.baseSpeed.toFixed(1)}x</span>
               </button>
               ${starsHtml}
@@ -3860,11 +4564,55 @@
       container.querySelectorAll('.saga-medallion').forEach(btn => {
         btn.addEventListener('click', () => {
           const lvl = parseInt(btn.dataset.level, 10);
-          if (lvl <= state.bestLevel || (state.levelStars[lvl] || 0) > 0) {
-            pickedStartLevel = lvl;
-            renderSagaMap();
-          }
+          pickedStartLevel = Math.max(1, Math.min(TOTAL_LEVELS, lvl));
+          renderSagaMap();
         });
+      });
+    }
+
+    document.querySelectorAll('#mapSelectorBtns .map-btn, #mapDifficultySelectorBar .map-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.selectedMap = btn.dataset.map || 'MAP_1_VOLCANO';
+        localStorage.setItem('dts_map_biome', state.selectedMap);
+        document.querySelectorAll('#mapDifficultySelectorBar .map-chip').forEach(b => {
+          b.classList.toggle('active', b.dataset.map === state.selectedMap);
+        });
+        resetLevel(pickedStartLevel);
+        renderSagaMap();
+      });
+    });
+
+    document.querySelectorAll('#difficultySelectorBtns .diff-btn, #mapDifficultySelectorBar .diff-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.selectedDifficulty = btn.dataset.diff || 'NORMAL';
+        localStorage.setItem('dts_difficulty', state.selectedDifficulty);
+        document.querySelectorAll('#mapDifficultySelectorBar .diff-chip').forEach(b => {
+          b.classList.toggle('active', b.dataset.diff === state.selectedDifficulty);
+        });
+        resetLevel(pickedStartLevel);
+        renderSagaMap();
+      });
+    });
+
+    const btnLvlMinus1 = document.getElementById('btnLvlMinus1');
+    if (btnLvlMinus1) {
+      btnLvlMinus1.addEventListener('click', () => {
+        pickedStartLevel = Math.max(1, pickedStartLevel - 1);
+        renderSagaMap();
+      });
+    }
+    const btnLvlPlus1 = document.getElementById('btnLvlPlus1');
+    if (btnLvlPlus1) {
+      btnLvlPlus1.addEventListener('click', () => {
+        pickedStartLevel = Math.min(TOTAL_LEVELS, pickedStartLevel + 1);
+        renderSagaMap();
+      });
+    }
+    const btnLvlPlus10 = document.getElementById('btnLvlPlus10');
+    if (btnLvlPlus10) {
+      btnLvlPlus10.addEventListener('click', () => {
+        pickedStartLevel = pickedStartLevel + 10 > TOTAL_LEVELS ? 1 : pickedStartLevel + 10;
+        renderSagaMap();
       });
     }
 
@@ -3877,6 +4625,58 @@
 
       if (state.screenState === 'START_MENU') {
         renderSagaMap();
+      }
+
+      if (state.screenState === 'LEVEL_COMPLETE') {
+        const earned = Math.max(1, Math.min(3, state.lastEarnedStars || 3));
+        const starsRowEl = document.getElementById('levelCompleteStarsRow');
+        if (starsRowEl) {
+          let starsHtml = '';
+          for (let s = 1; s <= 3; s++) {
+            const isEarned = s <= earned;
+            const sz = s === 2 ? 54 : 46;
+            const fz = s === 2 ? 28 : 22;
+            const bg = isEarned ? 'rgba(255, 202, 40, 0.22)' : 'rgba(15, 23, 42, 0.75)';
+            const border = isEarned ? '2.5px solid #FFCA28' : '1.5px solid rgba(148, 163, 184, 0.35)';
+            const col = isEarned ? '#FFCA28' : '#475569';
+            starsHtml += `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${bg};border:${border};display:flex;align-items:center;justify-content:center;font-size:${fz}px;color:${col};box-shadow:${isEarned ? '0 0 14px rgba(255,202,40,0.35)' : 'none'};">★</div>`;
+          }
+          starsRowEl.innerHTML = starsHtml;
+        }
+
+        const badgeEl = document.getElementById('levelCompleteStarsBadge');
+        if (badgeEl) {
+          badgeEl.textContent = earned === 3
+            ? '3 / 3 STARS • PERFECT ARCHITECT!'
+            : (earned === 2 ? '2 / 3 STARS • GREAT CROSSING!' : '1 / 3 STARS • LEVEL CLEARED!');
+        }
+
+        const statsCardEl = document.getElementById('levelCompleteStatsCard');
+        if (statsCardEl) {
+          const inkUsed = Math.round(state.totalInkDrawn || 0);
+          const parInk = Math.max(1, Math.round(state.level.parInkUsage || 1000));
+          const inkLeftPct = Math.max(0, Math.min(100, Math.round((state.currentInk / Math.max(1, state.level.maxInkPerLevel)) * 100)));
+          const totalBits = state.chalkBits.length;
+          const gotBits = state.chalkBits.filter(b => b.collected).length;
+          const targetBits = totalBits === 0 ? 0 : Math.max(1, Math.floor((totalBits + 1) / 2));
+          const inkOk = state.lastInkEfficiencyMet !== false;
+          const bitsOk = state.lastCollectiblesMet !== false;
+
+          statsCardEl.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:#F8FAFC;font-weight:800;">★ Crossing Complete</span>
+              <span style="color:#00E676;font-weight:800;">LVL ${state.currentLevel} Reached</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:${inkOk ? '#F8FAFC' : '#94A3B8'};font-weight:800;">${inkOk ? '★' : '☆'} Ink Efficiency</span>
+              <span style="color:${inkOk ? '#00E676' : '#FF5722'};font-weight:800;">${inkUsed} / ${parInk} Par (${inkLeftPct}% Left)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="color:${bitsOk ? '#F8FAFC' : '#94A3B8'};font-weight:800;">${bitsOk ? '★' : '☆'} Chalk Collectibles</span>
+              <span style="color:${bitsOk ? '#00E676' : '#FF5722'};font-weight:800;">${gotBits}/${totalBits} Collected (Need ${targetBits}+)</span>
+            </div>
+          `;
+        }
       }
 
       if (state.screenState === 'GAME_OVER') {

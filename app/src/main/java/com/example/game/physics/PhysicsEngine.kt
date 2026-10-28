@@ -6,8 +6,9 @@ import com.example.game.model.DrawnLine
 import com.example.game.model.DynamicHazard
 import com.example.game.model.EmberParticle
 import com.example.game.model.HazardType
+import com.example.game.model.LedgeStyle
 import com.example.game.model.LevelDefinition
-import com.example.game.model.LineSegment
+import com.example.game.model.MapBiome
 import com.example.game.model.Platform
 import com.example.game.model.ScribblerEnemy
 import com.example.game.model.SketchParticle
@@ -25,14 +26,14 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Pure 2D physics, path-smoothing, and collision engine for Draw to Survive (Chalk Runner Evolved).
+ * Pure 2D physics, path-smoothing, and collision engine for Draw to Survive.
  *
- * Key mechanics:
+ * Supports:
  * - Multi-substep collision resolution so the stickman never tunnels through thin drawn lines
- * - Multi-Chalk tools: White (standard + knee-high vault hurdles), Spring (blue trampoline bounce),
- *   Boost (gold turbo speed + enemy ramming), and Cutter (tap-to-cut with shockwave & 60% ink refund)
- * - Chalk Bit & Gold Star collection with Magnet Aura pull when combo is active
- * - Red Scribbler enemy AI that charges along platforms/lines and bonks off player-drawn walls
+ * - Overhead ceiling collision so drawn roofs protect against FALLING_SPIKE and WIND_UPDRAFT
+ * - All 8 modular obstacles: PENDULUM, LEDGE, LAVA_GEYSER, FALLING_SPIKE, LASER_GATE,
+ *   SAW_TRACK, NO_DRAW_ZONE, and WIND_UPDRAFT
+ * - Multi-Map environmental physics (MAP_1_VOLCANO, MAP_2_CRYO_LAB low gravity, MAP_3_CYBER_GRID moving platforms)
  */
 object PhysicsEngine {
 
@@ -54,11 +55,6 @@ object PhysicsEngine {
     val reachedFinish: Boolean = false
   )
 
-  /**
-   * Matter.js-inspired 2D rigid body representation for Compose physics simulation.
-   * Supports static oriented bounding boxes (OBBs) for drawn line segments and platforms,
-   * and dynamic circular/capsule bodies for the stickman runner.
-   */
   data class MatterBody2D(
     val id: Long,
     val centerX: Float,
@@ -72,10 +68,6 @@ object PhysicsEngine {
     val tool: ChalkTool = ChalkTool.WHITE
   )
 
-  /**
-   * Converts a player-drawn polyline into a chain of Matter.js-equivalent static oriented
-   * segment bodies (`Bodies.rectangle(cx, cy, length, thickness, { isStatic: true, angle })`).
-   */
   fun createMatterBodiesForLine(line: DrawnLine, thickness: Float = 8f): List<MatterBody2D> {
     return line.segments.mapIndexedNotNull { index, seg ->
       val dx = seg.end.x - seg.start.x
@@ -100,21 +92,40 @@ object PhysicsEngine {
     }
   }
 
+  /**
+   * Checks whether [candidatePoint] is blocked by any `NO_DRAW_ZONE` hazard when using standard `Chalk`.
+   */
+  fun isPointBlockedByNoDrawZone(
+    candidatePoint: Vec2,
+    tool: ChalkTool,
+    hazards: List<DynamicHazard>
+  ): Boolean {
+    if (tool == ChalkTool.CUTTER) return false
+    // Standard Chalk (WHITE) is blocked inside NO_DRAW_ZONE; players must place Bounce before the zone
+    if (tool != ChalkTool.WHITE) return false
+    return hazards.any { it.type == HazardType.NO_DRAW_ZONE && it.containsNoDrawPoint(candidatePoint) }
+  }
 
   /**
    * Appends a new touch point in world coordinates while respecting both the per-stroke
-   * maximum length and the remaining level ink budget.
+   * maximum length, the remaining level ink budget, and any `NO_DRAW_ZONE` fields.
    */
   fun appendPointToStroke(
     existingPoints: List<Vec2>,
     candidatePoint: Vec2,
     maxStrokeLength: Float,
-    availableInkForRemaining: Float
+    availableInkForRemaining: Float,
+    tool: ChalkTool = ChalkTool.WHITE,
+    hazards: List<DynamicHazard> = emptyList()
   ): List<Vec2> {
     val clampedCandidate = Vec2(
       x = candidatePoint.x,
       y = candidatePoint.y.coerceIn(4f, WorldConstants.WORLD_HEIGHT - 4f)
     )
+
+    if (isPointBlockedByNoDrawZone(clampedCandidate, tool, hazards)) {
+      return existingPoints
+    }
 
     if (existingPoints.isEmpty()) {
       return listOf(clampedCandidate)
@@ -145,10 +156,6 @@ object PhysicsEngine {
     }
   }
 
-  /**
-   * Smooths a raw finger-drawn path using endpoint-preserving Chaikin corner cutting
-   * so the resulting collision segments form a continuous, smooth surface.
-   */
   fun smoothStrokePoints(rawPoints: List<Vec2>): List<Vec2> {
     if (rawPoints.size <= 2) return rawPoints
 
@@ -198,10 +205,6 @@ object PhysicsEngine {
     return sum
   }
 
-  /**
-   * Advances stickman physics for [deltaSeconds] using substeps to guarantee no
-   * tunneling through thin player-drawn lines.
-   */
   fun stepPhysics(
     stickman: StickmanState,
     level: LevelDefinition,
@@ -297,7 +300,6 @@ object PhysicsEngine {
     val nextLowGravTimer = (state.lowGravityTimer - dt).coerceAtLeast(0f)
     val nextBlitzTimer = (state.blitzTimer - dt).coerceAtLeast(0f)
 
-    // Modulate horizontal speed on uphill slopes and apply Turbo/Blitz multipliers
     val slopeFactor = if (state.isGrounded && state.slopeRadians < 0f) {
       cos(state.slopeRadians.coerceIn(-1.05f, 0f)).coerceIn(0.62f, 1f)
     } else {
@@ -315,7 +317,6 @@ object PhysicsEngine {
     val prevY = state.footY
     var resolvedX = prevX + vx * dt
 
-    // Candidate vertical velocity: if leaving an upward drawn ramp, preserve upward launch velocity
     var vy = if (state.isGrounded) {
       if (state.slopeRadians < -0.15f) {
         sin(state.slopeRadians) * vx * 0.85f
@@ -326,7 +327,6 @@ object PhysicsEngine {
       state.velocityY
     }
 
-    // Check if the stickman hits a knee-high steep hurdle wall or approaches a higher platform ledge -> auto-vault!
     if (state.isGrounded) {
       val vaultHeight = findVaultWallHeight(prevX, resolvedX + 8f, prevY, completedLines)
       if (vaultHeight != null) {
@@ -347,27 +347,50 @@ object PhysicsEngine {
       }
     }
 
-    val gravityScale = if (nextLowGravTimer > 0f) 0.48f else 1f
+    // Apply MapBiome gravity multiplier (e.g. MAP_2_CRYO_LAB low gravity) + LOW GRAV callout modifier
+    val gravityScale = (if (nextLowGravTimer > 0f) 0.48f else 1f) * level.mapBiome.gravityMult
     vy = (vy + WorldConstants.GRAVITY * gravityScale * dt).coerceAtMost(WorldConstants.MAX_FALL_SPEED)
-    val freeFallY = prevY + vy * dt
 
-    // Gather all supporting surfaces under the stickman's foot span at resolvedX
+    // Apply WIND_UPDRAFT upward lift if stickman is inside an active Wind Updraft column
+    var inUpdraft = false
+    for (hazard in level.hazards) {
+      if (hazard.type == HazardType.WIND_UPDRAFT) {
+        if (resolvedX in hazard.startX..hazard.endX && prevY >= hazard.topY && prevY - WorldConstants.STICKMAN_HEIGHT <= hazard.bottomY) {
+          vy = (vy - hazard.updraftAcceleration * dt).coerceAtLeast(-390f)
+          inUpdraft = true
+        }
+      }
+    }
+
+    var freeFallY = prevY + vy * dt
+    var grounded = if (inUpdraft && vy < -40f) false else state.isGrounded
+
+    // Check overhead player-drawn ceiling lines when rising (protects stickman in WIND_UPDRAFT from hitting overhead hazards!)
+    if (vy < 0f) {
+      val headY = freeFallY - WorldConstants.STICKMAN_HEIGHT
+      val ceilingY = findOverheadCeilingY(resolvedX, prevY - WorldConstants.STICKMAN_HEIGHT, headY, completedLines)
+      if (ceilingY != null) {
+        freeFallY = ceilingY + WorldConstants.STICKMAN_HEIGHT + 2f
+        vy = 0f
+      }
+    }
+
     val candidateHits = collectSupportingSurfaces(
       footX = resolvedX,
       platforms = platforms,
       completedLines = completedLines,
       hazards = level.hazards,
-      animTime = animTime
+      animTime = animTime,
+      mapBiome = level.mapBiome
     )
 
     var resolvedY = freeFallY
     var resolvedVy = vy
-    var grounded = false
+    var isGroundedNow = false
     var resolvedSlope = 0f
     var activeSurfaceTool = ChalkTool.WHITE
 
-    if (state.isGrounded && vy >= -100f) {
-      // Stickman was on ground: look for a continuous surface within step-up and snap-down tolerance
+    if (grounded && vy >= -100f) {
       val reachable = candidateHits
         .filter { hit ->
           hit.y >= prevY - STEP_UP_TOLERANCE &&
@@ -378,14 +401,13 @@ object PhysicsEngine {
       if (reachable != null) {
         resolvedY = reachable.y
         resolvedVy = 0f
-        grounded = true
+        isGroundedNow = true
         resolvedSlope = reachable.slopeRadians
         activeSurfaceTool = reachable.tool
       }
     }
 
-    if (!grounded && vy >= 0f) {
-      // Stickman is airborne / falling: check if feet crossed any surface during this substep
+    if (!isGroundedNow && vy >= 0f) {
       val landingHit = candidateHits
         .filter { hit ->
           prevY <= hit.y + FALL_CROSSING_TOLERANCE &&
@@ -396,14 +418,12 @@ object PhysicsEngine {
       if (landingHit != null) {
         resolvedY = landingHit.y
         resolvedVy = 0f
-        grounded = true
+        isGroundedNow = true
         resolvedSlope = landingHit.slopeRadians
         activeSurfaceTool = landingHit.tool
       }
     }
 
-    // Solid platform enforcement: never allow the stickman to pass inside a platform below its top surface,
-    // and smoothly mantle onto the platform top if arriving via a bridge connected to the upper side wall.
     for (platform in platforms) {
       if (resolvedX + FOOT_SUPPORT_HALF_WIDTH >= platform.startX && resolvedX - FOOT_SUPPORT_HALF_WIDTH <= platform.endX) {
         if (
@@ -412,7 +432,7 @@ object PhysicsEngine {
         ) {
           resolvedY = platform.topY
           resolvedVy = 0f
-          grounded = true
+          isGroundedNow = true
           resolvedSlope = 0f
           activeSurfaceTool = ChalkTool.WHITE
         } else if (
@@ -425,23 +445,22 @@ object PhysicsEngine {
       }
     }
 
-    // Apply special chalk surface properties (Blue Bounce or Gold Boost)
     var updatedBoostTimer = nextBoostTimer
     var nextLandingSquash = (state.landingSquashTimer - dt).coerceAtLeast(0f)
-    if (grounded) {
+    if (isGroundedNow) {
       if (!state.isGrounded && state.velocityY > 110f) {
         nextLandingSquash = 0.26f
       }
       if (activeSurfaceTool == ChalkTool.SPRING) {
         resolvedVy = -530f
-        grounded = false
+        isGroundedNow = false
         nextLandingSquash = 0f
       } else if (activeSurfaceTool == ChalkTool.BOOST) {
         updatedBoostTimer = max(updatedBoostTimer, 0.55f)
       }
     }
 
-    // Check thumbtack and Swinging Pendulum hazards (Turbo Boost or Blitz shields the runner)
+    // Check modular obstacle collisions (Turbo Boost or Blitz shields the runner)
     if (updatedBoostTimer <= 0f && nextBlitzTimer <= 0f) {
       for (cluster in level.thumbtacks) {
         for (i in 0 until cluster.count) {
@@ -449,49 +468,80 @@ object PhysicsEngine {
           val tx = cluster.x + offset
           val ty = cluster.y
           if (abs(resolvedX - tx) < 13f && resolvedY >= ty - 6f && resolvedY - WorldConstants.STICKMAN_HEIGHT <= ty + 8f) {
-            return state.copy(
-              footX = resolvedX,
-              footY = resolvedY,
-              velocityX = 0f,
-              velocityY = 0f,
-              isGrounded = false,
-              isAlive = false,
-              landingSquashTimer = 0f,
-              deathTimer = 0.01f
-            )
+            return killStickman(state, resolvedX, resolvedY)
           }
         }
       }
 
-      // Check Swinging Pendulum hazards generated by getHazards(level)
+      val footSample = Vec2(resolvedX, resolvedY - 12f)
+      val torsoSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT * 0.5f)
+      val headSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT + 10f)
+      val stickmanTopY = resolvedY - WorldConstants.STICKMAN_HEIGHT
+
       for (hazard in level.hazards) {
-        if (hazard.type == HazardType.SWINGING_PENDULUM) {
-          val bobPos = hazard.pendulumBobPositionAt(animTime)
-          val hitRadius = hazard.bobRadius + 10f
-          val footSample = Vec2(resolvedX, resolvedY - 12f)
-          val torsoSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT * 0.5f)
-          val headSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT + 10f)
-          if (
-            bobPos.distanceTo(footSample) <= hitRadius ||
-              bobPos.distanceTo(torsoSample) <= hitRadius ||
-              bobPos.distanceTo(headSample) <= hitRadius
-          ) {
-            return state.copy(
-              footX = resolvedX,
-              footY = resolvedY,
-              velocityX = 0f,
-              velocityY = 0f,
-              isGrounded = false,
-              isAlive = false,
-              landingSquashTimer = 0f,
-              deathTimer = 0.01f
-            )
+        when (hazard.type) {
+          HazardType.PENDULUM -> {
+            val bobPos = hazard.pendulumBobPositionAt(animTime)
+            val hitRadius = hazard.bobRadius + 10f
+            if (
+              bobPos.distanceTo(footSample) <= hitRadius ||
+                bobPos.distanceTo(torsoSample) <= hitRadius ||
+                bobPos.distanceTo(headSample) <= hitRadius
+            ) {
+              return killStickman(state, resolvedX, resolvedY)
+            }
           }
+
+          HazardType.LAVA_GEYSER -> {
+            val ratio = hazard.geyserEruptionRatioAt(animTime)
+            if (ratio > 0.14f) {
+              val geyserTop = hazard.geyserCurrentTopYAt(animTime)
+              val halfW = hazard.geyserWidth * 0.5f + 8f
+              if (abs(resolvedX - hazard.x) <= halfW && resolvedY >= geyserTop + 6f) {
+                // Allow standing safely ON TOP of a drawn bridge above the geyser top
+                if (stickmanTopY <= WorldConstants.LAVA_SURFACE_Y && resolvedY > geyserTop + 10f) {
+                  return killStickman(state, resolvedX, resolvedY)
+                }
+              }
+            }
+          }
+
+          HazardType.FALLING_SPIKE -> {
+            if (abs(resolvedX - hazard.x) <= 18f) {
+              val (spikeTipY, blockedByRoof) = hazard.fallingSpikeTipY(resolvedX, completedLines)
+              val spikeTopY = (spikeTipY - hazard.spikeHeight).coerceAtLeast(hazard.y)
+              if (!blockedByRoof && spikeTipY >= stickmanTopY + 4f && spikeTopY <= resolvedY - 4f) {
+                return killStickman(state, resolvedX, resolvedY)
+              }
+            }
+          }
+
+          HazardType.LASER_GATE -> {
+            if (hazard.isLaserActiveAt(animTime)) {
+              if (abs(resolvedX - hazard.x) <= 13f && resolvedY >= hazard.topY + 6f && stickmanTopY <= hazard.bottomY - 6f) {
+                return killStickman(state, resolvedX, resolvedY)
+              }
+            }
+          }
+
+          HazardType.SAW_TRACK -> {
+            val sawPos = hazard.sawPositionAt(animTime)
+            val hitRadius = hazard.bobRadius + 9f
+            if (
+              sawPos.distanceTo(footSample) <= hitRadius ||
+                sawPos.distanceTo(torsoSample) <= hitRadius ||
+                sawPos.distanceTo(headSample) <= hitRadius
+            ) {
+              return killStickman(state, resolvedX, resolvedY)
+            }
+          }
+
+          HazardType.LEDGE, HazardType.NO_DRAW_ZONE, HazardType.WIND_UPDRAFT -> Unit
         }
       }
     }
 
-    // Check if stickman fell into the bottom hazard pit
+    // Check if stickman fell into the bottom hazard pit (Lava / Cryo Acid / Laser Floor)
     if (resolvedY >= WorldConstants.LAVA_SURFACE_Y) {
       return state.copy(
         footX = resolvedX,
@@ -505,14 +555,14 @@ object PhysicsEngine {
       )
     }
 
-    // Check if stickman crossed the finish line above the lava pit (on a player-drawn line or finish ledge)
+    // Check if stickman crossed the finish line above the bottom hazard pit
     if (resolvedX >= level.finishLineX && resolvedY < WorldConstants.LAVA_SURFACE_Y - 10f) {
       return state.copy(
         footX = resolvedX,
         footY = resolvedY,
         velocityX = vx,
         velocityY = resolvedVy,
-        isGrounded = grounded,
+        isGrounded = isGroundedNow,
         slopeRadians = resolvedSlope,
         runCyclePhase = state.runCyclePhase + dt * 10.5f,
         hasReachedFinish = true,
@@ -523,14 +573,14 @@ object PhysicsEngine {
       )
     }
 
-    val phaseAdvance = if (grounded) dt * (vx / 22.0f) else dt * 6.0f
+    val phaseAdvance = if (isGroundedNow) dt * (vx / 22.0f) else dt * 6.0f
 
     return state.copy(
       footX = resolvedX,
       footY = resolvedY,
       velocityX = vx,
       velocityY = resolvedVy,
-      isGrounded = grounded,
+      isGrounded = isGroundedNow,
       slopeRadians = resolvedSlope,
       runCyclePhase = state.runCyclePhase + phaseAdvance,
       boostTimer = updatedBoostTimer,
@@ -540,9 +590,51 @@ object PhysicsEngine {
     )
   }
 
+  private fun killStickman(state: StickmanState, x: Float, y: Float): StickmanState {
+    return state.copy(
+      footX = x,
+      footY = y,
+      velocityX = 0f,
+      velocityY = 0f,
+      isGrounded = false,
+      isAlive = false,
+      landingSquashTimer = 0f,
+      deathTimer = 0.01f
+    )
+  }
+
   /**
-   * Detects if a steep knee-high stroke lies directly in front of the stickman so he can vault it.
+   * Finds an overhead player-drawn ceiling line that stops upward motion (e.g. inside WIND_UPDRAFT).
    */
+  private fun findOverheadCeilingY(
+    footX: Float,
+    prevHeadY: Float,
+    nextHeadY: Float,
+    completedLines: List<DrawnLine>
+  ): Float? {
+    var lowestCeiling: Float? = null
+    for (line in completedLines) {
+      for (seg in line.segments) {
+        val left = if (seg.start.x <= seg.end.x) seg.start else seg.end
+        val right = if (seg.start.x <= seg.end.x) seg.end else seg.start
+        if (footX < left.x - 10f || footX > right.x + 10f) continue
+        val dx = right.x - left.x
+        val segY = if (dx < 2f) {
+          max(left.y, right.y)
+        } else {
+          val t = ((footX - left.x) / dx).coerceIn(0f, 1f)
+          left.y + (right.y - left.y) * t
+        }
+        if (prevHeadY >= segY - 12f && nextHeadY <= segY + 12f) {
+          if (lowestCeiling == null || segY > lowestCeiling) {
+            lowestCeiling = segY
+          }
+        }
+      }
+    }
+    return lowestCeiling
+  }
+
   private fun findVaultWallHeight(
     x0: Float,
     x1: Float,
@@ -568,16 +660,13 @@ object PhysicsEngine {
     return null
   }
 
-  /**
-   * Finds all platform tops, currently solid vanishing platforms, and player-drawn segments
-   * that horizontally overlap the stickman's foot footprint around [footX].
-   */
   private fun collectSupportingSurfaces(
     footX: Float,
     platforms: List<Platform>,
     completedLines: List<DrawnLine>,
     hazards: List<DynamicHazard> = emptyList(),
-    animTime: Float = 0f
+    animTime: Float = 0f,
+    mapBiome: MapBiome = MapBiome.MAP_1_VOLCANO
   ): List<SurfaceHit> {
     val hits = mutableListOf<SurfaceHit>()
     val minFootX = footX - FOOT_SUPPORT_HALF_WIDTH
@@ -590,11 +679,17 @@ object PhysicsEngine {
       }
     }
 
-    // 1b. Dynamic Vanishing Platforms (only when currently solid in their visibility cycle)
+    // 1b. Modular LEDGE obstacles (Cyan static/bouncy or Orange crumbling)
     for (hazard in hazards) {
-      if (hazard.type == HazardType.VANISHING_PLATFORM && hazard.isPlatformSolidAt(animTime)) {
-        if (maxFootX >= hazard.startX && minFootX <= hazard.endX) {
-          hits.add(SurfaceHit(y = hazard.topY, slopeRadians = 0f, tool = ChalkTool.WHITE))
+      if (hazard.type == HazardType.LEDGE && hazard.isPlatformSolidAt(animTime)) {
+        val (lStartX, lEndX) = hazard.ledgeBoundsAt(animTime, mapBiome)
+        if (maxFootX >= lStartX && minFootX <= lEndX) {
+          val surfaceTool = if (hazard.ledgeStyle == LedgeStyle.CYAN_BOUNCY) {
+            ChalkTool.SPRING
+          } else {
+            ChalkTool.WHITE
+          }
+          hits.add(SurfaceHit(y = hazard.topY, slopeRadians = 0f, tool = surfaceTool))
         }
       }
     }
@@ -643,10 +738,6 @@ object PhysicsEngine {
     return hits
   }
 
-  /**
-   * Cuts/snips the nearest player-drawn line within [reach] of [tapPoint], removing all points
-   * from the cut onward and returning the updated list plus the length of chalk removed.
-   */
   fun cutLineNearPoint(
     lines: List<DrawnLine>,
     tapPoint: Vec2,
@@ -692,10 +783,6 @@ object PhysicsEngine {
     return updatedLines to removedLength
   }
 
-  /**
-   * Updates Red Scribbler enemies: they charge along platforms/lines, bonk off steep player-drawn
-   * walls, or get rammed if the stickman is boosted.
-   */
   fun stepScribblers(
     scribblers: List<ScribblerEnemy>,
     stickman: StickmanState,
@@ -724,7 +811,6 @@ object PhysicsEngine {
         val moveVx = if (active) dir * enemy.speed else 0f
         val nextX = enemy.x + moveVx * dt
 
-        // Check if enemy hits a steep player-drawn wall -> bonk & tumble!
         val wallHit = findVaultWallHeight(enemy.x, nextX + dir * 10f, enemy.y, completedLines)
         if (wallHit != null) {
           return@mapNotNull enemy.copy(
@@ -739,21 +825,17 @@ object PhysicsEngine {
           .minByOrNull { it.y }
 
         if (support == null) {
-          // Walked off an edge into the abyss
           enemy.copy(x = nextX, isTumbling = true, tumbleVy = 60f)
         } else {
-          // Check contact with stickman
           val distX = abs(updatedStickman.footX - nextX)
           val distY = abs(updatedStickman.footY - support.y)
           if (distX < 24f && distY < 44f && updatedStickman.isAlive) {
             if (updatedStickman.boostTimer > 0f || updatedStickman.blitzTimer > 0f || updatedStickman.velocityY > 120f) {
-              // Stickman rams or stomps the scribbler!
               if (updatedStickman.velocityY > 120f) {
                 updatedStickman = updatedStickman.copy(velocityY = -360f, isGrounded = false)
               }
               return@mapNotNull enemy.copy(x = nextX, y = support.y, isTumbling = true, tumbleVy = -420f)
             } else {
-              // Scribbler bounces stickman upward
               updatedStickman = updatedStickman.copy(
                 velocityY = -340f,
                 isGrounded = false
@@ -774,9 +856,6 @@ object PhysicsEngine {
     return nextScribblers to updatedStickman
   }
 
-  /**
-   * Shortest distance from point [p] to line segment `[a, b]`.
-   */
   fun distancePointToSegment(p: Vec2, a: Vec2, b: Vec2): Float {
     val abx = b.x - a.x
     val aby = b.y - a.y
@@ -790,11 +869,6 @@ object PhysicsEngine {
     return sqrt(dx * dx + dy * dy)
   }
 
-  /**
-   * Collects any uncollected [ChalkBit]s that are touched by the player's drawn line segments
-   * ([strokePoints]), allowing the player to draw their line directly to floating chalk for
-   * additional chalk level (ink).
-   */
   fun collectChalkBitsAlongStroke(
     bits: List<ChalkBit>,
     strokePoints: List<Vec2>,
@@ -831,10 +905,6 @@ object PhysicsEngine {
     return updated to newlyCollected
   }
 
-  /**
-   * Collects Chalk Bits and Gold Stars when either the player's drawn line or the stickman
-   * reaches them, pulling nearby bits magnetically when a combo streak or Blitz is active.
-   */
   fun updateChalkBits(
     bits: List<ChalkBit>,
     stickman: StickmanState,
@@ -856,7 +926,6 @@ object PhysicsEngine {
       val dy = bodyCenterY - bit.y
       val distToStickman = sqrt(dx * dx + dy * dy)
 
-      // Also check if any player-drawn line touches this floating chalk bit
       var touchedByLine = false
       for (line in activeLines) {
         val pts = line.points
@@ -894,9 +963,6 @@ object PhysicsEngine {
     return updated to newlyCollected
   }
 
-  /**
-   * Updates animated lava ember particles in world coordinates.
-   */
   fun updateEmbers(
     existing: List<EmberParticle>,
     cameraX: Float,
@@ -934,10 +1000,6 @@ object PhysicsEngine {
     return updated
   }
 
-  /**
-   * Updates active hand-drawn sketch particles and spawns chalk footsteps when the stickman
-   * runs or lands on a surface.
-   */
   fun updateSketchParticles(
     existing: List<SketchParticle>,
     stickman: StickmanState,
@@ -1010,9 +1072,6 @@ object PhysicsEngine {
     return if (next.size > 120) next.takeLast(120) else next
   }
 
-  /**
-   * Spawns graphite shavings at the active pencil tip while the player drags across the screen.
-   */
   fun createPencilTipParticles(tip: Vec2, count: Int = 2): List<SketchParticle> {
     return List(count) {
       SketchParticle(
@@ -1029,9 +1088,6 @@ object PhysicsEngine {
     }
   }
 
-  /**
-   * Spawns a burst of hand-drawn solidification sparks along a newly completed line.
-   */
   fun createLineCompletedParticles(points: List<Vec2>): List<SketchParticle> {
     if (points.isEmpty()) return emptyList()
     val result = mutableListOf<SketchParticle>()

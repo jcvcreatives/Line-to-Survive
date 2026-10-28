@@ -8,9 +8,11 @@ import com.example.game.level.LevelCatalog
 import com.example.game.model.CalloutMove
 import com.example.game.model.CalloutMoveType
 import com.example.game.model.ChalkTool
+import com.example.game.model.DifficultyMode
 import com.example.game.model.DrawnLine
 import com.example.game.model.GameUiState
 import com.example.game.model.LevelDefinition
+import com.example.game.model.MapBiome
 import com.example.game.model.ScreenState
 import com.example.game.model.StickmanState
 import com.example.game.model.Vec2
@@ -20,13 +22,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Manages the game state, level progression, multi-chalk palette tools, callout move bubbles,
- * chalk bit magnet collection, red scribbler enemies, and 60 FPS simulation for Draw to Survive.
+ * Manages the game state, 50-level progression matrix, DifficultyModes, MapBiomes,
+ * multi-chalk palette tools, callout move bubbles, chalk bit magnet collection, and 60 FPS simulation.
  */
 class GameViewModel(
   private val progressRepository: ProgressRepository,
@@ -121,12 +122,16 @@ class GameViewModel(
     val savedStars = progressRepository.getAllLevelStars()
     val soundOn = progressRepository.isSoundEnabled()
     soundManager.setSoundEnabledState(enabled = soundOn, shouldPlayBgm = false)
-    val level1 = LevelCatalog.getLevel(1)
+    val defaultDifficulty = DifficultyMode.NORMAL
+    val defaultMap = MapBiome.MAP_1_VOLCANO
+    val level1 = LevelCatalog.getLevel(1, defaultDifficulty, defaultMap)
     return GameUiState(
       screenState = ScreenState.START_MENU,
       currentLevel = 1,
       bestLevel = bestLevel,
       levelStars = savedStars,
+      selectedDifficulty = defaultDifficulty,
+      selectedMap = defaultMap,
       levelDefinition = level1,
       stickman = createInitialStickman(level1),
       cameraX = 0f,
@@ -157,12 +162,35 @@ class GameViewModel(
     updateState { it.copy(selectedTool = tool, activeStrokePoints = emptyList()) }
   }
 
+  fun selectDifficulty(difficulty: DifficultyMode) {
+    soundManager.playButtonClick()
+    val cur = _uiState.value
+    loadLevel(
+      levelNumber = cur.currentLevel,
+      targetScreenState = cur.screenState,
+      difficulty = difficulty,
+      mapBiome = cur.selectedMap
+    )
+  }
+
+  fun selectMapBiome(mapBiome: MapBiome) {
+    soundManager.playButtonClick()
+    val cur = _uiState.value
+    loadLevel(
+      levelNumber = cur.currentLevel,
+      targetScreenState = cur.screenState,
+      difficulty = cur.selectedDifficulty,
+      mapBiome = mapBiome
+    )
+  }
+
+  /**
+   * Allows selecting any level (1..50) from the Main Menu so the user can test any level immediately.
+   */
   fun selectMapLevel(levelNumber: Int) {
     val clamped = levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS)
-    if (clamped <= _uiState.value.bestLevel) {
-      soundManager.playButtonClick()
-      loadLevel(clamped, targetScreenState = ScreenState.START_MENU)
-    }
+    soundManager.playButtonClick()
+    loadLevel(clamped, targetScreenState = ScreenState.START_MENU)
   }
 
   fun startGame(levelNumber: Int = _uiState.value.currentLevel) {
@@ -230,11 +258,15 @@ class GameViewModel(
     updateState { it.copy(soundEnabled = newEnabled) }
   }
 
-  private fun loadLevel(levelNumber: Int, targetScreenState: ScreenState) {
+  private fun loadLevel(
+    levelNumber: Int,
+    targetScreenState: ScreenState,
+    difficulty: DifficultyMode = _uiState.value.selectedDifficulty,
+    mapBiome: MapBiome = _uiState.value.selectedMap
+  ) {
     val validLevel = levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS)
-    val levelDef = LevelCatalog.getLevel(validLevel)
-    val best = max(progressRepository.getBestLevel(), validLevel).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
-    progressRepository.recordLevelReached(best)
+    val levelDef = LevelCatalog.getLevel(validLevel, difficulty, mapBiome)
+    val savedBest = progressRepository.getBestLevel().coerceIn(1, LevelCatalog.TOTAL_LEVELS)
     val savedStars = progressRepository.getAllLevelStars()
 
     if (targetScreenState == ScreenState.PLAYING) {
@@ -247,8 +279,10 @@ class GameViewModel(
       state.copy(
         screenState = targetScreenState,
         currentLevel = validLevel,
-        bestLevel = best,
+        bestLevel = savedBest,
         levelStars = savedStars,
+        selectedDifficulty = difficulty,
+        selectedMap = mapBiome,
         levelDefinition = levelDef,
         stickman = createInitialStickman(levelDef),
         cameraX = 0f,
@@ -293,6 +327,11 @@ class GameViewModel(
       y = worldPoint.y.coerceIn(4f, WorldConstants.WORLD_HEIGHT - 4f)
     )
 
+    if (PhysicsEngine.isPointBlockedByNoDrawZone(clamped, state.selectedTool, state.levelDefinition.hazards)) {
+      soundManager.playButtonClick()
+      return
+    }
+
     val (bitsAfterStart, collectedAtStart) = PhysicsEngine.collectChalkBitsAlongStroke(
       bits = state.chalkBits,
       strokePoints = listOf(clamped)
@@ -321,9 +360,7 @@ class GameViewModel(
   }
 
   /**
-   * Appends a dragged finger point in world coordinates. Automatically solidifies the line
-   * if the player reaches the maximum drawing length per attempt or depletes the ink meter.
-   * Drawing the line to floating Chalk pickups immediately refills additional chalk level!
+   * Appends a dragged finger point in world coordinates.
    */
   fun onDrawMove(worldPoint: Vec2) {
     val state = _uiState.value
@@ -336,7 +373,8 @@ class GameViewModel(
 
     if (state.activeStrokePoints.isEmpty()) return
 
-    val toolCostMult = state.selectedTool.inkCostMultiplier.coerceAtLeast(1f)
+    val toolCostMult = (state.selectedTool.inkCostMultiplier.coerceAtLeast(1f)) *
+      state.selectedDifficulty.inkDrainMult
     val maxStrokeLen = state.levelDefinition.maxStrokeLength
     val remainingInk = state.currentInk.coerceAtLeast(0f)
     val maxAffordableDistance = remainingInk / toolCostMult
@@ -352,7 +390,9 @@ class GameViewModel(
       existingPoints = state.activeStrokePoints,
       candidatePoint = worldPoint,
       maxStrokeLength = maxStrokeLen,
-      availableInkForRemaining = maxAffordableDistance
+      availableInkForRemaining = maxAffordableDistance,
+      tool = state.selectedTool,
+      hazards = state.levelDefinition.hazards
     )
 
     val addedNewPoint = updatedPoints.size > state.activeStrokePoints.size
@@ -361,7 +401,6 @@ class GameViewModel(
     val deltaLen = (strokeLen - prevStrokeLen).coerceAtLeast(0f)
     val deltaInk = deltaLen * toolCostMult
 
-    // Check if the player's drawn line reached any floating Chalk pickups for additional chalk level
     val (updatedBits, newlyCollectedBits) = PhysicsEngine.collectChalkBitsAlongStroke(
       bits = state.chalkBits,
       strokePoints = updatedPoints
@@ -404,10 +443,6 @@ class GameViewModel(
     }
   }
 
-  /**
-   * Completes the current finger stroke and turns it into a solid physical collision surface,
-   * or triggers tap-to-cut if the user tapped on an existing line.
-   */
   fun onDrawEnd() {
     val state = _uiState.value
     if (state.selectedTool == ChalkTool.CUTTER) return
@@ -433,7 +468,6 @@ class GameViewModel(
     val burstParticles = PhysicsEngine.createLineCompletedParticles(listOf(point))
     soundManager.playLineCompleted()
 
-    // Shockwave stuns/tumbles nearby Red Scribblers within 140 units
     val updatedScribblers = state.scribblers.map { scribbler ->
       if (!scribbler.isTumbling && hypotDistance(scribbler.x, scribbler.y, point.x, point.y) <= 140f) {
         scribbler.copy(isTumbling = true, tumbleVy = -380f)
@@ -496,10 +530,6 @@ class GameViewModel(
     }
   }
 
-  /**
-   * Advances the game simulation by [deltaSeconds] (targeted at 60 FPS).
-   * [visibleWorldWidth] is the current screen width expressed in logical world units.
-   */
   fun stepFrame(deltaSeconds: Float, visibleWorldWidth: Float = 1000f) {
     val state = _uiState.value
     val clampedDt = deltaSeconds.coerceIn(0f, 0.05f)
@@ -540,7 +570,7 @@ class GameViewModel(
     val level = state.levelDefinition
 
     // 1. Age lines that the stickman has reached or passed; Turbo Gold lines never expire
-    val agedLines = state.completedLines.mapNotNull { line ->
+    var agedLines = state.completedLines.mapNotNull { line ->
       if (line.tool == ChalkTool.BOOST) {
         line
       } else {
@@ -579,7 +609,6 @@ class GameViewModel(
     } else {
       val rem = nextCallout.remainingSeconds - clampedDt
       if (rem <= 0f) {
-        // Execute callout move!
         when (nextCallout.type) {
           CalloutMoveType.JUMP -> {
             if (preStickman.isGrounded) {
@@ -594,7 +623,13 @@ class GameViewModel(
             preStickman = preStickman.copy(lowGravityTimer = 2.6f)
           }
           CalloutMoveType.WIPEOUT -> {
-            // Wipeout ages lines behind the runner
+            agedLines = agedLines.mapNotNull { line ->
+              if (line.tool == ChalkTool.BOOST) line
+              else {
+                val acceleratedAge = line.ageSeconds + 1.4f
+                if (acceleratedAge >= line.maxLifetime) null else line.copy(ageSeconds = acceleratedAge)
+              }
+            }
           }
         }
         nextCallout = null
@@ -639,7 +674,7 @@ class GameViewModel(
       dt = clampedDt
     )
 
-    // 5. Update Chalk Bits & Magnet Combo collection (by stickman OR by player-drawn lines)
+    // 5. Update Chalk Bits & Magnet Combo collection
     val (nextChalkBits, newlyCollectedBits) = PhysicsEngine.updateChalkBits(
       bits = state.chalkBits,
       stickman = stickmanAfterEnemies,
@@ -656,7 +691,7 @@ class GameViewModel(
       state.comboCount
     }
 
-    // 6. Ink recharges slowly over time (plus combo bonus) while not actively drawing
+    // 6. Ink recharges slowly over time while not actively drawing
     val comboBonusMult = 1f + min(nextCombo, 5) * 0.08f
     val currentInk = state.currentInk
     val inkRecharge = if (state.activeStrokePoints.isEmpty() && currentInk < level.maxInkPerLevel) {
@@ -717,12 +752,12 @@ class GameViewModel(
         progressRepository.recordLevelReached(unlockedNext)
         val newBest = max(state.bestLevel, unlockedNext).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
 
-        // Compute 3-Star rating (1: Flag reached, 2: Under chalk par, 3: Collected bits/stars)
         var stars = 1
         if (state.totalInkDrawn <= level.parInkUsage) stars++
         val totalBits = nextChalkBits.size
         val gotBits = nextChalkBits.count { it.collected }
-        if (totalBits == 0 || gotBits >= max(1, totalBits / 2)) stars++
+        val targetBits = if (totalBits == 0) 0 else max(1, (totalBits + 1) / 2)
+        if (totalBits == 0 || gotBits >= targetBits) stars++
 
         progressRepository.recordLevelStars(state.currentLevel, stars)
         val updatedLevelStars = progressRepository.getAllLevelStars()

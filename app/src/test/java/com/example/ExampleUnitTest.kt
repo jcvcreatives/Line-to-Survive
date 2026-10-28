@@ -273,59 +273,51 @@ class ExampleUnitTest {
   }
 
   @Test
-  fun `getHazards dynamically scales obstacle frequency and difficulty from level 1 to 50`() {
-    val hazardsL1 = LevelCatalog.getHazards(1)
-    val hazardsL2 = LevelCatalog.getHazards(2)
-    val hazardsL10 = LevelCatalog.getHazards(10)
-    val hazardsL25 = LevelCatalog.getHazards(25)
-    val hazardsL50 = LevelCatalog.getHazards(50)
+  fun `getHazards and LEVEL_DEFINITIONS support all 8 modular obstacles and multi-map difficulty architecture`() {
+    // 1. Verify DIFFICULTY_MODES config object
+    assertEquals(4, com.example.game.model.DifficultyMode.DIFFICULTY_MODES.size)
+    assertEquals(0.8f, com.example.game.model.DifficultyMode.EASY.speedMult, 0.001f)
+    assertEquals(1.0f, com.example.game.model.DifficultyMode.NORMAL.speedMult, 0.001f)
+    assertEquals(1.25f, com.example.game.model.DifficultyMode.HARD.speedMult, 0.001f)
+    assertEquals(1.5f, com.example.game.model.DifficultyMode.NIGHTMARE.speedMult, 0.001f)
 
-    // Level 1 is introductory; Levels 2..50 scale up in frequency
-    assertTrue("Level 1 should have 0 dynamic hazards", hazardsL1.isEmpty())
-    assertTrue("Level 2 should introduce initial dynamic hazards", hazardsL2.isNotEmpty())
-    assertTrue("Level 10 should have more hazards than Level 2", hazardsL10.size > hazardsL2.size)
-    assertTrue("Level 25 should have more hazards than Level 10", hazardsL25.size > hazardsL10.size)
-    assertTrue("Level 50 should have the highest hazard count", hazardsL50.size > hazardsL25.size)
+    // 2. Verify MAPS_CONFIG biome registry
+    assertEquals(3, com.example.game.model.MapBiome.MAPS_CONFIG.size)
+    assertTrue(com.example.game.model.MapBiome.MAPS_CONFIG.containsKey("MAP_1_VOLCANO"))
+    assertTrue(com.example.game.model.MapBiome.MAPS_CONFIG.containsKey("MAP_2_CRYO_LAB"))
+    assertTrue(com.example.game.model.MapBiome.MAPS_CONFIG.containsKey("MAP_3_CYBER_GRID"))
 
-    // Verify both SWINGING_PENDULUM and VANISHING_PLATFORM appear in mid/high levels
-    assertTrue(
-      "Mid/high levels must contain Swinging Pendulums",
-      hazardsL25.any { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
-    )
-    assertTrue(
-      "Mid/high levels must contain Vanishing Platforms",
-      hazardsL25.any { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
-    )
+    // 3. Verify 50 distinct LEVEL_DEFINITIONS
+    assertEquals(50, LevelCatalog.LEVEL_DEFINITIONS.size)
+    val level49 = LevelCatalog.getLevel(49)
+    val level48 = LevelCatalog.getLevel(48)
+    assertEquals(2.0f, LevelCatalog.getBlueprint(49).lengthMultiplier, 0.001f)
+    assertTrue("Level 49 should be a 2x Marathon length level", level49.finishLineX > level48.finishLineX * 1.8f)
 
-    // Verify difficulty scaling for Swinging Pendulums (faster angularSpeed, wider maxAngleRadians, larger bobRadius)
-    val earlyPendulum = LevelCatalog.getHazards(5).first { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
-    val latePendulum = hazardsL50.first { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
-    assertTrue("Pendulum angular speed must increase with level", latePendulum.angularSpeed > earlyPendulum.angularSpeed)
-    assertTrue("Pendulum swing angle must widen with level", latePendulum.maxAngleRadians > earlyPendulum.maxAngleRadians)
-    assertTrue("Pendulum bob radius must increase with level", latePendulum.bobRadius > earlyPendulum.bobRadius)
+    val level50 = LevelCatalog.getLevel(50)
+    assertTrue("Level 50 should contain at least 20 collectible bits/stars for x20 MAGNET finale", level50.chalkBits.size >= 20)
 
-    // Verify difficulty scaling for Vanishing Platforms (narrower width, faster cycleSeconds, smaller visibleRatio)
-    val earlyPlatform = hazardsL2.first { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
-    val latePlatform = hazardsL50.first { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
-    assertTrue("Vanishing platform width must shrink at higher levels", latePlatform.width < earlyPlatform.width)
-    assertTrue("Vanishing platform cycle must speed up at higher levels", latePlatform.cycleSeconds < earlyPlatform.cycleSeconds)
-    assertTrue("Vanishing platform solid ratio must tighten at higher levels", latePlatform.visibleRatio < earlyPlatform.visibleRatio)
+    // 4. Verify all 8 modular obstacle types are generated across the 50 levels
+    val allSpawnedTypes = (1..50).flatMap { lvl -> LevelCatalog.getHazards(lvl).map { it.type } }.toSet()
+    assertTrue("Should spawn PENDULUM", allSpawnedTypes.contains(com.example.game.model.HazardType.SWINGING_PENDULUM))
+    assertTrue("Should spawn LEDGE", allSpawnedTypes.contains(com.example.game.model.HazardType.VANISHING_PLATFORM))
+    assertTrue("Should spawn LAVA_GEYSER", allSpawnedTypes.contains(com.example.game.model.HazardType.LAVA_GEYSER))
+    assertTrue("Should spawn FALLING_SPIKE", allSpawnedTypes.contains(com.example.game.model.HazardType.FALLING_SPIKE))
+    assertTrue("Should spawn LASER_GATE", allSpawnedTypes.contains(com.example.game.model.HazardType.LASER_GATE))
+    assertTrue("Should spawn SAW_TRACK", allSpawnedTypes.contains(com.example.game.model.HazardType.SAW_TRACK))
+    assertTrue("Should spawn NO_DRAW_ZONE", allSpawnedTypes.contains(com.example.game.model.HazardType.NO_DRAW_ZONE))
+    assertTrue("Should spawn WIND_UPDRAFT", allSpawnedTypes.contains(com.example.game.model.HazardType.WIND_UPDRAFT))
 
-    // Verify Vanishing Platform solid vs vanished states in PhysicsEngine
-    val testVanishing = com.example.game.model.DynamicHazard(
-      id = 999,
-      type = com.example.game.model.HazardType.VANISHING_PLATFORM,
-      x = 620f,
-      y = 400f,
-      startX = 560f,
-      endX = 680f,
-      topY = 400f,
-      cycleSeconds = 4.0f,
-      visibleRatio = 0.5f,
-      phaseOffset = 0f
-    )
-    assertTrue("Platform should be solid at t=0.5s", testVanishing.isPlatformSolidAt(0.5f))
-    assertFalse("Platform should be vanished at t=2.8s", testVanishing.isPlatformSolidAt(2.8f))
+    // 5. Verify Level 50 contains all 8 modular obstacle types
+    val l50Types = LevelCatalog.getHazards(50).map { it.type }.toSet()
+    assertEquals("Level 50 should feature all 8 modular obstacle types", 8, l50Types.size)
+
+    // 6. Verify NO_DRAW_ZONE point helper
+    val l24Hazards = LevelCatalog.getHazards(24)
+    val noDraw = l24Hazards.first { it.type == com.example.game.model.HazardType.NO_DRAW_ZONE }
+    val insidePt = Vec2((noDraw.startX + noDraw.endX) * 0.5f, (noDraw.topY + noDraw.bottomY) * 0.5f)
+    assertTrue("Point inside NO_DRAW_ZONE should be detected", noDraw.containsNoDrawPoint(insidePt))
   }
 }
+
 
