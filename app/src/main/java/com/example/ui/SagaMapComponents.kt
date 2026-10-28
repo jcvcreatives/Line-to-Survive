@@ -106,16 +106,32 @@ fun MapAndDifficultySelectorBar(
             onClick = { onSelectMap(biome) },
             modifier = Modifier
               .weight(1f)
+              .drawBehind {
+                if (isSelected) {
+                  drawRoundRect(
+                    color = accent.copy(alpha = 0.42f),
+                    topLeft = Offset(-4.dp.toPx(), -4.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(
+                      width = size.width + 8.dp.toPx(),
+                      height = size.height + 8.dp.toPx()
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx(), 24.dp.toPx())
+                  )
+                }
+              }
               .testTag("select_map_${biome.id}"),
             shape = RoundedCornerShape(50),
-            color = if (isSelected) accent.copy(alpha = 0.24f) else SketchCharcoalBg.copy(alpha = 0.85f),
-            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) accent else ChalkWhite.copy(alpha = 0.24f))
+            color = if (isSelected) accent.copy(alpha = 0.34f) else SketchCharcoalBg.copy(alpha = 0.85f),
+            border = BorderStroke(
+              width = if (isSelected) 2.dp else 1.dp,
+              color = if (isSelected) ChalkWhite else ChalkWhite.copy(alpha = 0.22f)
+            )
           ) {
             Text(
-              text = biome.shortLabel,
+              text = if (isSelected) "✦ ${biome.shortLabel}" else biome.shortLabel,
               fontSize = 11.sp,
-              fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-              color = if (isSelected) accent else ChalkWhite.copy(alpha = 0.8f),
+              fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+              color = if (isSelected) ChalkWhite else ChalkWhite.copy(alpha = 0.75f),
               textAlign = TextAlign.Center,
               modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
             )
@@ -123,7 +139,7 @@ fun MapAndDifficultySelectorBar(
         }
       }
 
-      // 2. Difficulty Mode Selector Row
+      // 2. Difficulty Mode Selector Row (with vivid neon glow on selected difficulty)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -147,16 +163,41 @@ fun MapAndDifficultySelectorBar(
             onClick = { onSelectDifficulty(diff) },
             modifier = Modifier
               .weight(1f)
+              .drawBehind {
+                if (isSelected) {
+                  drawRoundRect(
+                    color = accent.copy(alpha = 0.48f),
+                    topLeft = Offset(-5.dp.toPx(), -5.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(
+                      width = size.width + 10.dp.toPx(),
+                      height = size.height + 10.dp.toPx()
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx(), 24.dp.toPx())
+                  )
+                  drawRoundRect(
+                    color = accent.copy(alpha = 0.25f),
+                    topLeft = Offset(-9.dp.toPx(), -9.dp.toPx()),
+                    size = androidx.compose.ui.geometry.Size(
+                      width = size.width + 18.dp.toPx(),
+                      height = size.height + 18.dp.toPx()
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx(), 28.dp.toPx())
+                  )
+                }
+              }
               .testTag("select_difficulty_${diff.id}"),
             shape = RoundedCornerShape(50),
-            color = if (isSelected) accent.copy(alpha = 0.24f) else SketchCharcoalBg.copy(alpha = 0.85f),
-            border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) accent else ChalkWhite.copy(alpha = 0.24f))
+            color = if (isSelected) accent.copy(alpha = 0.36f) else SketchCharcoalBg.copy(alpha = 0.85f),
+            border = BorderStroke(
+              width = if (isSelected) 2.2.dp else 1.dp,
+              color = if (isSelected) accent else ChalkWhite.copy(alpha = 0.22f)
+            )
           ) {
             Text(
-              text = diff.displayName,
+              text = if (isSelected) "✦ ${diff.displayName}" else diff.displayName,
               fontSize = 11.sp,
-              fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-              color = if (isSelected) accent else ChalkWhite.copy(alpha = 0.8f),
+              fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+              color = if (isSelected) ChalkWhite else ChalkWhite.copy(alpha = 0.75f),
               textAlign = TextAlign.Center,
               modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
             )

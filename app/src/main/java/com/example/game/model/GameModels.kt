@@ -19,7 +19,7 @@ data class Vec2(
 object WorldConstants {
   const val WORLD_HEIGHT = 600f
   const val LAVA_SURFACE_Y = 532f
-  const val DEFAULT_GROUND_Y = 420f
+  const val DEFAULT_GROUND_Y = 325f
 
   const val STICKMAN_HEIGHT = 58f
   const val STICKMAN_FOOT_RADIUS = 14f

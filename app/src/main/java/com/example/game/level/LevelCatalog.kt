@@ -725,8 +725,8 @@ object LevelCatalog {
           } else {
             (160f + (hazardIndex % 3) * 14f).coerceIn(150f, 195f)
           }
-          val pivotY = (WorldConstants.DEFAULT_GROUND_Y - armLen - 78f + elevationShift * 0.55f)
-            .coerceIn(68f, 210f)
+          val pivotY = (WorldConstants.DEFAULT_GROUND_Y - armLen - 52f + elevationShift * 0.45f)
+            .coerceIn(58f, 185f)
           val effSpeed = if (pStyle == PendulumStyle.FAST_SHORT) pendulumAngularSpeed * 1.25f else pendulumAngularSpeed
 
           hazards.add(
@@ -769,8 +769,8 @@ object LevelCatalog {
           } else {
             0f
           }
-          val topY = (WorldConstants.DEFAULT_GROUND_Y - 12f + elevationShift + stairBoost)
-            .coerceIn(185f, 455f)
+          val topY = (WorldConstants.DEFAULT_GROUND_Y - 8f + elevationShift * 0.65f + stairBoost)
+            .coerceIn(180f, 410f)
           val halfW = platformWidth * 0.5f
           val style = if (clampedLevel <= 14 && blueprint.ledgeStyle == LedgeStyle.CYAN_STATIC && hazardIndex % 2 == 1) {
             LedgeStyle.ORANGE_CRUMBLING
@@ -798,8 +798,8 @@ object LevelCatalog {
         }
 
         HazardType.LAVA_GEYSER -> {
-          val geyserTopY = (WorldConstants.DEFAULT_GROUND_Y - 140f + elevationShift * 0.4f)
-            .coerceIn(175f, 320f)
+          val geyserTopY = (WorldConstants.DEFAULT_GROUND_Y - 95f + elevationShift * 0.35f)
+            .coerceIn(165f, 290f)
           hazards.add(
             DynamicHazard(
               id = baseId,
@@ -839,8 +839,8 @@ object LevelCatalog {
         }
 
         HazardType.LASER_GATE -> {
-          val gateTopY = 95f
-          val gateBottomY = (WorldConstants.DEFAULT_GROUND_Y + 55f).coerceAtMost(WorldConstants.LAVA_SURFACE_Y - 18f)
+          val gateTopY = 88f
+          val gateBottomY = (WorldConstants.DEFAULT_GROUND_Y + 95f).coerceAtMost(WorldConstants.LAVA_SURFACE_Y - 18f)
           hazards.add(
             DynamicHazard(
               id = baseId,
@@ -859,7 +859,7 @@ object LevelCatalog {
 
         HazardType.SAW_TRACK -> {
           val isVertical = (hazardIndex % 3 == 2) && clampedLevel >= 28
-          val centerY = (WorldConstants.DEFAULT_GROUND_Y - 38f + elevationShift * 0.5f).coerceIn(210f, 430f)
+          val centerY = (WorldConstants.DEFAULT_GROUND_Y - 22f + elevationShift * 0.45f).coerceIn(190f, 395f)
           val tStartX = if (isVertical) cursorX else cursorX - 85f
           val tEndX = if (isVertical) cursorX else cursorX + 85f
           val tStartY = if (isVertical) (centerY - 75f).coerceAtLeast(130f) else centerY
@@ -884,7 +884,7 @@ object LevelCatalog {
 
         HazardType.NO_DRAW_ZONE -> {
           val zoneHalfW = (62f + t * 26f).coerceIn(60f, 92f)
-          val zoneTopY = (WorldConstants.DEFAULT_GROUND_Y - 135f + elevationShift * 0.35f).coerceIn(160f, 310f)
+          val zoneTopY = (WorldConstants.DEFAULT_GROUND_Y - 95f + elevationShift * 0.35f).coerceIn(155f, 285f)
           val zoneBottomY = (WorldConstants.LAVA_SURFACE_Y - 12f)
           hazards.add(
             DynamicHazard(
@@ -1077,11 +1077,11 @@ object LevelCatalog {
       if (cursorX >= finishX - 50f) break
 
       val targetY = if (cfg.maxDeltaY <= 0.5f) {
-        WorldConstants.DEFAULT_GROUND_Y - 28f
+        WorldConstants.DEFAULT_GROUND_Y - 24f
       } else {
         val wave = sin((levelNumber * 1.3f + segmentIndex * 1.15f).toDouble()).toFloat()
-        val rawDelta = wave * cfg.maxDeltaY
-        (WorldConstants.DEFAULT_GROUND_Y - 30f + rawDelta).coerceIn(160f, 445f)
+        val rawDelta = wave * (cfg.maxDeltaY * 0.65f)
+        (WorldConstants.DEFAULT_GROUND_Y - 22f + rawDelta).coerceIn(180f, 405f)
       }
       currentY = targetY
 
@@ -1117,8 +1117,8 @@ object LevelCatalog {
     val finishTopY = if (cfg.maxDeltaY <= 0.5f) {
       WorldConstants.DEFAULT_GROUND_Y
     } else {
-      val finalDelta = sin((levelNumber * 2.7).toDouble()).toFloat() * (cfg.maxDeltaY * 0.55f)
-      (WorldConstants.DEFAULT_GROUND_Y + finalDelta).coerceIn(230f, 440f)
+      val finalDelta = sin((levelNumber * 2.7).toDouble()).toFloat() * (cfg.maxDeltaY * 0.35f)
+      (WorldConstants.DEFAULT_GROUND_Y + finalDelta).coerceIn(265f, 365f)
     }
 
     // Level 50 Grand Finale ("Inferno Overlord"): Massive x20 MAGNET star/pill finale before the finish flag!

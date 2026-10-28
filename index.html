@@ -263,6 +263,84 @@
       color: var(--lava-orange);
     }
 
+    /* Glowing Map Biome & Difficulty Selector Chips */
+    .map-chip, .diff-chip {
+      position: relative;
+      transition: all 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+
+    .map-chip.active[data-map="MAP_1_VOLCANO"] {
+      background: rgba(255, 87, 34, 0.34);
+      border: 2px solid #FFCA28;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 87, 34, 0.85), 0 0 24px rgba(255, 202, 40, 0.45), inset 0 0 8px rgba(255, 202, 40, 0.35);
+      text-shadow: 0 0 8px rgba(255, 202, 40, 0.9);
+    }
+
+    .map-chip.active[data-map="MAP_2_CRYO_LAB"] {
+      background: rgba(0, 229, 255, 0.32);
+      border: 2px solid #84FFFF;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.85), 0 0 24px rgba(0, 229, 255, 0.45), inset 0 0 8px rgba(132, 255, 255, 0.35);
+      text-shadow: 0 0 8px rgba(0, 229, 255, 0.9);
+    }
+
+    .map-chip.active[data-map="MAP_3_CYBER_GRID"] {
+      background: rgba(224, 64, 251, 0.34);
+      border: 2px solid #EA80FC;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(224, 64, 251, 0.85), 0 0 24px rgba(224, 64, 251, 0.45), inset 0 0 8px rgba(234, 128, 252, 0.35);
+      text-shadow: 0 0 8px rgba(224, 64, 251, 0.9);
+    }
+
+    .diff-chip.active[data-diff="EASY"] {
+      background: rgba(0, 230, 118, 0.32);
+      border: 2px solid #00E676;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.06);
+      box-shadow: 0 0 14px rgba(0, 230, 118, 0.85), 0 0 28px rgba(0, 230, 118, 0.45), inset 0 0 10px rgba(0, 230, 118, 0.38);
+      text-shadow: 0 0 8px rgba(0, 230, 118, 0.95);
+    }
+
+    .diff-chip.active[data-diff="NORMAL"] {
+      background: rgba(64, 196, 255, 0.34);
+      border: 2px solid #40C4FF;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.06);
+      box-shadow: 0 0 14px rgba(64, 196, 255, 0.88), 0 0 28px rgba(64, 196, 255, 0.45), inset 0 0 10px rgba(64, 196, 255, 0.38);
+      text-shadow: 0 0 8px rgba(64, 196, 255, 0.95);
+    }
+
+    .diff-chip.active[data-diff="HARD"] {
+      background: rgba(255, 202, 40, 0.34);
+      border: 2px solid #FFCA28;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.06);
+      box-shadow: 0 0 15px rgba(255, 202, 40, 0.90), 0 0 30px rgba(255, 87, 34, 0.50), inset 0 0 10px rgba(255, 202, 40, 0.40);
+      text-shadow: 0 0 8px rgba(255, 202, 40, 0.95);
+    }
+
+    .diff-chip.active[data-diff="NIGHTMARE"] {
+      background: rgba(255, 23, 68, 0.38);
+      border: 2px solid #FF5252;
+      color: #FFFFFF;
+      font-weight: 900;
+      transform: scale(1.07);
+      box-shadow: 0 0 16px rgba(255, 23, 68, 0.95), 0 0 32px rgba(213, 0, 0, 0.60), inset 0 0 12px rgba(255, 23, 68, 0.45);
+      text-shadow: 0 0 10px rgba(255, 82, 82, 1);
+    }
+
     .bits-indicator-pill {
       border-radius: 999px;
       padding: 6px 10px;
@@ -441,9 +519,10 @@
       gap: 6px;
     }
 
-    .world-biome-banner {
+    .world-biome-banner, .saga-world-banner {
       width: 100%;
       background: rgba(44, 47, 59, 0.95);
+      border: 1.5px solid rgba(64, 196, 255, 0.45);
       border-radius: 12px;
       padding: 6px 12px;
       display: flex;
@@ -451,8 +530,8 @@
       justify-content: space-between;
       font-family: var(--font-mono);
       font-weight: 800;
-      font-size: 12px;
-      letter-spacing: 0.8px;
+      font-size: 11px;
+      letter-spacing: 0.6px;
       margin: 4px 0;
     }
 
@@ -463,6 +542,10 @@
       display: flex;
       align-items: center;
       justify-content: space-evenly;
+    }
+
+    .saga-row.reverse {
+      flex-direction: row-reverse;
     }
 
     .saga-row-road {
@@ -478,7 +561,7 @@
     .saga-node-wrap {
       position: relative;
       z-index: 1;
-      width: 74px;
+      width: 82px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -491,7 +574,7 @@
       opacity: 0.72;
     }
 
-    .saga-next-badge {
+    .saga-next-badge, .saga-badge-pill {
       background: var(--lava-flame-yellow);
       color: var(--sketch-charcoal-bg);
       font-family: var(--font-mono);
@@ -500,34 +583,73 @@
       padding: 1px 6px;
       border-radius: 999px;
       margin-bottom: 2px;
+      line-height: 1.2;
     }
 
     .saga-medallion {
-      width: 46px;
-      height: 46px;
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
+      background: rgba(30, 41, 59, 0.95);
+      border: 2px solid rgba(247, 248, 242, 0.35);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       font-family: var(--font-mono);
       font-weight: 800;
-      font-size: 15px;
+      font-size: 14px;
       color: var(--chalk-white);
-      transition: transform 0.12s ease;
+      cursor: pointer;
+      padding: 2px;
+      transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+    }
+
+    .saga-medallion.completed {
+      background: rgba(6, 78, 59, 0.65);
+      border-color: #34D399;
+    }
+
+    .saga-medallion.frontier {
+      background: rgba(154, 52, 18, 0.75);
+      border-color: #FFCA28;
+      box-shadow: 0 0 12px rgba(255, 87, 34, 0.55);
+    }
+
+    .saga-medallion.selected {
+      border-width: 2.5px;
+      border-color: #40C4FF !important;
+      box-shadow: 0 0 16px rgba(64, 196, 255, 0.85), 0 0 28px rgba(64, 196, 255, 0.35) !important;
+      transform: scale(1.08);
+    }
+
+    .saga-medallion .sub-spd {
+      font-size: 9px;
+      font-weight: 700;
+      color: #94A3B8;
+      line-height: 1;
     }
 
     .saga-node-wrap:not(.locked):hover .saga-medallion {
       transform: scale(1.08);
     }
 
-    .saga-stars-row {
-      height: 14px;
-      margin-top: 2px;
-      font-size: 11px;
+    .saga-stars-row, .saga-stars {
+      height: 15px;
+      margin-top: 3px;
+      font-size: 12px;
       letter-spacing: 1px;
       font-family: var(--font-mono);
       font-weight: 700;
+    }
+
+    .saga-stars .star-on {
+      color: #FFCA28;
+      text-shadow: 0 0 6px rgba(255, 202, 40, 0.6);
+    }
+
+    .saga-stars .star-off {
+      color: #475569;
     }
 
     .level-config-banner {
@@ -876,7 +998,7 @@
 
     const WORLD_HEIGHT = 600;
     const LAVA_SURFACE_Y = 532;
-    const DEFAULT_GROUND_Y = 420;
+    const DEFAULT_GROUND_Y = 325;
     const STICKMAN_HEIGHT = 58;
     const STICKMAN_HEAD_RADIUS = 10;
     const BASE_RUN_SPEED = 175;
@@ -930,6 +1052,7 @@
         bgBottom: '#1E1718',
         gridColor: '#2A2D38',
         pitBack: '#D50000',
+        pitDeep: '#D50000',
         pitMid: '#FF5722',
         pitCore: 'rgba(255, 202, 40, 0.88)'
       },
@@ -945,6 +1068,7 @@
         bgBottom: '#0B2430',
         gridColor: '#1E3A56',
         pitBack: '#0097A7',
+        pitDeep: '#0097A7',
         pitMid: '#00E5FF',
         pitCore: 'rgba(132, 255, 255, 0.88)'
       },
@@ -960,6 +1084,7 @@
         bgBottom: '#260B2C',
         gridColor: '#391E5A',
         pitBack: '#AA00FF',
+        pitDeep: '#AA00FF',
         pitMid: '#FF1744',
         pitCore: 'rgba(255, 128, 171, 0.88)'
       }
@@ -1185,7 +1310,7 @@
             ? 122
             : Math.max(150, Math.min(195, 160 + (hazardIndex % 3) * 14));
           const speedMult = style === 'FAST_SHORT' ? 1.35 : 1.0;
-          const pivotY = Math.max(70, Math.min(210, DEFAULT_GROUND_Y - armLen - 78 + elevationShift * 0.55));
+          const pivotY = Math.max(58, Math.min(185, DEFAULT_GROUND_Y - armLen - 52 + elevationShift * 0.45));
           hazards.push({
             id: baseId,
             type: 'PENDULUM',
@@ -1213,7 +1338,7 @@
             });
           }
         } else if (chosenType === 'LEDGE') {
-          const topY = Math.max(195, Math.min(455, DEFAULT_GROUND_Y - 12 + elevationShift));
+          const topY = Math.max(180, Math.min(410, DEFAULT_GROUND_Y - 8 + elevationShift * 0.65));
           const halfW = platformWidth * 0.5;
           hazards.push({
             id: baseId,
@@ -1229,7 +1354,7 @@
             ledgeStyle: blueprint.ledgeStyle || 'CYAN_STATIC'
           });
         } else if (chosenType === 'LAVA_GEYSER') {
-          const peakY = Math.max(165, Math.min(310, DEFAULT_GROUND_Y - 135 + elevationShift * 0.4));
+          const peakY = Math.max(165, Math.min(290, DEFAULT_GROUND_Y - 95 + elevationShift * 0.35));
           hazards.push({
             id: baseId,
             type: 'LAVA_GEYSER',
@@ -1255,7 +1380,7 @@
             phaseOffset
           });
         } else if (chosenType === 'LASER_GATE') {
-          const topNodeY = Math.max(120, Math.min(250, DEFAULT_GROUND_Y - 210 + elevationShift * 0.45));
+          const topNodeY = Math.max(88, Math.min(210, DEFAULT_GROUND_Y - 190 + elevationShift * 0.4));
           const botNodeY = Math.min(LAVA_SURFACE_Y - 24, topNodeY + 215);
           hazards.push({
             id: baseId,
@@ -1269,7 +1394,7 @@
             phaseOffset
           });
         } else if (chosenType === 'SAW_TRACK') {
-          const centerY = Math.max(210, Math.min(430, DEFAULT_GROUND_Y - 45 + elevationShift * 0.5));
+          const centerY = Math.max(190, Math.min(395, DEFAULT_GROUND_Y - 22 + elevationShift * 0.45));
           const isHorizontal = (hazardIndex % 2 === 0);
           hazards.push({
             id: baseId,
@@ -1284,8 +1409,8 @@
           });
         } else if (chosenType === 'NO_DRAW_ZONE') {
           const zoneW = Math.max(120, Math.min(185, 130 + t * 45));
-          const zoneH = 230;
-          const centerY = Math.max(240, Math.min(395, DEFAULT_GROUND_Y - 75 + elevationShift * 0.35));
+          const zoneH = 220;
+          const centerY = Math.max(220, Math.min(365, DEFAULT_GROUND_Y - 35 + elevationShift * 0.35));
           hazards.push({
             id: baseId,
             type: 'NO_DRAW_ZONE',
@@ -1516,8 +1641,8 @@
         if (cursorX >= finishX - 50) break;
 
         const targetY = cfg.maxDeltaY <= 0.5
-          ? groundY - 28
-          : Math.max(160, Math.min(445, groundY - 30 + Math.sin(clamped * 1.3 + segmentIndex * 1.15) * cfg.maxDeltaY));
+          ? groundY - 24
+          : Math.max(180, Math.min(405, groundY - 22 + Math.sin(clamped * 1.3 + segmentIndex * 1.15) * (cfg.maxDeltaY * 0.65)));
         currentY = targetY;
 
         const isGoldStar = (segmentIndex % 4 === 2);
@@ -1545,7 +1670,7 @@
 
       const finishTopY = cfg.maxDeltaY <= 0.5
         ? groundY
-        : Math.max(230, Math.min(440, groundY + Math.sin(clamped * 2.7) * (cfg.maxDeltaY * 0.55)));
+        : Math.max(265, Math.min(365, groundY + Math.sin(clamped * 2.7) * (cfg.maxDeltaY * 0.35)));
 
       // Level 50 Grand Finale: x20 MAGNET star/pill arch before the finish flag!
       const magnetCount = blueprint.magnetFinaleCount || 0;
@@ -2997,18 +3122,19 @@
       const startWX = camX - 60;
       const endWX = camX + visW + 60;
       const bCfg = biomeCfg || MAPS_CONFIG.MAP_1_VOLCANO;
+      const pitDeepColor = bCfg.pitDeep || bCfg.pitBack || '#D50000';
 
       // Ambient glow above hazard floor
       const glowTop = toScreenY(lavaTopY - 75);
       const glowGrad = ctx.createLinearGradient(0, glowTop, 0, h);
       glowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
       glowGrad.addColorStop(0.5, bCfg.pitMid + '33');
-      glowGrad.addColorStop(1, bCfg.pitDeep + '99');
+      glowGrad.addColorStop(1, pitDeepColor + '99');
       ctx.fillStyle = glowGrad;
       ctx.fillRect(0, glowTop, w, h - glowTop);
 
       // Back wave
-      ctx.fillStyle = bCfg.pitDeep;
+      ctx.fillStyle = pitDeepColor;
       ctx.beginPath();
       ctx.moveTo(0, h);
       for (let wx = startWX; wx <= endWX; wx += 20) {
@@ -3422,14 +3548,14 @@
           ctx.setLineDash([8 * worldScale, 8 * worldScale]);
           ctx.beginPath();
           ctx.moveTo(gx, baseScreenY);
-          ctx.lineTo(gx, toScreenY(LAVA_SURFACE_Y - hazard.geyserMaxHeight));
+          ctx.lineTo(gx, toScreenY(hazard.topY || (DEFAULT_GROUND_Y - 95)));
           ctx.stroke();
           ctx.setLineDash([]);
         }
 
-        if (plumeTopWorld !== null) {
+        if (plumeTopWorld < LAVA_SURFACE_Y - 4) {
           const topScreenY = toScreenY(plumeTopWorld);
-          const colW = (hazard.width || 46) * worldScale;
+          const colW = (hazard.width || 38) * worldScale;
           ctx.lineCap = 'round';
           ctx.strokeStyle = 'rgba(255, 87, 34, 0.38)';
           ctx.lineWidth = colW * 1.35;
@@ -3450,9 +3576,9 @@
       } else if (hazard.type === 'FALLING_SPIKE') {
         const sx = toScreenX(hazard.x);
         if (sx < -60 || sx > w + 60) return;
-        const tipWorldY = getFallingSpikeTipY(hazard, state.stickman ? state.stickman.footX : 0, animTime);
+        const tipWorldY = getFallingSpikeTipY(hazard, state.stickman ? state.stickman.footX : 0, state.completedLines);
         const tipY = toScreenY(tipWorldY);
-        const baseY = toScreenY(tipWorldY - 42);
+        const baseY = toScreenY(tipWorldY - (hazard.height || 44));
         const halfW = 15 * worldScale;
 
         ctx.save();
@@ -3479,8 +3605,10 @@
       } else if (hazard.type === 'LASER_GATE') {
         const lx = toScreenX(hazard.x);
         if (lx < -60 || lx > w + 60) return;
-        const topY = toScreenY(hazard.y);
-        const botY = toScreenY(hazard.height || (LAVA_SURFACE_Y - 18));
+        const topNodeWorldY = hazard.topY !== undefined ? hazard.topY : hazard.y;
+        const botNodeWorldY = hazard.topY !== undefined ? (hazard.topY + (hazard.height || 215)) : (LAVA_SURFACE_Y - 18);
+        const topY = toScreenY(topNodeWorldY);
+        const botY = toScreenY(botNodeWorldY);
         const active = isLaserActive(hazard, animTime);
         const warning = isLaserWarning(hazard, animTime);
 
@@ -3511,10 +3639,12 @@
         }
         ctx.restore();
       } else if (hazard.type === 'SAW_TRACK') {
-        const ax = toScreenX(hazard.startX);
-        const ay = toScreenY(hazard.y);
-        const bx = toScreenX(hazard.endX);
-        const by = toScreenY(hazard.trackEndY);
+        const rx = hazard.trackRadiusX || 0;
+        const ry = hazard.trackRadiusY || 0;
+        const ax = toScreenX(hazard.x - rx);
+        const ay = toScreenY(hazard.y - ry);
+        const bx = toScreenX(hazard.x + rx);
+        const by = toScreenY(hazard.y + ry);
         if (Math.max(ax, bx) < -80 || Math.min(ax, bx) > w + 80) return;
 
         ctx.save();
@@ -4454,17 +4584,30 @@
     }
 
     function syncSelectorButtonsDOM() {
-      document.querySelectorAll('#mapSelectorBtns .map-btn').forEach(btn => {
-        const active = btn.dataset.map === state.selectedMap;
-        btn.style.background = active ? '#FF5722' : '#1E293B';
-        btn.style.color = active ? '#FFF' : '#CBD5E1';
-        btn.style.borderColor = active ? '#FFCA28' : 'rgba(255,255,255,0.22)';
+      const mapLabels = {
+        MAP_1_VOLCANO: 'VOLCANO',
+        MAP_2_CRYO_LAB: 'CRYO LAB',
+        MAP_3_CYBER_GRID: 'CYBER GRID'
+      };
+      const diffLabels = {
+        EASY: 'EASY',
+        NORMAL: 'NORMAL',
+        HARD: 'HARD',
+        NIGHTMARE: 'NIGHTMARE'
+      };
+      document.querySelectorAll('#mapDifficultySelectorBar .map-chip').forEach(btn => {
+        const mapKey = btn.dataset.map;
+        const active = mapKey === state.selectedMap;
+        btn.classList.toggle('active', active);
+        const baseLabel = mapLabels[mapKey] || mapKey;
+        btn.textContent = active ? `✦ ${baseLabel}` : baseLabel;
       });
-      document.querySelectorAll('#difficultySelectorBtns .diff-btn').forEach(btn => {
-        const active = btn.dataset.diff === state.selectedDifficulty;
-        btn.style.background = active ? '#0284C7' : '#1E293B';
-        btn.style.color = active ? '#FFF' : '#CBD5E1';
-        btn.style.borderColor = active ? '#38BDF8' : 'rgba(255,255,255,0.22)';
+      document.querySelectorAll('#mapDifficultySelectorBar .diff-chip').forEach(btn => {
+        const diffKey = btn.dataset.diff;
+        const active = diffKey === state.selectedDifficulty;
+        btn.classList.toggle('active', active);
+        const baseLabel = diffLabels[diffKey] || diffKey;
+        btn.textContent = active ? `✦ ${baseLabel}` : baseLabel;
       });
     }
 
