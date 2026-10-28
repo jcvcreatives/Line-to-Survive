@@ -173,7 +173,13 @@ fun DrawToSurviveScreen(
           StartMenuOverlay(
             uiState = uiState,
             onPlayClick = { viewModel.startGame() },
-            onSelectLevelClick = { level -> viewModel.startGame(level) },
+            onSelectLevelClick = { level ->
+              if (uiState.currentLevel == level) {
+                viewModel.startGame(level)
+              } else {
+                viewModel.selectMapLevel(level)
+              }
+            },
             onToggleSoundClick = { viewModel.toggleSound() }
           )
         }

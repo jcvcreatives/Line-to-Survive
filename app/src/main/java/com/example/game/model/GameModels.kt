@@ -179,6 +179,35 @@ data class ScriptedCallout(
 )
 
 /**
+ * Core scaling parameters for a level (1..50) calculated by `getLevelConfig(level)`:
+ * - [levelLength]: Distance to finish line (`800px` in Level 1, `+150px` per level)
+ * - [baseSpeed]: Character speed multiplier (`3.0` in Level 1 scaling linearly to `8.5` at Level 50)
+ * - [runSpeed]: World horizontal velocity in px/sec derived from [baseSpeed]
+ * - [minGap], [maxGap]: Gap width range (`80px–140px` in Level 1 scaling to `180px–380px` in Level 50)
+ * - [maxDeltaY]: Platform elevation variance (`0px` in Levels 1–3, scaling up to `±160px` by Level 50)
+ * - [maxInkPerLevel], [inkRechargeRate]: Tighter ink capacity & regen relative to gap sizes
+ * - [lineLifespan]: Decay timer (`5.0s` in Level 1 decreasing linearly to `1.8s` by Level 50)
+ */
+data class LevelConfig(
+  val level: Int,
+  val worldIndex: Int,
+  val worldTitle: String,
+  val levelTitle: String,
+  val levelSubtitle: String,
+  val levelLength: Float,
+  val baseSpeed: Float,
+  val runSpeed: Float,
+  val minGap: Float,
+  val maxGap: Float,
+  val maxDeltaY: Float,
+  val maxInkPerLevel: Float,
+  val inkRechargeRate: Float,
+  val parInkUsage: Float,
+  val maxStrokeLength: Float,
+  val lineLifespan: Float
+)
+
+/**
  * Complete definition for a playable level.
  */
 data class LevelDefinition(
@@ -193,6 +222,13 @@ data class LevelDefinition(
   val inkRechargeRate: Float = 120f,
   val parInkUsage: Float = 950f,
   val maxStrokeLength: Float = WorldConstants.MAX_STROKE_LENGTH,
+  val lineLifespan: Float = 5.0f,
+  val baseSpeed: Float = 3.0f,
+  val levelLength: Float = 800f,
+  val minGap: Float = 80f,
+  val maxGap: Float = 140f,
+  val maxDeltaY: Float = 0f,
+  val worldTitle: String = "World 1: Chalkboard Meadows",
   val platforms: List<Platform>,
   val guideStrokes: List<GuideStroke> = emptyList(),
   val chalkBits: List<ChalkBit> = emptyList(),
@@ -277,6 +313,7 @@ data class GameUiState(
   val screenState: ScreenState = ScreenState.START_MENU,
   val currentLevel: Int = 1,
   val bestLevel: Int = 1,
+  val levelStars: Map<Int, Int> = emptyMap(),
   val levelDefinition: LevelDefinition,
   val stickman: StickmanState,
   val cameraX: Float = 0f,
@@ -299,6 +336,12 @@ data class GameUiState(
   val soundEnabled: Boolean = true,
   val showInstructionBanner: Boolean = true
 ) {
+  val totalStarsEarned: Int
+    get() = levelStars.values.sum()
+
+  val completedLevelsCount: Int
+    get() = maxOf(levelStars.count { it.value > 0 }, (bestLevel - 1).coerceAtLeast(0))
+
   val inkRemainingRatio: Float
     get() = if (levelDefinition.maxInkPerLevel > 0f) {
       (currentInk / levelDefinition.maxInkPerLevel).coerceIn(0f, 1f)

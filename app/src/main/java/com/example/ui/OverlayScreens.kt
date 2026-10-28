@@ -399,7 +399,7 @@ fun GameplayHudOverlay(
 }
 
 /**
- * Start screen with the title DRAW TO SURVIVE, level selector / best level badge, and Play button.
+ * Start screen with the title DRAW TO SURVIVE, 50-Level Candy Crush Saga Map, scaling stats inspector, and Play button.
  */
 @Composable
 fun StartMenuOverlay(
@@ -408,129 +408,142 @@ fun StartMenuOverlay(
   onSelectLevelClick: (Int) -> Unit,
   onToggleSoundClick: () -> Unit
 ) {
+  val selectedConfig = com.example.game.level.LevelCatalog.getLevelConfig(uiState.currentLevel)
+  val selectedStars = uiState.levelStars[uiState.currentLevel] ?: if (uiState.currentLevel < uiState.bestLevel) 3 else 0
+  val isSelectedCompleted = (uiState.currentLevel < uiState.bestLevel) || (selectedStars > 0)
+
   Box(
     modifier = Modifier
       .fillMaxSize()
-      .background(SketchCharcoalBg.copy(alpha = 0.78f))
+      .background(SketchCharcoalBg.copy(alpha = 0.82f))
       .windowInsetsPadding(WindowInsets.safeDrawing)
-      .padding(24.dp),
+      .padding(horizontal = 16.dp, vertical = 10.dp),
     contentAlignment = Alignment.Center
   ) {
     Card(
       modifier = Modifier
         .fillMaxWidth()
-        .widthIn(max = 520.dp)
-        .border(2.5.dp, ChalkWhite, RoundedCornerShape(28.dp))
+        .widthIn(max = 620.dp)
+        .border(2.5.dp, ChalkWhite, RoundedCornerShape(26.dp))
         .testTag("start_screen_card"),
-      shape = RoundedCornerShape(28.dp),
-      colors = CardDefaults.cardColors(containerColor = SketchPaperSurface.copy(alpha = 0.96f)),
+      shape = RoundedCornerShape(26.dp),
+      colors = CardDefaults.cardColors(containerColor = SketchPaperSurface.copy(alpha = 0.97f)),
       elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
     ) {
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 28.dp, vertical = 26.dp),
+          .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
       ) {
+        // Top Header: Title + Best Level & Stars + Sound Toggle
         Row(
+          modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-          Icon(
-            imageVector = Icons.Default.Whatshot,
-            contentDescription = null,
-            tint = LavaOrange,
-            modifier = Modifier.size(34.dp)
-          )
-          Text(
-            text = stringResource(R.string.title_draw_to_survive),
-            style = MaterialTheme.typography.displayMedium,
-            color = ChalkWhite,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.testTag("start_title_text")
-          )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-          text = stringResource(R.string.subtitle_sketchbook_runner),
-          style = MaterialTheme.typography.bodyLarge,
-          color = PencilGraphite,
-          textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Best level & instruction pill
-        Surface(
-          color = SketchPaperCard,
-          shape = RoundedCornerShape(14.dp),
-          border = BorderStroke(1.dp, LavaFlameYellow.copy(alpha = 0.5f))
+          horizontalArrangement = Arrangement.SpaceBetween
         ) {
           Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
           ) {
             Icon(
-              imageVector = Icons.Default.EmojiEvents,
+              imageVector = Icons.Default.Whatshot,
               contentDescription = null,
-              tint = LavaFlameYellow,
-              modifier = Modifier.size(20.dp)
+              tint = LavaOrange,
+              modifier = Modifier.size(28.dp)
             )
             Text(
-              text = stringResource(R.string.label_best_level, uiState.bestLevel),
-              style = MaterialTheme.typography.titleMedium,
-              color = LavaFlameYellow,
-              modifier = Modifier.testTag("best_level_text")
+              text = stringResource(R.string.title_draw_to_survive),
+              style = MaterialTheme.typography.headlineLarge,
+              color = ChalkWhite,
+              modifier = Modifier.testTag("start_title_text")
             )
           }
-        }
 
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // Quick level selection pills if the player has unlocked multiple levels
-        if (uiState.bestLevel > 1) {
           Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
           ) {
-            val maxShown = uiState.bestLevel.coerceAtMost(4)
-            for (lvl in 1..maxShown) {
-              val isSelected = uiState.currentLevel == lvl
-              OutlinedButton(
-                onClick = { onSelectLevelClick(lvl) },
-                modifier = Modifier
-                  .height(48.dp)
-                  .testTag("select_level_${lvl}_button"),
-                colors = ButtonDefaults.outlinedButtonColors(
-                  containerColor = if (isSelected) LavaOrange.copy(alpha = 0.25f) else Color.Transparent,
-                  contentColor = if (isSelected) LavaFlameYellow else ChalkWhite
-                ),
-                border = BorderStroke(
-                  width = if (isSelected) 2.dp else 1.dp,
-                  color = if (isSelected) LavaFlameYellow else PencilGraphite
-                )
+            Surface(
+              color = SketchPaperCard,
+              shape = RoundedCornerShape(12.dp),
+              border = BorderStroke(1.dp, LavaFlameYellow.copy(alpha = 0.55f))
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
               ) {
+                Icon(
+                  imageVector = Icons.Default.EmojiEvents,
+                  contentDescription = null,
+                  tint = LavaFlameYellow,
+                  modifier = Modifier.size(18.dp)
+                )
                 Text(
-                  text = "LVL $lvl",
-                  style = MaterialTheme.typography.labelLarge
+                  text = "${stringResource(R.string.label_best_level, uiState.bestLevel)} • ★ ${uiState.totalStarsEarned}/150",
+                  style = MaterialTheme.typography.labelLarge,
+                  color = LavaFlameYellow,
+                  modifier = Modifier.testTag("best_level_text")
                 )
               }
             }
+
+            OutlinedButton(
+              onClick = onToggleSoundClick,
+              modifier = Modifier
+                .height(40.dp)
+                .testTag("start_sound_toggle_button"),
+              shape = CircleShape,
+              border = BorderStroke(1.dp, PencilGraphite.copy(alpha = 0.6f))
+            ) {
+              Icon(
+                imageVector = if (uiState.soundEnabled) {
+                  Icons.AutoMirrored.Filled.VolumeUp
+                } else {
+                  Icons.AutoMirrored.Filled.VolumeOff
+                },
+                contentDescription = stringResource(R.string.action_sound_toggle),
+                tint = ChalkWhite,
+                modifier = Modifier.size(18.dp)
+              )
+            }
           }
-          Spacer(modifier = Modifier.height(16.dp))
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Candy Crush-Style 50-Level Winding Saga Map
+        CandyCrushSagaMap(
+          selectedLevel = uiState.currentLevel,
+          bestLevel = uiState.bestLevel,
+          levelStars = uiState.levelStars,
+          onSelectLevel = onSelectLevelClick,
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f, fill = false)
+            .height(230.dp)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Selected Level Scaling Formula Summary
+        SelectedLevelConfigBanner(
+          config = selectedConfig,
+          isCompleted = isSelectedCompleted,
+          stars = selectedStars
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Large Play Button
         Button(
           onClick = onPlayClick,
           modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(52.dp)
             .testTag("play_button"),
-          shape = RoundedCornerShape(18.dp),
+          shape = RoundedCornerShape(16.dp),
           colors = ButtonDefaults.buttonColors(
             containerColor = LavaOrange,
             contentColor = ChalkWhite
@@ -539,39 +552,12 @@ fun StartMenuOverlay(
           Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = null,
-            modifier = Modifier.size(28.dp)
-          )
-          Spacer(modifier = Modifier.width(10.dp))
-          Text(
-            text = stringResource(R.string.action_play),
-            style = MaterialTheme.typography.headlineMedium
-          )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedButton(
-          onClick = onToggleSoundClick,
-          modifier = Modifier
-            .height(48.dp)
-            .testTag("start_sound_toggle_button"),
-          shape = CircleShape,
-          border = BorderStroke(1.dp, PencilGraphite.copy(alpha = 0.6f))
-        ) {
-          Icon(
-            imageVector = if (uiState.soundEnabled) {
-              Icons.AutoMirrored.Filled.VolumeUp
-            } else {
-              Icons.AutoMirrored.Filled.VolumeOff
-            },
-            contentDescription = stringResource(R.string.action_sound_toggle),
-            tint = ChalkWhite
+            modifier = Modifier.size(26.dp)
           )
           Spacer(modifier = Modifier.width(8.dp))
           Text(
-            text = if (uiState.soundEnabled) "SOUND: ON" else "SOUND: OFF",
-            style = MaterialTheme.typography.bodyMedium,
-            color = ChalkWhite
+            text = "${stringResource(R.string.action_play)} (LVL ${uiState.currentLevel})",
+            style = MaterialTheme.typography.headlineSmall
           )
         }
       }

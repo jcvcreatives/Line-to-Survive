@@ -118,6 +118,7 @@ class GameViewModel(
 
   private fun createInitialState(): GameUiState {
     val bestLevel = progressRepository.getBestLevel()
+    val savedStars = progressRepository.getAllLevelStars()
     val soundOn = progressRepository.isSoundEnabled()
     soundManager.setSoundEnabledState(enabled = soundOn, shouldPlayBgm = false)
     val level1 = LevelCatalog.getLevel(1)
@@ -125,6 +126,7 @@ class GameViewModel(
       screenState = ScreenState.START_MENU,
       currentLevel = 1,
       bestLevel = bestLevel,
+      levelStars = savedStars,
       levelDefinition = level1,
       stickman = createInitialStickman(level1),
       cameraX = 0f,
@@ -155,9 +157,17 @@ class GameViewModel(
     updateState { it.copy(selectedTool = tool, activeStrokePoints = emptyList()) }
   }
 
+  fun selectMapLevel(levelNumber: Int) {
+    val clamped = levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS)
+    if (clamped <= _uiState.value.bestLevel) {
+      soundManager.playButtonClick()
+      loadLevel(clamped, targetScreenState = ScreenState.START_MENU)
+    }
+  }
+
   fun startGame(levelNumber: Int = _uiState.value.currentLevel) {
     soundManager.playButtonClick()
-    loadLevel(levelNumber, targetScreenState = ScreenState.PLAYING)
+    loadLevel(levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS), targetScreenState = ScreenState.PLAYING)
   }
 
   fun retryCurrentLevel() {
@@ -167,7 +177,7 @@ class GameViewModel(
 
   fun startNextLevel() {
     soundManager.playButtonClick()
-    val nextLevel = _uiState.value.currentLevel + 1
+    val nextLevel = (_uiState.value.currentLevel + 1).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
     progressRepository.recordLevelReached(nextLevel)
     loadLevel(nextLevel, targetScreenState = ScreenState.PLAYING)
   }
@@ -221,10 +231,11 @@ class GameViewModel(
   }
 
   private fun loadLevel(levelNumber: Int, targetScreenState: ScreenState) {
-    val validLevel = levelNumber.coerceAtLeast(1)
+    val validLevel = levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS)
     val levelDef = LevelCatalog.getLevel(validLevel)
-    val best = max(progressRepository.getBestLevel(), validLevel)
+    val best = max(progressRepository.getBestLevel(), validLevel).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
     progressRepository.recordLevelReached(best)
+    val savedStars = progressRepository.getAllLevelStars()
 
     if (targetScreenState == ScreenState.PLAYING) {
       soundManager.startBackgroundMusic()
@@ -237,6 +248,7 @@ class GameViewModel(
         screenState = targetScreenState,
         currentLevel = validLevel,
         bestLevel = best,
+        levelStars = savedStars,
         levelDefinition = levelDef,
         stickman = createInitialStickman(levelDef),
         cameraX = 0f,
@@ -424,7 +436,7 @@ class GameViewModel(
     val lifetime = if (state.selectedTool == ChalkTool.BOOST) {
       9999f
     } else {
-      WorldConstants.DEFAULT_LINE_LIFETIME
+      state.levelDefinition.lineLifespan
     }
     val newLine = DrawnLine(
       id = nextLineId++,
@@ -660,9 +672,9 @@ class GameViewModel(
 
       tickResult.reachedFinish || stickmanAfterEnemies.hasReachedFinish -> {
         soundManager.playLevelComplete()
-        val unlockedNext = state.currentLevel + 1
+        val unlockedNext = (state.currentLevel + 1).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
         progressRepository.recordLevelReached(unlockedNext)
-        val newBest = max(state.bestLevel, unlockedNext)
+        val newBest = max(state.bestLevel, unlockedNext).coerceIn(1, LevelCatalog.TOTAL_LEVELS)
 
         // Compute 3-Star rating (1: Flag reached, 2: Under chalk par, 3: Collected bits/stars)
         var stars = 1
@@ -671,10 +683,14 @@ class GameViewModel(
         val gotBits = nextChalkBits.count { it.collected }
         if (totalBits == 0 || gotBits >= max(1, totalBits / 2)) stars++
 
+        progressRepository.recordLevelStars(state.currentLevel, stars)
+        val updatedLevelStars = progressRepository.getAllLevelStars()
+
         updateState {
           it.copy(
             screenState = ScreenState.LEVEL_COMPLETE,
             bestLevel = newBest,
+            levelStars = updatedLevelStars,
             stickman = stickmanAfterEnemies,
             cameraX = newCameraX,
             completedLines = agedLines,

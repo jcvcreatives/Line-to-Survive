@@ -428,25 +428,118 @@
       flex-wrap: wrap;
     }
 
-    .lvl-outline-btn {
-      height: 48px;
-      padding: 0 16px;
-      border-radius: 24px;
-      border: 1px solid var(--pencil-graphite);
-      background: transparent;
-      color: var(--chalk-white);
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: all 0.12s ease;
+    .saga-map-scroll {
+      width: 100%;
+      height: 235px;
+      overflow-y: auto;
+      background: rgba(24, 25, 31, 0.92);
+      border: 1.5px solid rgba(247, 248, 242, 0.22);
+      border-radius: 20px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    .lvl-outline-btn.selected {
-      background: rgba(255, 87, 34, 0.25);
-      border: 2px solid var(--lava-flame-yellow);
-      color: var(--lava-flame-yellow);
+    .world-biome-banner {
+      width: 100%;
+      background: rgba(44, 47, 59, 0.95);
+      border-radius: 12px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: 0.8px;
+      margin: 4px 0;
+    }
+
+    .saga-row {
+      position: relative;
+      width: 100%;
+      height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+    }
+
+    .saga-row-road {
+      position: absolute;
+      left: 18%;
+      right: 18%;
+      top: 44%;
+      height: 6px;
+      border-radius: 4px;
+      z-index: 0;
+    }
+
+    .saga-node-wrap {
+      position: relative;
+      z-index: 1;
+      width: 74px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .saga-node-wrap.locked {
+      cursor: not-allowed;
+      opacity: 0.72;
+    }
+
+    .saga-next-badge {
+      background: var(--lava-flame-yellow);
+      color: var(--sketch-charcoal-bg);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 900;
+      padding: 1px 6px;
+      border-radius: 999px;
+      margin-bottom: 2px;
+    }
+
+    .saga-medallion {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 15px;
+      color: var(--chalk-white);
+      transition: transform 0.12s ease;
+    }
+
+    .saga-node-wrap:not(.locked):hover .saga-medallion {
+      transform: scale(1.08);
+    }
+
+    .saga-stars-row {
+      height: 14px;
+      margin-top: 2px;
+      font-size: 11px;
+      letter-spacing: 1px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+
+    .level-config-banner {
+      width: 100%;
+      background: var(--sketch-paper-card);
+      border: 1px solid rgba(64, 196, 255, 0.55);
+      border-radius: 16px;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      text-align: center;
     }
 
     .action-btn {
@@ -626,50 +719,53 @@
 
     <!-- 2. START MENU OVERLAY (Matches StartMenuOverlay in OverlayScreens.kt) -->
     <div class="overlay-backdrop" id="startOverlay">
-      <div class="modal-card start-card">
-        <div class="start-title-row">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="#FF5722">
-            <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
-          </svg>
-          <h1 class="display-title">DRAW TO SURVIVE</h1>
+      <div class="modal-card start-card" style="max-width: 620px; padding: 16px 20px;">
+        <div style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+          <div class="start-title-row">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#FF5722">
+              <path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/>
+            </svg>
+            <h1 class="display-title" style="font-size: 24px;">DRAW TO SURVIVE</h1>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="best-level-pill" style="padding: 6px 12px; font-size: 13px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFCA28">
+                <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
+              </svg>
+              <span id="bestLevelText">BEST LEVEL: 1 • ★ 0/150</span>
+            </div>
+
+            <button class="outlined-pill-btn" id="btnStartSound" style="height: 40px; padding: 0 12px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <span id="startSoundText">ON</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="height: 8px;"></div>
+
+        <!-- Candy Crush-Style 50-Level Winding Saga Map -->
+        <div class="saga-map-scroll" id="sagaMapContainer"></div>
+
+        <div style="height: 8px;"></div>
+
+        <!-- Selected Level Scaling Formula Inspector -->
+        <div class="level-config-banner" id="selectedLevelBanner">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-weight: 800; font-size: 14px;">
+            <span id="selectedLevelTitle" style="color: var(--lava-flame-yellow);">LVL 1: HOMEROOM SKETCH</span>
+            <span id="selectedLevelStatus" style="color: var(--ink-cyan-accent); font-size: 12px;">READY TO RUN</span>
+          </div>
+          <div id="selectedLevelMetrics" style="font-size: 12px; color: rgba(247, 248, 242, 0.9);">
+            Dist: 800px • Speed: 3.0x • Gaps: 80–140px • ΔY: ±0px • Decay: 5.0s
+          </div>
         </div>
 
         <div style="height: 10px;"></div>
 
-        <p class="body-large">
-          Sketch solid bridges in real-time before the stickman hits the molten lava!
-        </p>
-
-        <div style="height: 14px;"></div>
-
-        <div class="best-level-pill">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="#FFCA28">
-            <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
-          </svg>
-          <span id="bestLevelText">BEST LEVEL: 1</span>
-        </div>
-
-        <div style="height: 18px;"></div>
-
-        <div class="level-select-row" id="levelPickerRow">
-          <button class="lvl-outline-btn selected" data-level="1">LVL 1</button>
-          <button class="lvl-outline-btn" data-level="2">LVL 2</button>
-          <button class="lvl-outline-btn" data-level="3">LVL 3</button>
-          <button class="lvl-outline-btn" data-level="4">LVL 4</button>
-        </div>
-
-        <div style="height: 16px;"></div>
-
-        <button class="action-btn play-orange" id="btnStartGame">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <span>PLAY</span>
-        </button>
-
-        <div style="height: 12px;"></div>
-
-        <button class="outlined-pill-btn" id="btnStartSound">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-          <span id="startSoundText">SOUND: ON</span>
+        <button class="action-btn play-orange" id="btnStartGame" style="height: 52px; font-size: 20px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <span id="btnStartGameLabel">PLAY (LVL 1)</span>
         </button>
       </div>
     </div>
@@ -853,259 +949,277 @@
 
     const sound = new SoundManager();
 
-    /* -------------------------- LEVEL CATALOG ---------------------------- */
+    /* -------------------------- 50-LEVEL CATALOG ------------------------- */
+    const TOTAL_LEVELS = 50;
+    const WORLD_THEMES = [
+      "World 1: Chalkboard Meadows",
+      "World 2: Ember Sketch Caverns",
+      "World 3: Neon Blueprint Peaks",
+      "World 4: Molten Magma Foundry",
+      "World 5: Inferno Citadel"
+    ];
+    const LEVEL_NAMES = [
+      "Homeroom Sketch", "Flatline Sprint", "Chalk Dust Dash", "Stepping Stones", "First Elevation",
+      "Scribbler Ambush", "Bounce Pad Basics", "Thumbtack Alley", "Turbo Chalk Trial", "Meadow Boss Run",
+      "Ember Cavern Entry", "Falling Stalactites", "Crumbling Bridges", "Double Gap Leap", "Low Gravity Vault",
+      "Crimson Scribblers", "Razor Tack Ridge", "High Ledge Climb", "Gold Ink Express", "Cavern Guardian",
+      "Blueprint Ascent", "Drafting Table Drop", "Steep Vector Ramp", "Architect's Gap", "Skyline Hurdles",
+      "Shockwave Snip", "Pendulum Cliffs", "Wind Tunnel Sketch", "Vertigo Spire", "Blueprint Overlord",
+      "Magma Foundry Gate", "Smelting Crucible", "Slag Pit Crossing", "Piston Ledges", "Superheated Ink",
+      "Blazing Gauntlet", "Anvil Drop Canyon", "Molten Cascade", "Forge Master's Path", "Foundry Core",
+      "Inferno Ramparts", "Obsidian Chasm", "Supersonic Sketch", "Vanishing Chalk", "Volcanic Updraft",
+      "Demon Scribbler Pack", "Hellfire Spire", "Abyssal Leap", "Final Crucible", "Grandmaster of Survival"
+    ];
+
+    function getLevelConfig(level) {
+      const clampedLevel = Math.max(1, Math.min(TOTAL_LEVELS, level));
+      const t = (clampedLevel - 1) / (TOTAL_LEVELS - 1);
+      const worldIdx = Math.floor((clampedLevel - 1) / 10);
+      const worldTitle = WORLD_THEMES[Math.min(WORLD_THEMES.length - 1, worldIdx)];
+      const levelTitle = LEVEL_NAMES[clampedLevel - 1] || `Chalk Trial #${clampedLevel}`;
+
+      // 1. Level Length: 800px in Level 1, +150px per level
+      const levelLength = 800 + (clampedLevel - 1) * 150;
+      // 2. Character Run Speed (baseSpeed): 3.0 in Level 1 -> 8.5 in Level 50
+      const baseSpeed = 3.0 + t * (8.5 - 3.0);
+      const runSpeed = 175 + t * (340 - 175);
+      // 3. Gap Width Range (minGap, maxGap): 80..140 in Level 1 -> 180..380 in Level 50
+      const minGap = 80 + t * (180 - 80);
+      const maxGap = 140 + t * (380 - 140);
+      // 4. Platform Elevation Variance (deltaY): 0px in Levels 1..3 -> ±160px by Level 50
+      const maxDeltaY = clampedLevel <= 3 ? 0 : ((clampedLevel - 3) / 47) * 160;
+      // 5. Max Ink Capacity & Regen Rate: tighter relative to gap size
+      const maxInkPerLevel = 1000 - t * 320;
+      const inkRechargeRate = 120 - t * 52;
+      const parInkUsage = maxInkPerLevel * 0.92;
+      const maxStrokeLength = 760 - t * 240;
+      // 6. Line Lifespan (Decay Timer): 5.0s in Level 1 -> 1.8s by Level 50
+      const lineLifespan = 5.0 - t * (5.0 - 1.8);
+
+      const levelSubtitle = clampedLevel <= 3
+        ? `Flat platforms (0px elevation). Draw sturdy bridges before your chalk fades (${lineLifespan.toFixed(1)}s)!`
+        : `Speed ${baseSpeed.toFixed(1)}x • ΔY ±${Math.round(maxDeltaY)}px • Lines decay in ${lineLifespan.toFixed(1)}s!`;
+
+      return {
+        level: clampedLevel,
+        worldIndex: worldIdx + 1,
+        worldTitle,
+        levelTitle,
+        levelSubtitle,
+        levelLength,
+        baseSpeed,
+        runSpeed,
+        minGap,
+        maxGap,
+        maxDeltaY,
+        maxInkPerLevel,
+        inkRechargeRate,
+        parInkUsage,
+        maxStrokeLength,
+        lineLifespan
+      };
+    }
+
     function getLevelDefinition(levelNumber) {
+      const clamped = Math.max(1, Math.min(TOTAL_LEVELS, levelNumber));
+      const cfg = getLevelConfig(clamped);
       const groundY = DEFAULT_GROUND_Y;
-      if (levelNumber === 1) {
+
+      if (clamped === 1) {
         return {
           levelNumber: 1,
-          title: "Homeroom Sketch",
-          subtitle: "Bridge the gaps, grab Chalk Bits to refill ink, or switch to Bounce/Turbo chalk!",
-          runSpeed: 175,
+          title: cfg.levelTitle,
+          subtitle: cfg.levelSubtitle,
+          runSpeed: cfg.runSpeed,
           spawnPosition: { x: 110, y: groundY },
-          finishLineX: 1980,
-          levelEndX: 2220,
-          maxInkPerLevel: 1000,
-          inkRechargeRate: 120,
-          parInkUsage: 920,
-          maxStrokeLength: 760,
+          finishLineX: 1560,
+          levelEndX: 1880,
+          maxInkPerLevel: cfg.maxInkPerLevel,
+          inkRechargeRate: cfg.inkRechargeRate,
+          parInkUsage: cfg.parInkUsage,
+          maxStrokeLength: cfg.maxStrokeLength,
+          lineLifespan: cfg.lineLifespan,
+          baseSpeed: cfg.baseSpeed,
+          levelLength: cfg.levelLength,
+          minGap: cfg.minGap,
+          maxGap: cfg.maxGap,
+          maxDeltaY: cfg.maxDeltaY,
+          worldTitle: cfg.worldTitle,
           platforms: [
             { startX: -80, endX: 560, topY: groundY, label: "START" },
-            { startX: 860, endX: 1280, topY: groundY, label: "CHECKPOINT" },
-            { startX: 1760, endX: 2350, topY: groundY, label: "FINISH" }
+            { startX: 700, endX: 1280, topY: groundY, label: "CHECKPOINT" },
+            { startX: 1420, endX: 2020, topY: groundY, label: "FINISH" }
           ],
           guideStrokes: [
             {
-              points: [{ x: 535, y: groundY - 4 }, { x: 710, y: groundY - 22 }, { x: 885, y: groundY - 4 }],
+              points: [{ x: 545, y: groundY - 4 }, { x: 630, y: groundY - 20 }, { x: 715, y: groundY - 4 }],
               caption: "DRAG HERE TO BRIDGE GAP 1"
             },
             {
-              points: [{ x: 1255, y: groundY - 4 }, { x: 1520, y: groundY - 30 }, { x: 1785, y: groundY - 4 }],
-              caption: "DRAW LONGER BRIDGE"
+              points: [{ x: 1265, y: groundY - 4 }, { x: 1350, y: groundY - 22 }, { x: 1435, y: groundY - 4 }],
+              caption: "BRIDGE GAP 2 TO FINISH"
             }
           ],
           chalkBits: [
             { id: 1, x: 360, y: groundY - 34, inkAmount: 135, isStar: false },
-            { id: 2, x: 650, y: groundY - 44, inkAmount: 135, isStar: false },
-            { id: 3, x: 760, y: groundY - 44, inkAmount: 135, isStar: false },
-            { id: 4, x: 1060, y: groundY - 36, inkAmount: 135, isStar: false },
-            { id: 5, x: 1420, y: groundY - 48, inkAmount: 135, isStar: false },
-            { id: 6, x: 1520, y: groundY - 76, inkAmount: 220, isStar: true },
-            { id: 7, x: 1620, y: groundY - 48, inkAmount: 135, isStar: false }
+            { id: 2, x: 605, y: groundY - 42, inkAmount: 135, isStar: false },
+            { id: 3, x: 655, y: groundY - 42, inkAmount: 135, isStar: false },
+            { id: 4, x: 990, y: groundY - 36, inkAmount: 135, isStar: false },
+            { id: 5, x: 1320, y: groundY - 46, inkAmount: 135, isStar: false },
+            { id: 6, x: 1350, y: groundY - 72, inkAmount: 220, isStar: true },
+            { id: 7, x: 1385, y: groundY - 46, inkAmount: 135, isStar: false }
           ],
           thumbtacks: [],
           scribblers: [],
           calloutScript: [
-            { triggerX: 890, type: "BLITZ" }
+            { triggerX: 730, type: "BLITZ" }
           ]
         };
       }
 
-      if (levelNumber === 2) {
-        return {
-          levelNumber: 2,
-          title: "Recess Bounce",
-          subtitle: "Use Blue Bounce chalk or upward ramps to climb, and bonk Red Scribblers with walls!",
-          runSpeed: 185,
-          spawnPosition: { x: 110, y: 430 },
-          finishLineX: 2320,
-          levelEndX: 2560,
-          maxInkPerLevel: 1000,
-          inkRechargeRate: 125,
-          parInkUsage: 960,
-          maxStrokeLength: 780,
-          platforms: [
-            { startX: -80, endX: 520, topY: 430, label: "START" },
-            { startX: 860, endX: 1260, topY: 370, label: "LEDGE 1" },
-            { startX: 1680, endX: 2000, topY: 320, label: "HIGH LEDGE" },
-            { startX: 2180, endX: 2680, topY: 360, label: "FINISH" }
-          ],
-          guideStrokes: [
-            {
-              points: [{ x: 495, y: 426 }, { x: 690, y: 395 }, { x: 880, y: 366 }],
-              caption: "DRAW RAMP OR BLUE BOUNCE PAD"
-            }
-          ],
-          chalkBits: [
-            { id: 10, x: 620, y: 370, inkAmount: 135, isStar: false },
-            { id: 11, x: 740, y: 345, inkAmount: 135, isStar: false },
-            { id: 12, x: 1060, y: 335, inkAmount: 135, isStar: false },
-            { id: 13, x: 1460, y: 295, inkAmount: 135, isStar: false },
-            { id: 14, x: 1560, y: 265, inkAmount: 220, isStar: true },
-            { id: 15, x: 2090, y: 305, inkAmount: 135, isStar: false }
-          ],
-          thumbtacks: [
-            { x: 690, y: 455, count: 3, spacing: 26 }
-          ],
-          scribblers: [
-            { id: 201, x: 1160, y: 370, speed: 110 },
-            { id: 202, x: 1910, y: 320, speed: 120 }
-          ],
-          calloutScript: [
-            { triggerX: 320, type: "JUMP" },
-            { triggerX: 1320, type: "GRAVITY" }
-          ]
-        };
-      }
-
-      if (levelNumber === 3) {
-        return {
-          levelNumber: 3,
-          title: "Field Trip Canyon",
-          subtitle: "Ride Low Gravity arcs, ram Red Scribblers with Gold Turbo chalk, and survive Wipeout!",
-          runSpeed: 195,
-          spawnPosition: { x: 110, y: 310 },
-          finishLineX: 2580,
-          levelEndX: 2820,
-          maxInkPerLevel: 1050,
-          inkRechargeRate: 130,
-          parInkUsage: 1000,
-          maxStrokeLength: 800,
-          platforms: [
-            { startX: -80, endX: 480, topY: 310, label: "HIGH CLIFF" },
-            { startX: 980, endX: 1320, topY: 430, label: "VALLEY" },
-            { startX: 1680, endX: 1860, topY: 390, label: "ISLAND" },
-            { startX: 2380, endX: 2950, topY: 380, label: "FINISH" }
-          ],
-          guideStrokes: [],
-          chalkBits: [
-            { id: 20, x: 640, y: 320, inkAmount: 135, isStar: false },
-            { id: 21, x: 790, y: 355, inkAmount: 135, isStar: false },
-            { id: 22, x: 1150, y: 390, inkAmount: 135, isStar: false },
-            { id: 23, x: 1500, y: 365, inkAmount: 135, isStar: false },
-            { id: 24, x: 2020, y: 325, inkAmount: 240, isStar: true },
-            { id: 25, x: 2180, y: 340, inkAmount: 135, isStar: false }
-          ],
-          thumbtacks: [
-            { x: 1500, y: 445, count: 3, spacing: 26 }
-          ],
-          scribblers: [
-            { id: 301, x: 1240, y: 430, speed: 125 },
-            { id: 302, x: 2520, y: 380, speed: 130 }
-          ],
-          calloutScript: [
-            { triggerX: 350, type: "GRAVITY" },
-            { triggerX: 1050, type: "BLITZ" },
-            { triggerX: 1880, type: "WIPEOUT" }
-          ]
-        };
-      }
-
-      if (levelNumber === 4) {
-        return {
-          levelNumber: 4,
-          title: "Final Exam Gauntlet",
-          subtitle: "Combine Bounce, Turbo Gold, and Tap-Cut shockwaves across the night board!",
-          runSpeed: 205,
-          spawnPosition: { x: 110, y: 410 },
-          finishLineX: 2850,
-          levelEndX: 3100,
-          maxInkPerLevel: 1100,
-          inkRechargeRate: 135,
-          parInkUsage: 1050,
-          maxStrokeLength: 800,
-          platforms: [
-            { startX: -80, endX: 460, topY: 410, label: "START" },
-            { startX: 820, endX: 1040, topY: 380 },
-            { startX: 1420, endX: 1640, topY: 340 },
-            { startX: 2060, endX: 2260, topY: 400 },
-            { startX: 2720, endX: 3220, topY: 370, label: "FINISH" }
-          ],
-          guideStrokes: [],
-          chalkBits: [
-            { id: 30, x: 640, y: 355, inkAmount: 135, isStar: false },
-            { id: 31, x: 1230, y: 315, inkAmount: 135, isStar: false },
-            { id: 32, x: 1850, y: 310, inkAmount: 250, isStar: true },
-            { id: 33, x: 2480, y: 340, inkAmount: 135, isStar: false }
-          ],
-          thumbtacks: [
-            { x: 1230, y: 425, count: 3, spacing: 26 },
-            { x: 2480, y: 435, count: 3, spacing: 26 }
-          ],
-          scribblers: [
-            { id: 401, x: 980, y: 380, speed: 130 },
-            { id: 402, x: 1580, y: 340, speed: 135 },
-            { id: 403, x: 2200, y: 400, speed: 140 }
-          ],
-          calloutScript: [
-            { triggerX: 330, type: "JUMP" },
-            { triggerX: 1440, type: "GRAVITY" },
-            { triggerX: 2100, type: "BLITZ" }
-          ]
-        };
-      }
-
-      // Procedural Level 5+
       const platforms = [];
       const chalkBits = [];
+      const thumbtacks = [];
       const scribblers = [];
       const calloutScript = [];
+      const guideStrokes = [];
       const calloutTypes = ["JUMP", "BLITZ", "GRAVITY", "WIPEOUT"];
 
-      let cursorX = -80;
-      let currentY = 410;
-      const startEnd = 480;
-      platforms.push({ startX: cursorX, endX: startEnd, topY: currentY, label: "START" });
-      cursorX = startEnd;
+      const spawnX = 110;
+      let currentY = groundY;
+      const startPlatformEnd = 460;
+      platforms.push({ startX: -80, endX: startPlatformEnd, topY: currentY, label: "START" });
 
-      const segmentsCount = Math.min(6, 3 + (levelNumber % 3));
-      for (let i = 0; i < segmentsCount; i++) {
-        const gapWidth = 310 + ((levelNumber * 37 + i * 83) % 210);
+      let cursorX = startPlatformEnd;
+      const targetFinishX = startPlatformEnd + cfg.levelLength;
+      let segmentIndex = 0;
+
+      while (cursorX < targetFinishX - cfg.maxGap - 180) {
+        const hashRatio = ((clamped * 37 + segmentIndex * 73) % 101) / 100;
+        const gapWidth = cfg.minGap + (cfg.maxGap - cfg.minGap) * hashRatio;
+        const prevY = currentY;
+
+        const nextY = cfg.maxDeltaY <= 0.5
+          ? groundY
+          : Math.max(210, Math.min(455, currentY + Math.sin(clamped * 1.7 + segmentIndex * 2.3) * cfg.maxDeltaY));
+
         const midGapX = cursorX + gapWidth * 0.5;
+        const arcPeakY = Math.min(prevY, nextY) - 48;
+
         chalkBits.push({
-          id: levelNumber * 100 + i,
-          x: midGapX,
-          y: Math.max(180, currentY - 52),
-          inkAmount: i === segmentsCount - 1 ? 240 : 135,
-          isStar: i === segmentsCount - 1
+          id: clamped * 100 + segmentIndex * 2,
+          x: midGapX - gapWidth * 0.18,
+          y: Math.max(150, arcPeakY),
+          inkAmount: 130,
+          isStar: false
         });
-        if (i % 2 === 0) {
-          calloutScript.push({
-            triggerX: cursorX - 90,
-            type: calloutTypes[(levelNumber + i) % calloutTypes.length]
+        chalkBits.push({
+          id: clamped * 100 + segmentIndex * 2 + 1,
+          x: midGapX + gapWidth * 0.18,
+          y: Math.max(140, arcPeakY - 18),
+          inkAmount: segmentIndex % 3 === 1 ? 220 : 130,
+          isStar: segmentIndex % 3 === 1
+        });
+
+        if (clamped <= 3 && segmentIndex === 0) {
+          guideStrokes.push({
+            points: [
+              { x: cursorX - 15, y: prevY - 4 },
+              { x: midGapX, y: Math.min(prevY, nextY) - 24 },
+              { x: cursorX + gapWidth + 15, y: nextY - 4 }
+            ],
+            caption: "DRAW SHORT RAMP ACROSS GAP"
           });
         }
+
+        if (segmentIndex % 2 === 1) {
+          calloutScript.push({
+            triggerX: Math.max(spawnX + 120, cursorX - 85),
+            type: calloutTypes[(clamped + segmentIndex) % calloutTypes.length]
+          });
+        }
+
         cursorX += gapWidth;
-        const deltaY = ((levelNumber * 29 + i * 53) % 110) - 55;
-        currentY = Math.max(290, Math.min(445, currentY + deltaY));
-        const platWidth = 240 + ((i * 67) % 140);
-        platforms.push({ startX: cursorX, endX: cursorX + platWidth, topY: currentY });
-        scribblers.push({
-          id: levelNumber * 1000 + i,
-          x: cursorX + platWidth * 0.7,
-          y: currentY,
-          speed: 125 + (levelNumber % 5) * 6
+        currentY = nextY;
+
+        const remainingToTarget = Math.max(220, targetFinishX - cursorX);
+        const platWidth = Math.min(remainingToTarget, 240 + ((clamped * 19 + segmentIndex * 61) % 150));
+
+        platforms.push({
+          startX: cursorX,
+          endX: cursorX + platWidth,
+          topY: currentY,
+          label: segmentIndex === 1 ? "CHECKPOINT" : undefined
         });
+
+        if (clamped >= 2 && platWidth >= 250 && segmentIndex % 2 === 0) {
+          scribblers.push({
+            id: clamped * 1000 + segmentIndex,
+            x: cursorX + platWidth * 0.72,
+            y: currentY,
+            speed: 110 + Math.min(95, clamped * 1.8)
+          });
+        } else if (clamped >= 4 && platWidth >= 270 && segmentIndex % 2 === 1) {
+          thumbtacks.push({
+            x: cursorX + platWidth * 0.52,
+            y: currentY - 2,
+            count: clamped >= 25 ? 4 : 3,
+            spacing: 26
+          });
+        }
+
         cursorX += platWidth;
+        segmentIndex++;
       }
 
-      const finalGap = 420 + ((levelNumber * 41) % 140);
+      const finalGapRatio = ((clamped * 53) % 101) / 100;
+      const finalGap = cfg.minGap + (cfg.maxGap - cfg.minGap) * finalGapRatio;
+      const finishTopY = cfg.maxDeltaY <= 0.5
+        ? groundY
+        : Math.max(240, Math.min(440, currentY + Math.sin(clamped * 3.1) * (cfg.maxDeltaY * 0.65)));
+
+      chalkBits.push({
+        id: clamped * 100 + 99,
+        x: cursorX + finalGap * 0.5,
+        y: Math.max(150, Math.min(currentY, finishTopY) - 56),
+        inkAmount: 240,
+        isStar: true
+      });
+
       cursorX += finalGap;
-      const finishX = cursorX + 180;
-      const endX = cursorX + 480;
+      const finishX = Math.max(cursorX + 160, startPlatformEnd + cfg.levelLength);
+      const finishPlatformEnd = finishX + 360;
+
       platforms.push({
         startX: cursorX,
-        endX: endX + 100,
-        topY: Math.max(320, Math.min(430, currentY)),
+        endX: finishPlatformEnd,
+        topY: finishTopY,
         label: "FINISH"
       });
 
       return {
-        levelNumber,
-        title: `Chalk Trial #${levelNumber}`,
-        subtitle: "Master Bounce, Turbo Gold, and Tap-Cut shockwaves!",
-        runSpeed: Math.min(245, 195 + (levelNumber - 4) * 5),
-        spawnPosition: { x: 110, y: 410 },
+        levelNumber: clamped,
+        title: cfg.levelTitle,
+        subtitle: cfg.levelSubtitle,
+        runSpeed: cfg.runSpeed,
+        spawnPosition: { x: spawnX, y: groundY },
         finishLineX: finishX,
-        levelEndX: endX,
-        maxInkPerLevel: 1150,
-        inkRechargeRate: 140,
-        parInkUsage: 1080,
-        maxStrokeLength: 820,
+        levelEndX: finishPlatformEnd - 80,
+        maxInkPerLevel: cfg.maxInkPerLevel,
+        inkRechargeRate: cfg.inkRechargeRate,
+        parInkUsage: cfg.parInkUsage,
+        maxStrokeLength: cfg.maxStrokeLength,
+        lineLifespan: cfg.lineLifespan,
+        baseSpeed: cfg.baseSpeed,
+        levelLength: cfg.levelLength,
+        minGap: cfg.minGap,
+        maxGap: cfg.maxGap,
+        maxDeltaY: cfg.maxDeltaY,
+        worldTitle: cfg.worldTitle,
         platforms,
-        guideStrokes: [],
+        guideStrokes,
         chalkBits,
-        thumbtacks: [],
+        thumbtacks,
         scribblers,
         calloutScript
       };
@@ -1228,7 +1342,14 @@
     let state = {
       screenState: 'START_MENU',
       currentLevel: 1,
-      bestLevel: parseInt(localStorage.getItem('dts_best_level') || '1', 10),
+      bestLevel: Math.max(1, Math.min(TOTAL_LEVELS, parseInt(localStorage.getItem('dts_best_level') || '1', 10))),
+      levelStars: (() => {
+        try {
+          return JSON.parse(localStorage.getItem('dts_level_stars') || '{}') || {};
+        } catch (_) {
+          return {};
+        }
+      })(),
       level: getLevelDefinition(1),
       selectedTool: 'WHITE',
       stickman: null,
@@ -1853,11 +1974,24 @@
         syncOverlays();
       } else if (state.stickman.hasReachedFinish) {
         state.screenState = 'LEVEL_COMPLETE';
-        const unlockedNext = state.currentLevel + 1;
+        const inkRatio = state.currentInk / Math.max(1, state.level.maxInkPerLevel);
+        const totalBits = state.chalkBits.length;
+        const collectedBits = state.chalkBits.filter(b => b.collected).length;
+        const bitRatio = totalBits > 0 ? (collectedBits / totalBits) : 1;
+        const earnedStars = (inkRatio >= 0.42 && bitRatio >= 0.5) ? 3 : ((inkRatio >= 0.18 || bitRatio >= 0.25) ? 2 : 1);
+        const prevStars = state.levelStars[state.currentLevel] || 0;
+        if (earnedStars > prevStars) {
+          state.levelStars[state.currentLevel] = earnedStars;
+          try {
+            localStorage.setItem('dts_level_stars', JSON.stringify(state.levelStars));
+          } catch (_) {}
+        }
+        const unlockedNext = Math.min(TOTAL_LEVELS, state.currentLevel + 1);
         if (unlockedNext > state.bestLevel) {
           state.bestLevel = unlockedNext;
           localStorage.setItem('dts_best_level', String(state.bestLevel));
         }
+        pickedStartLevel = unlockedNext;
         sound.playLevelComplete();
         syncOverlays();
       }
@@ -2111,7 +2245,7 @@
           segments: makeSegments(smoothed),
           tool: state.selectedTool,
           ageSeconds: 0,
-          maxLifetime: state.selectedTool === 'BOOST' ? 9999 : DEFAULT_LINE_LIFETIME
+          maxLifetime: state.selectedTool === 'BOOST' ? 9999 : (state.level.lineLifespan || DEFAULT_LINE_LIFETIME)
         };
         state.completedLines.push(newLine);
         matterBridge.addDrawnLineBodies(newLine);
@@ -3352,6 +3486,126 @@
       }
     }
 
+    let pickedStartLevel = Math.max(1, Math.min(TOTAL_LEVELS, state.bestLevel));
+
+    function updateSelectedLevelBanner(levelNumber) {
+      const cfg = getLevelConfig(levelNumber);
+      const stars = state.levelStars[levelNumber] || 0;
+      const isCompleted = stars > 0 || levelNumber < state.bestLevel;
+      const starDisplay = isCompleted ? '★'.repeat(Math.max(1, stars)) + '☆'.repeat(3 - Math.max(1, stars)) : '☆☆☆';
+      const statusBadge = isCompleted ? `COMPLETED ${starDisplay}` : 'CURRENT FRONTIER';
+      const bannerEl = document.getElementById('selectedLevelBanner');
+      if (bannerEl) {
+        bannerEl.innerHTML = `
+          <div>
+            <div class="cfg-title">LVL ${cfg.level}: ${cfg.title}</div>
+            <div class="cfg-meta">${cfg.worldTitle} • Dist ${Math.round(cfg.levelLength)}px • Speed ${cfg.baseSpeed.toFixed(1)} • Gaps ${Math.round(cfg.minGap)}-${Math.round(cfg.maxGap)}px • ΔY ±${Math.round(cfg.maxDeltaY)}px • Decay ${cfg.lineLifespan.toFixed(1)}s</div>
+          </div>
+          <div style="text-align:right;font-size:10px;font-weight:900;color:${isCompleted ? '#34D399' : '#FBBF24'};">${statusBadge}</div>
+        `;
+      }
+      const btnLabel = document.getElementById('btnStartGameLabel');
+      if (btnLabel) {
+        btnLabel.textContent = `PLAY LEVEL ${cfg.level}`;
+      }
+    }
+
+    function renderSagaMap() {
+      const container = document.getElementById('sagaMapContainer');
+      if (!container) return;
+
+      const completedCount = Object.keys(state.levelStars).filter(k => (state.levelStars[k] || 0) > 0).length;
+      const totalStars = Object.values(state.levelStars).reduce((a, b) => a + (b || 0), 0);
+      const bestTextEl = document.getElementById('bestLevelText');
+      if (bestTextEl) {
+        bestTextEl.textContent = `FRONTIER: LVL ${state.bestLevel}/50  •  COMPLETED: ${completedCount}/50  •  ★ ${totalStars}/150`;
+      }
+
+      updateSelectedLevelBanner(pickedStartLevel);
+
+      const worldAccents = ['#34D399', '#38BDF8', '#FBBF24', '#F97316', '#F43F5E'];
+      const totalRows = Math.ceil(TOTAL_LEVELS / 3);
+      let html = '';
+
+      for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
+        const startLvl = rowIdx * 3 + 1;
+        const endLvl = Math.min(TOTAL_LEVELS, startLvl + 2);
+        const rowLevels = [];
+        for (let l = startLvl; l <= endLvl; l++) rowLevels.push(l);
+
+        const worldHeaderLvl = rowLevels.find(l => (l - 1) % 10 === 0);
+        if (worldHeaderLvl !== undefined) {
+          const cfg = getLevelConfig(worldHeaderLvl);
+          const wIdx = Math.floor((worldHeaderLvl - 1) / 10) % worldAccents.length;
+          const accent = worldAccents[wIdx];
+          const wStart = worldHeaderLvl;
+          const wEnd = Math.min(TOTAL_LEVELS, wStart + 9);
+          let wDone = 0;
+          for (let l = wStart; l <= wEnd; l++) {
+            if ((state.levelStars[l] || 0) > 0 || l < state.bestLevel) wDone++;
+          }
+          html += `
+            <div class="saga-world-banner" style="border-color:${accent}88;">
+              <span style="color:${accent};">★ ${cfg.worldTitle.toUpperCase()} (LVLS ${wStart}–${wEnd})</span>
+              <span style="color:#F8FAFC;">${wDone}/${wEnd - wStart + 1} CLEAR</span>
+            </div>
+          `;
+        }
+
+        const isReversed = (rowIdx % 2 === 1);
+        html += `<div class="saga-row ${isReversed ? 'reverse' : ''}">`;
+        for (const lvl of rowLevels) {
+          const cfg = getLevelConfig(lvl);
+          const stars = state.levelStars[lvl] || (lvl < state.bestLevel ? 2 : 0);
+          const isCompleted = stars > 0 || lvl < state.bestLevel;
+          const isUnlocked = lvl <= state.bestLevel || isCompleted;
+          const isCurrentFrontier = (lvl === state.bestLevel && !isCompleted);
+          const isSelected = (lvl === pickedStartLevel);
+
+          const stateClass = isCompleted ? 'completed' : (isCurrentFrontier ? 'frontier' : (isUnlocked ? 'completed' : 'locked'));
+          const selClass = isSelected ? 'selected' : '';
+          const badgeHtml = isCompleted
+            ? `<div class="saga-badge-pill" style="background:#059669;color:#fff;">✓</div>`
+            : (isCurrentFrontier ? `<div class="saga-badge-pill" style="background:#EA580C;color:#fff;">NEXT</div>` : '');
+
+          let starsHtml = '';
+          if (isCompleted) {
+            starsHtml = '<div class="saga-stars">';
+            for (let s = 1; s <= 3; s++) {
+              starsHtml += `<span class="${s <= stars ? 'star-on' : 'star-off'}">★</span>`;
+            }
+            starsHtml += '</div>';
+          } else {
+            starsHtml = `<div class="saga-stars"><span style="color:${isUnlocked ? '#FDE047' : '#64748B'};font-size:9px;font-weight:800;">${Math.round(cfg.levelLength)}m</span></div>`;
+          }
+
+          html += `
+            <div class="saga-node-wrap">
+              <button type="button" class="saga-medallion ${stateClass} ${selClass}" data-level="${lvl}" ${!isUnlocked ? 'disabled' : ''} title="Level ${lvl}: ${cfg.title}">
+                ${badgeHtml}
+                <span>${isUnlocked ? lvl : '🔒'}</span>
+                <span class="sub-spd">${cfg.baseSpeed.toFixed(1)}x</span>
+              </button>
+              ${starsHtml}
+            </div>
+          `;
+        }
+        html += `</div>`;
+      }
+
+      container.innerHTML = html;
+
+      container.querySelectorAll('.saga-medallion').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const lvl = parseInt(btn.dataset.level, 10);
+          if (lvl <= state.bestLevel || (state.levelStars[lvl] || 0) > 0) {
+            pickedStartLevel = lvl;
+            renderSagaMap();
+          }
+        });
+      });
+    }
+
     function syncOverlays() {
       hudLayer.hidden = !(state.screenState === 'PLAYING' || state.screenState === 'PAUSED');
       startOverlay.hidden = (state.screenState !== 'START_MENU');
@@ -3359,7 +3613,9 @@
       gameOverOverlay.hidden = (state.screenState !== 'GAME_OVER');
       levelCompleteOverlay.hidden = (state.screenState !== 'LEVEL_COMPLETE');
 
-      document.getElementById('bestLevelText').textContent = `BEST LEVEL: ${state.bestLevel}`;
+      if (state.screenState === 'START_MENU') {
+        renderSagaMap();
+      }
 
       if (state.screenState === 'GAME_OVER') {
         const prog = Math.max(0, Math.min(1,
@@ -3379,15 +3635,6 @@
 
     document.querySelectorAll('#toolSelector .tool-chip').forEach(btn => {
       btn.addEventListener('click', () => selectTool(btn.dataset.tool));
-    });
-
-    let pickedStartLevel = 1;
-    document.querySelectorAll('#levelPickerRow .lvl-outline-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        pickedStartLevel = parseInt(btn.dataset.level, 10);
-        document.querySelectorAll('#levelPickerRow .lvl-outline-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-      });
     });
 
     document.getElementById('btnStartGame').addEventListener('click', () => {
@@ -3450,12 +3697,13 @@
     });
 
     document.getElementById('btnNextLevel').addEventListener('click', () => {
-      resetLevel(state.currentLevel + 1);
+      resetLevel(Math.min(TOTAL_LEVELS, state.currentLevel + 1));
       state.screenState = 'PLAYING';
       syncOverlays();
     });
 
     function goToMainMenu() {
+      pickedStartLevel = state.currentLevel;
       resetLevel(state.currentLevel);
       state.screenState = 'START_MENU';
       syncOverlays();

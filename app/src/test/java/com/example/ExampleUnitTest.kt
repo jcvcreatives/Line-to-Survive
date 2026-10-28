@@ -212,4 +212,51 @@ class ExampleUnitTest {
     assertEquals(1, remainingLines.size)
     assertTrue("Removed length should be ~200f from x=200..400", removedLen >= 190f)
   }
+
+  @Test
+  fun `getLevelConfig scales all 50 levels according to core progression formulas`() {
+    val cfg1 = LevelCatalog.getLevelConfig(1)
+    val cfg3 = LevelCatalog.getLevelConfig(3)
+    val cfg25 = LevelCatalog.getLevelConfig(25)
+    val cfg50 = LevelCatalog.getLevelConfig(50)
+
+    // Level 1 checks
+    assertEquals(800f, cfg1.levelLength, 0.1f)
+    assertEquals(3.0f, cfg1.baseSpeed, 0.01f)
+    assertEquals(80f, cfg1.minGap, 0.1f)
+    assertEquals(140f, cfg1.maxGap, 0.1f)
+    assertEquals(0f, cfg1.maxDeltaY, 0.01f)
+    assertEquals(5.0f, cfg1.lineLifespan, 0.01f)
+
+    // Levels 1-3 flat platforms (deltaY == 0)
+    assertEquals(0f, cfg3.maxDeltaY, 0.01f)
+    assertEquals(1100f, cfg3.levelLength, 0.1f)
+
+    // Mid-progression checks (Level 25)
+    assertEquals(800f + 24 * 150f, cfg25.levelLength, 0.1f)
+    assertTrue(cfg25.baseSpeed > 5.0f && cfg25.baseSpeed < 6.5f)
+    assertTrue(cfg25.maxDeltaY > 60f && cfg25.maxDeltaY < 90f)
+    assertTrue(cfg25.lineLifespan < 4.0f && cfg25.lineLifespan > 3.0f)
+
+    // Level 50 finale checks
+    assertEquals(8150f, cfg50.levelLength, 0.1f)
+    assertEquals(8.5f, cfg50.baseSpeed, 0.01f)
+    assertEquals(180f, cfg50.minGap, 0.5f)
+    assertEquals(380f, cfg50.maxGap, 0.5f)
+    assertEquals(160f, cfg50.maxDeltaY, 0.5f)
+    assertEquals(1.8f, cfg50.lineLifespan, 0.01f)
+    assertTrue("Ink capacity should tighten by Level 50", cfg50.maxInkPerLevel < cfg1.maxInkPerLevel)
+    assertTrue("Ink regen rate should tighten by Level 50", cfg50.inkRechargeRate < cfg1.inkRechargeRate)
+
+    // Ensure all 50 levels generate valid LevelDefinitions with finish platforms
+    val allConfigs = LevelCatalog.getAllLevelConfigs()
+    assertEquals(50, allConfigs.size)
+    for (lvl in 1..50) {
+      val def = LevelCatalog.getLevel(lvl)
+      assertEquals(lvl, def.levelNumber)
+      assertTrue("Level $lvl must have at least 3 platforms", def.platforms.size >= 3)
+      assertTrue("Level $lvl finishLineX must be positive", def.finishLineX > def.spawnPosition.x)
+    }
+  }
 }
+
