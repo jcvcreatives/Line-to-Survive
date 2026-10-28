@@ -619,7 +619,8 @@ class GameViewModel(
       stickman = preStickman,
       level = level,
       completedLines = activeLines,
-      deltaSeconds = clampedDt
+      deltaSeconds = clampedDt,
+      animTime = state.lavaAnimTime
     )
 
     if (tickResult.justJumped || tickResult.justBouncedSpring) {

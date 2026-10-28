@@ -433,8 +433,9 @@ fun SelectedLevelConfigBanner(
         )
       }
 
+      val hazardCount = LevelCatalog.getHazards(config.level, config).size
       Text(
-        text = "Dist: ${config.levelLength.toInt()}px • Speed: ${String.format("%.1f", config.baseSpeed)}x • Gaps: ${config.minGap.toInt()}–${config.maxGap.toInt()}px • ΔY: ±${config.maxDeltaY.toInt()}px • Decay: ${String.format("%.1f", config.lineLifespan)}s",
+        text = "Dist: ${config.levelLength.toInt()}px • Speed: ${String.format("%.1f", config.baseSpeed)}x • Gaps: ${config.minGap.toInt()}–${config.maxGap.toInt()}px • ΔY: ±${config.maxDeltaY.toInt()}px • Decay: ${String.format("%.1f", config.lineLifespan)}s • Hazards: $hazardCount",
         style = MaterialTheme.typography.bodySmall,
         color = ChalkWhite.copy(alpha = 0.9f),
         textAlign = TextAlign.Center

@@ -14,8 +14,10 @@ import com.example.game.model.CalloutMove
 import com.example.game.model.ChalkBit
 import com.example.game.model.ChalkTool
 import com.example.game.model.DrawnLine
+import com.example.game.model.DynamicHazard
 import com.example.game.model.EmberParticle
 import com.example.game.model.GuideStroke
+import com.example.game.model.HazardType
 import com.example.game.model.LevelDefinition
 import com.example.game.model.Platform
 import com.example.game.model.ScribblerEnemy
@@ -143,9 +145,18 @@ object SketchbookRenderer {
       worldScale = worldScale
     )
 
-    // 6. Thumbtack Hazards
+    // 6. Thumbtack & Dynamic Level Hazards (Swinging Pendulums & Vanishing Platforms)
     for (cluster in level.thumbtacks) {
       drawThumbtackCluster(cluster, ::toScreenX, ::toScreenY, worldScale)
+    }
+    for (hazard in level.hazards) {
+      drawDynamicHazard(
+        hazard = hazard,
+        animTime = lavaAnimTime,
+        toScreenX = ::toScreenX,
+        toScreenY = ::toScreenY,
+        worldScale = worldScale
+      )
     }
 
     // 7. Collectible Chalk Bits & Gold Stars
@@ -684,6 +695,221 @@ object SketchbookRenderer {
         cap = StrokeCap.Round
       )
     }
+  }
+
+  private fun DrawScope.drawDynamicHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    when (hazard.type) {
+      HazardType.VANISHING_PLATFORM -> drawVanishingPlatformHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+      HazardType.SWINGING_PENDULUM -> drawSwingingPendulumHazard(
+        hazard = hazard,
+        animTime = animTime,
+        toScreenX = toScreenX,
+        toScreenY = toScreenY,
+        worldScale = worldScale
+      )
+    }
+  }
+
+  private fun DrawScope.drawVanishingPlatformHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val leftX = toScreenX(hazard.startX)
+    val rightX = toScreenX(hazard.endX)
+    val topY = toScreenY(hazard.topY)
+    if (rightX < -80f || leftX > size.width + 80f) return
+
+    val isSolid = hazard.isPlatformSolidAt(animTime)
+    val isWarning = hazard.isPlatformWarningAt(animTime)
+    val cycleProg = hazard.vanishingCycleProgressAt(animTime)
+
+    if (isSolid) {
+      val flicker = if (isWarning) {
+        0.45f + 0.55f * (0.5f + 0.5f * sin(animTime * 28f))
+      } else {
+        1f
+      }
+      val barColor = if (isWarning) {
+        LavaFlameYellow.copy(alpha = flicker)
+      } else {
+        InkCyanAccent.copy(alpha = 0.92f)
+      }
+      val glowColor = if (isWarning) {
+        LavaOrange.copy(alpha = 0.35f * flicker)
+      } else {
+        InkCyanAccent.copy(alpha = 0.26f)
+      }
+
+      // Soft spectral chalk glow under solid vanishing platform
+      drawLine(
+        color = glowColor,
+        start = Offset(leftX, topY + 2f * worldScale),
+        end = Offset(rightX, topY + 2f * worldScale),
+        strokeWidth = 14f * worldScale,
+        cap = StrokeCap.Round
+      )
+
+      // Solid top chalk ledge
+      drawLine(
+        color = barColor,
+        start = Offset(leftX, topY),
+        end = Offset(rightX, topY),
+        strokeWidth = 6.0f * worldScale,
+        cap = StrokeCap.Round
+      )
+      drawLine(
+        color = ChalkWhite.copy(alpha = 0.88f * flicker),
+        start = Offset(leftX + 3f * worldScale, topY - 1.2f * worldScale),
+        end = Offset(rightX - 3f * worldScale, topY - 1.2f * worldScale),
+        strokeWidth = 2.4f * worldScale,
+        cap = StrokeCap.Round
+      )
+
+      // Remaining solid time progress bar underneath
+      val solidRemainingRatio = ((hazard.visibleRatio - cycleProg) / hazard.visibleRatio.coerceAtLeast(0.1f))
+        .coerceIn(0f, 1f)
+      val barSpan = (rightX - leftX) * solidRemainingRatio
+      drawLine(
+        color = if (isWarning) LavaOrange else FinishBannerGreen,
+        start = Offset(leftX, topY + 8f * worldScale),
+        end = Offset(leftX + barSpan, topY + 8f * worldScale),
+        strokeWidth = 2.8f * worldScale,
+        cap = StrokeCap.Round
+      )
+    } else {
+      // Vanished ghost state: dashed outline showing where platform will rematerialize
+      val ghostDash = PathEffect.dashPathEffect(
+        intervals = floatArrayOf(10f * worldScale, 8f * worldScale),
+        phase = animTime * 24f * worldScale
+      )
+      drawLine(
+        color = InkCyanAccent.copy(alpha = 0.28f),
+        start = Offset(leftX, topY),
+        end = Offset(rightX, topY),
+        strokeWidth = 3.5f * worldScale,
+        cap = StrokeCap.Round,
+        pathEffect = ghostDash
+      )
+    }
+  }
+
+  private fun DrawScope.drawSwingingPendulumHazard(
+    hazard: DynamicHazard,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val pivotX = toScreenX(hazard.x)
+    val pivotY = toScreenY(hazard.y)
+    val bobWorld = hazard.pendulumBobPositionAt(animTime)
+    val bobX = toScreenX(bobWorld.x)
+    val bobY = toScreenY(bobWorld.y)
+    val maxReachPx = (hazard.armLength + hazard.bobRadius + 40f) * worldScale
+
+    if (pivotX + maxReachPx < -60f || pivotX - maxReachPx > size.width + 60f) return
+
+    // 1. Faint dashed swing-arc telegraph so player can curve chalk lines safely around it
+    val arcPath = reusableGuidePath.apply {
+      reset()
+      val steps = 16
+      for (i in 0..steps) {
+        val ratio = (i.toFloat() / steps) * 2f - 1f
+        val a = ratio * hazard.maxAngleRadians
+        val wx = hazard.x + sin(a) * hazard.armLength
+        val wy = hazard.y + cos(a) * hazard.armLength
+        if (i == 0) moveTo(toScreenX(wx), toScreenY(wy)) else lineTo(toScreenX(wx), toScreenY(wy))
+      }
+    }
+    drawPath(
+      path = arcPath,
+      color = LavaOrange.copy(alpha = 0.25f),
+      style = Stroke(
+        width = 2.2f * worldScale,
+        cap = StrokeCap.Round,
+        pathEffect = PathEffect.dashPathEffect(
+          intervals = floatArrayOf(10f * worldScale, 8f * worldScale),
+          phase = 0f
+        )
+      )
+    )
+
+    // 2. Ceiling anchor ring & taut pendulum chain/rod
+    drawCircle(
+      color = SketchCharcoalBg,
+      radius = 8.5f * worldScale,
+      center = Offset(pivotX, pivotY)
+    )
+    drawCircle(
+      color = ChalkWhite,
+      radius = 8.5f * worldScale,
+      center = Offset(pivotX, pivotY),
+      style = Stroke(width = 2.6f * worldScale)
+    )
+    drawLine(
+      color = PencilGraphite.copy(alpha = 0.85f),
+      start = Offset(pivotX, pivotY),
+      end = Offset(bobX, bobY),
+      strokeWidth = 3.6f * worldScale,
+      cap = StrokeCap.Round
+    )
+
+    // 3. Spiked wrecking bob with fiery aura & chalk outline
+    val bobR = hazard.bobRadius * worldScale
+    drawCircle(
+      color = LavaOrange.copy(alpha = 0.28f),
+      radius = bobR * 1.45f,
+      center = Offset(bobX, bobY)
+    )
+
+    val spikeCount = 8
+    val spinOffset = animTime * 2.8f
+    for (i in 0 until spikeCount) {
+      val angle = spinOffset + i * (2f * PI.toFloat() / spikeCount)
+      val innerX = bobX + cos(angle) * (bobR * 0.85f)
+      val innerY = bobY + sin(angle) * (bobR * 0.85f)
+      val outerX = bobX + cos(angle) * (bobR * 1.38f)
+      val outerY = bobY + sin(angle) * (bobR * 1.38f)
+      drawLine(
+        color = ChalkWhite,
+        start = Offset(innerX, innerY),
+        end = Offset(outerX, outerY),
+        strokeWidth = 3.2f * worldScale,
+        cap = StrokeCap.Round
+      )
+    }
+
+    drawCircle(
+      color = LavaDeepRed,
+      radius = bobR,
+      center = Offset(bobX, bobY)
+    )
+    drawCircle(
+      color = LavaFlameYellow,
+      radius = bobR * 0.48f,
+      center = Offset(bobX, bobY)
+    )
+    drawCircle(
+      color = ChalkWhite,
+      radius = bobR,
+      center = Offset(bobX, bobY),
+      style = Stroke(width = 2.8f * worldScale)
+    )
   }
 
   private fun DrawScope.drawScribblerEnemy(

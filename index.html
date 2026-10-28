@@ -1020,6 +1020,108 @@
       };
     }
 
+    function getHazards(level, config = getLevelConfig(level)) {
+      const clampedLevel = Math.max(1, Math.min(TOTAL_LEVELS, level));
+      if (clampedLevel <= 1) return [];
+
+      const t = (clampedLevel - 1) / (TOTAL_LEVELS - 1);
+      const startPlatformEnd = 520;
+      const finishX = startPlatformEnd + config.levelLength;
+
+      // Frequency scaling: spacing tightens from 680px (L2) down to 310px (L50)
+      const baseHazardSpacing = 680 - t * 370;
+
+      // Difficulty scaling for Swinging Pendulums
+      const pendulumAngularSpeed = 1.85 + t * 2.50;
+      const pendulumMaxAngle = 0.52 + t * 0.50;
+      const pendulumBobRadius = 18 + t * 8;
+
+      // Difficulty scaling for Vanishing Platforms
+      const platformWidth = 150 - t * 58;
+      const platformCycleSeconds = 4.2 - t * 2.3;
+      const platformVisibleRatio = 0.72 - t * 0.30;
+
+      const hazards = [];
+      let cursorX = startPlatformEnd + 240;
+      let hazardIndex = 0;
+
+      while (cursorX < finishX - 180) {
+        const isPendulum = clampedLevel <= 3
+          ? false
+          : (clampedLevel <= 6
+            ? (hazardIndex % 2 === 1)
+            : (((clampedLevel + hazardIndex) % 2 === 0) || (clampedLevel >= 25 && hazardIndex % 3 === 0)));
+
+        const elevationShift = config.maxDeltaY <= 0.5
+          ? 0
+          : Math.sin(clampedLevel * 1.1 + hazardIndex * 1.45) * (config.maxDeltaY * 0.65);
+        const phaseOffset = ((clampedLevel * 0.65) + (hazardIndex * 1.15)) % 6.28;
+
+        if (isPendulum) {
+          const armLen = Math.max(150, Math.min(195, 160 + (hazardIndex % 3) * 14));
+          const pivotY = Math.max(70, Math.min(210, DEFAULT_GROUND_Y - armLen - 78 + elevationShift * 0.55));
+          hazards.push({
+            id: clampedLevel * 1000 + hazardIndex,
+            type: 'SWINGING_PENDULUM',
+            x: cursorX,
+            y: pivotY,
+            armLength: armLen,
+            bobRadius: pendulumBobRadius,
+            maxAngleRadians: pendulumMaxAngle,
+            angularSpeed: pendulumAngularSpeed,
+            phaseOffset
+          });
+        } else {
+          const topY = Math.max(195, Math.min(455, DEFAULT_GROUND_Y - 12 + elevationShift));
+          const halfW = platformWidth * 0.5;
+          hazards.push({
+            id: clampedLevel * 1000 + hazardIndex,
+            type: 'VANISHING_PLATFORM',
+            x: cursorX,
+            y: topY,
+            startX: cursorX - halfW,
+            endX: cursorX + halfW,
+            topY,
+            cycleSeconds: platformCycleSeconds,
+            visibleRatio: platformVisibleRatio,
+            phaseOffset
+          });
+        }
+
+        const jitterRatio = (((clampedLevel * 19 + hazardIndex * 43) % 41) - 20) / 100;
+        const stepX = Math.max(250, baseHazardSpacing * (1 + jitterRatio * 0.35));
+        cursorX += stepX;
+        hazardIndex++;
+      }
+
+      return hazards;
+    }
+
+    function getPendulumBobPos(hazard, timeSeconds) {
+      const angle = Math.sin(timeSeconds * hazard.angularSpeed + hazard.phaseOffset) * hazard.maxAngleRadians;
+      return {
+        x: hazard.x + Math.sin(angle) * hazard.armLength,
+        y: hazard.y + Math.cos(angle) * hazard.armLength
+      };
+    }
+
+    function getVanishingCycleProgress(hazard, timeSeconds) {
+      const safeCycle = Math.max(0.5, hazard.cycleSeconds || 3.6);
+      const raw = ((timeSeconds + (hazard.phaseOffset || 0)) % safeCycle) / safeCycle;
+      return raw < 0 ? raw + 1 : raw;
+    }
+
+    function isVanishingPlatformSolid(hazard, timeSeconds) {
+      if (hazard.type !== 'VANISHING_PLATFORM') return false;
+      return getVanishingCycleProgress(hazard, timeSeconds) < hazard.visibleRatio;
+    }
+
+    function isVanishingPlatformWarning(hazard, timeSeconds) {
+      if (!isVanishingPlatformSolid(hazard, timeSeconds)) return false;
+      const prog = getVanishingCycleProgress(hazard, timeSeconds);
+      return prog >= Math.max(0.1, hazard.visibleRatio - 0.18);
+    }
+
     function getLevelDefinition(levelNumber) {
       const clamped = Math.max(1, Math.min(TOTAL_LEVELS, levelNumber));
       const cfg = getLevelConfig(clamped);
@@ -1075,6 +1177,7 @@
           ],
           thumbtacks: [],
           scribblers: [],
+          hazards: getHazards(1, cfg),
           calloutScript: [
             { triggerX: 760, type: "BLITZ" }
           ]
@@ -1171,6 +1274,7 @@
         chalkBits,
         thumbtacks: [],
         scribblers: [],
+        hazards: getHazards(clamped, cfg),
         calloutScript
       };
     }
@@ -1436,7 +1540,7 @@
     const FALL_CROSSING_TOLERANCE = 24;
     const PLATFORM_MANTLE_TOLERANCE = 115;
 
-    function collectSupportingSurfaces(footX, platforms, completedLines) {
+    function collectSupportingSurfaces(footX, platforms, completedLines, hazards = [], animTime = 0) {
       const hits = [];
       const minFootX = footX - FOOT_SUPPORT_HALF_WIDTH;
       const maxFootX = footX + FOOT_SUPPORT_HALF_WIDTH;
@@ -1444,6 +1548,14 @@
       for (const p of platforms) {
         if (maxFootX >= p.startX && minFootX <= p.endX) {
           hits.push({ y: p.topY, slopeRadians: 0, tool: 'WHITE' });
+        }
+      }
+
+      for (const h of hazards) {
+        if (h.type === 'VANISHING_PLATFORM' && isVanishingPlatformSolid(h, animTime)) {
+          if (maxFootX >= h.startX && minFootX <= h.endX) {
+            hits.push({ y: h.topY, slopeRadians: 0, tool: 'WHITE' });
+          }
         }
       }
 
@@ -1551,7 +1663,7 @@
       vy = Math.min(MAX_FALL_SPEED, vy + GRAVITY * gravScale * dt);
       const freeFallY = prevY + vy * dt;
 
-      const candidateHits = collectSupportingSurfaces(resolvedX, level.platforms, completedLines);
+      const candidateHits = collectSupportingSurfaces(resolvedX, level.platforms, completedLines, level.hazards || [], state.lavaAnimTime);
       let resolvedY = freeFallY;
       let resolvedVy = vy;
       let grounded = false;
@@ -1637,6 +1749,30 @@
             const ty = cluster.y;
             if (Math.abs(resolvedX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
               state.gameOverReason = "Burned in the lava pit! Draw a sturdy bridge across the gap.";
+              return {
+                ...st,
+                footX: resolvedX,
+                footY: resolvedY,
+                velocityX: 0,
+                velocityY: 0,
+                isGrounded: false,
+                isAlive: false,
+                landingSquashTimer: 0,
+                deathTimer: 0.01
+              };
+            }
+          }
+        }
+
+        for (const hazard of (level.hazards || [])) {
+          if (hazard.type === 'SWINGING_PENDULUM') {
+            const bobPos = getPendulumBobPos(hazard, state.lavaAnimTime);
+            const hitR = hazard.bobRadius + 10;
+            const dFoot = Math.hypot(resolvedX - bobPos.x, (resolvedY - 12) - bobPos.y);
+            const dTorso = Math.hypot(resolvedX - bobPos.x, (resolvedY - STICKMAN_HEIGHT * 0.5) - bobPos.y);
+            const dHead = Math.hypot(resolvedX - bobPos.x, (resolvedY - STICKMAN_HEIGHT + 10) - bobPos.y);
+            if (dFoot <= hitR || dTorso <= hitR || dHead <= hitR) {
+              state.gameOverReason = "Struck by a swinging pendulum! Curve your chalk line around the arc.";
               return {
                 ...st,
                 footX: resolvedX,
@@ -2343,9 +2479,12 @@
       const finishGroundY = finishPlat ? finishPlat.topY : DEFAULT_GROUND_Y;
       drawFinishLine(state.level.finishLineX, finishGroundY, toScreenX, toScreenY, worldScale, w);
 
-      // 6. Thumbtack Hazards
+      // 6. Thumbtack & Dynamic Level Hazards (Swinging Pendulums & Vanishing Platforms)
       for (const cluster of state.level.thumbtacks) {
         drawThumbtackCluster(cluster, toScreenX, toScreenY, worldScale, w);
+      }
+      for (const hazard of (state.level.hazards || [])) {
+        drawDynamicHazard(hazard, state.lavaAnimTime, toScreenX, toScreenY, worldScale, w);
       }
 
       // 7. Collectible Chalk Bits & Gold Stars
@@ -2662,6 +2801,129 @@
         ctx.moveTo(tx, ty - 2 * worldScale);
         ctx.lineTo(tx, ty - 14 * worldScale);
         ctx.stroke();
+      }
+    }
+
+    function drawDynamicHazard(hazard, animTime, toScreenX, toScreenY, worldScale, w) {
+      if (hazard.type === 'VANISHING_PLATFORM') {
+        const leftX = toScreenX(hazard.startX);
+        const rightX = toScreenX(hazard.endX);
+        const topY = toScreenY(hazard.topY);
+        if (rightX < -80 || leftX > w + 80) return;
+
+        const isSolid = isVanishingPlatformSolid(hazard, animTime);
+        const isWarning = isVanishingPlatformWarning(hazard, animTime);
+        const cycleProg = getVanishingCycleProgress(hazard, animTime);
+
+        ctx.save();
+        if (isSolid) {
+          const flicker = isWarning ? (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(animTime * 28))) : 1.0;
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = isWarning ? `rgba(255, 87, 34, ${0.35 * flicker})` : 'rgba(64, 196, 255, 0.26)';
+          ctx.lineWidth = 14 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY + 2 * worldScale);
+          ctx.lineTo(rightX, topY + 2 * worldScale);
+          ctx.stroke();
+
+          ctx.strokeStyle = isWarning ? `rgba(255, 202, 40, ${flicker})` : 'rgba(64, 196, 255, 0.92)';
+          ctx.lineWidth = 6 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY);
+          ctx.lineTo(rightX, topY);
+          ctx.stroke();
+
+          ctx.strokeStyle = `rgba(247, 248, 242, ${0.88 * flicker})`;
+          ctx.lineWidth = 2.4 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftX + 3 * worldScale, topY - 1.2 * worldScale);
+          ctx.lineTo(rightX - 3 * worldScale, topY - 1.2 * worldScale);
+          ctx.stroke();
+
+          const solidRemRatio = Math.max(0, Math.min(1, (hazard.visibleRatio - cycleProg) / Math.max(0.1, hazard.visibleRatio)));
+          const barSpan = (rightX - leftX) * solidRemRatio;
+          ctx.strokeStyle = isWarning ? COLORS.LavaOrange : COLORS.FinishBannerGreen;
+          ctx.lineWidth = 2.8 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY + 8 * worldScale);
+          ctx.lineTo(leftX + barSpan, topY + 8 * worldScale);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = 'rgba(64, 196, 255, 0.28)';
+          ctx.lineWidth = 3.5 * worldScale;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([10 * worldScale, 8 * worldScale]);
+          ctx.lineDashOffset = -animTime * 24 * worldScale;
+          ctx.beginPath();
+          ctx.moveTo(leftX, topY);
+          ctx.lineTo(rightX, topY);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (hazard.type === 'SWINGING_PENDULUM') {
+        const pivotX = toScreenX(hazard.x);
+        const pivotY = toScreenY(hazard.y);
+        const bobWorld = getPendulumBobPos(hazard, animTime);
+        const bobX = toScreenX(bobWorld.x);
+        const bobY = toScreenY(bobWorld.y);
+        const maxReachPx = (hazard.armLength + hazard.bobRadius + 40) * worldScale;
+        if (pivotX + maxReachPx < -60 || pivotX - maxReachPx > w + 60) return;
+
+        ctx.save();
+        // 1. Faint dashed swing-arc telegraph
+        ctx.strokeStyle = 'rgba(255, 87, 34, 0.25)';
+        ctx.lineWidth = 2.2 * worldScale;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([10 * worldScale, 8 * worldScale]);
+        ctx.beginPath();
+        const steps = 16;
+        for (let i = 0; i <= steps; i++) {
+          const ratio = (i / steps) * 2 - 1;
+          const a = ratio * hazard.maxAngleRadians;
+          const wx = hazard.x + Math.sin(a) * hazard.armLength;
+          const wy = hazard.y + Math.cos(a) * hazard.armLength;
+          if (i === 0) ctx.moveTo(toScreenX(wx), toScreenY(wy));
+          else ctx.lineTo(toScreenX(wx), toScreenY(wy));
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 2. Ceiling anchor ring & chain
+        ctx.fillStyle = COLORS.SketchCharcoalBg;
+        ctx.beginPath(); ctx.arc(pivotX, pivotY, 8.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 2.6 * worldScale;
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(216, 219, 208, 0.85)';
+        ctx.lineWidth = 3.6 * worldScale;
+        ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bobX, bobY); ctx.stroke();
+
+        // 3. Spiked wrecking bob
+        const bobR = hazard.bobRadius * worldScale;
+        ctx.fillStyle = 'rgba(255, 87, 34, 0.28)';
+        ctx.beginPath(); ctx.arc(bobX, bobY, bobR * 1.45, 0, Math.PI * 2); ctx.fill();
+
+        const spikeCount = 8;
+        const spinOffset = animTime * 2.8;
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 3.2 * worldScale;
+        for (let i = 0; i < spikeCount; i++) {
+          const angle = spinOffset + i * (Math.PI * 2 / spikeCount);
+          ctx.beginPath();
+          ctx.moveTo(bobX + Math.cos(angle) * (bobR * 0.85), bobY + Math.sin(angle) * (bobR * 0.85));
+          ctx.lineTo(bobX + Math.cos(angle) * (bobR * 1.38), bobY + Math.sin(angle) * (bobR * 1.38));
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = COLORS.LavaDeepRed;
+        ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = COLORS.LavaFlameYellow;
+        ctx.beginPath(); ctx.arc(bobX, bobY, bobR * 0.48, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 2.8 * worldScale;
+        ctx.beginPath(); ctx.arc(bobX, bobY, bobR, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
     }
 
@@ -3493,12 +3755,13 @@
       const isCompleted = stars > 0 || levelNumber < state.bestLevel;
       const starDisplay = isCompleted ? '★'.repeat(Math.max(1, stars)) + '☆'.repeat(3 - Math.max(1, stars)) : '☆☆☆';
       const statusBadge = isCompleted ? `COMPLETED ${starDisplay}` : 'CURRENT FRONTIER';
+      const hazardCount = getHazards(cfg.level, cfg).length;
       const bannerEl = document.getElementById('selectedLevelBanner');
       if (bannerEl) {
         bannerEl.innerHTML = `
           <div>
-            <div class="cfg-title">LVL ${cfg.level}: ${cfg.title}</div>
-            <div class="cfg-meta">${cfg.worldTitle} • Dist ${Math.round(cfg.levelLength)}px • Speed ${cfg.baseSpeed.toFixed(1)} • Gaps ${Math.round(cfg.minGap)}-${Math.round(cfg.maxGap)}px • ΔY ±${Math.round(cfg.maxDeltaY)}px • Decay ${cfg.lineLifespan.toFixed(1)}s</div>
+            <div class="cfg-title">LVL ${cfg.level}: ${cfg.levelTitle}</div>
+            <div class="cfg-meta">${cfg.worldTitle} • Dist ${Math.round(cfg.levelLength)}px • Speed ${cfg.baseSpeed.toFixed(1)}x • Gaps ${Math.round(cfg.minGap)}-${Math.round(cfg.maxGap)}px • ΔY ±${Math.round(cfg.maxDeltaY)}px • Decay ${cfg.lineLifespan.toFixed(1)}s • Hazards ${hazardCount}</div>
           </div>
           <div style="text-align:right;font-size:10px;font-weight:900;color:${isCompleted ? '#34D399' : '#FBBF24'};">${statusBadge}</div>
         `;

@@ -271,5 +271,61 @@ class ExampleUnitTest {
     assertTrue("Collected chalk bit should be marked collected", updatedBits.first { it.id == firstBit.id }.collected)
     assertTrue("Collected chalk bit should grant additional chalk ink", newlyCollected.sumOf { it.inkAmount.toDouble() } >= 200.0)
   }
+
+  @Test
+  fun `getHazards dynamically scales obstacle frequency and difficulty from level 1 to 50`() {
+    val hazardsL1 = LevelCatalog.getHazards(1)
+    val hazardsL2 = LevelCatalog.getHazards(2)
+    val hazardsL10 = LevelCatalog.getHazards(10)
+    val hazardsL25 = LevelCatalog.getHazards(25)
+    val hazardsL50 = LevelCatalog.getHazards(50)
+
+    // Level 1 is introductory; Levels 2..50 scale up in frequency
+    assertTrue("Level 1 should have 0 dynamic hazards", hazardsL1.isEmpty())
+    assertTrue("Level 2 should introduce initial dynamic hazards", hazardsL2.isNotEmpty())
+    assertTrue("Level 10 should have more hazards than Level 2", hazardsL10.size > hazardsL2.size)
+    assertTrue("Level 25 should have more hazards than Level 10", hazardsL25.size > hazardsL10.size)
+    assertTrue("Level 50 should have the highest hazard count", hazardsL50.size > hazardsL25.size)
+
+    // Verify both SWINGING_PENDULUM and VANISHING_PLATFORM appear in mid/high levels
+    assertTrue(
+      "Mid/high levels must contain Swinging Pendulums",
+      hazardsL25.any { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
+    )
+    assertTrue(
+      "Mid/high levels must contain Vanishing Platforms",
+      hazardsL25.any { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
+    )
+
+    // Verify difficulty scaling for Swinging Pendulums (faster angularSpeed, wider maxAngleRadians, larger bobRadius)
+    val earlyPendulum = LevelCatalog.getHazards(5).first { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
+    val latePendulum = hazardsL50.first { it.type == com.example.game.model.HazardType.SWINGING_PENDULUM }
+    assertTrue("Pendulum angular speed must increase with level", latePendulum.angularSpeed > earlyPendulum.angularSpeed)
+    assertTrue("Pendulum swing angle must widen with level", latePendulum.maxAngleRadians > earlyPendulum.maxAngleRadians)
+    assertTrue("Pendulum bob radius must increase with level", latePendulum.bobRadius > earlyPendulum.bobRadius)
+
+    // Verify difficulty scaling for Vanishing Platforms (narrower width, faster cycleSeconds, smaller visibleRatio)
+    val earlyPlatform = hazardsL2.first { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
+    val latePlatform = hazardsL50.first { it.type == com.example.game.model.HazardType.VANISHING_PLATFORM }
+    assertTrue("Vanishing platform width must shrink at higher levels", latePlatform.width < earlyPlatform.width)
+    assertTrue("Vanishing platform cycle must speed up at higher levels", latePlatform.cycleSeconds < earlyPlatform.cycleSeconds)
+    assertTrue("Vanishing platform solid ratio must tighten at higher levels", latePlatform.visibleRatio < earlyPlatform.visibleRatio)
+
+    // Verify Vanishing Platform solid vs vanished states in PhysicsEngine
+    val testVanishing = com.example.game.model.DynamicHazard(
+      id = 999,
+      type = com.example.game.model.HazardType.VANISHING_PLATFORM,
+      x = 620f,
+      y = 400f,
+      startX = 560f,
+      endX = 680f,
+      topY = 400f,
+      cycleSeconds = 4.0f,
+      visibleRatio = 0.5f,
+      phaseOffset = 0f
+    )
+    assertTrue("Platform should be solid at t=0.5s", testVanishing.isPlatformSolidAt(0.5f))
+    assertFalse("Platform should be vanished at t=2.8s", testVanishing.isPlatformSolidAt(2.8f))
+  }
 }
 

@@ -2,7 +2,9 @@ package com.example.game.level
 
 import com.example.game.model.CalloutMoveType
 import com.example.game.model.ChalkBit
+import com.example.game.model.DynamicHazard
 import com.example.game.model.GuideStroke
+import com.example.game.model.HazardType
 import com.example.game.model.LevelConfig
 import com.example.game.model.LevelDefinition
 import com.example.game.model.Platform
@@ -126,6 +128,109 @@ object LevelCatalog {
     return (1..TOTAL_LEVELS).map { getLevelConfig(it) }
   }
 
+  /**
+   * Dynamically generates obstacles (`SWINGING_PENDULUM` and `VANISHING_PLATFORM`) for [level] (`1..50`),
+   * scaling both their **frequency** (spacing and total count) and **difficulty** (pendulum angular speed,
+   * swing arc, bob radius, and vanishing platform cycle speed & solid duration) as levels progress:
+   * - Level 1: 0 dynamic hazards (introductory tutorial level).
+   * - Levels 2..50:
+   *   - Frequency: Hazard spacing tightens from `680px` at Level 2 down to `310px` at Level 50,
+   *     scaling total hazard count from `1` obstacle in Level 2 up to `24+` obstacles in Level 50.
+   *   - Pendulum Difficulty: Angular speed scales from `1.85 rad/s` to `4.35 rad/s`, max swing angle
+   *     from `0.52 rad` to `1.02 rad`, and bob radius from `18px` to `26px`.
+   *   - Vanishing Platform Difficulty: Width shrinks from `150px` to `92px`, cycle time speeds up from
+   *     `4.2s` to `1.9s`, and visible solid ratio tightens from `72%` (`0.72f`) down to `42%` (`0.42f`).
+   */
+  fun getHazards(level: Int, config: LevelConfig = getLevelConfig(level)): List<DynamicHazard> {
+    val clampedLevel = level.coerceIn(1, TOTAL_LEVELS)
+    if (clampedLevel <= 1) return emptyList()
+
+    val t = (clampedLevel - 1f) / (TOTAL_LEVELS - 1f) // ~0.02 at L2 .. 1.0 at L50
+    val startPlatformEnd = 520f
+    val finishX = startPlatformEnd + config.levelLength
+
+    // Frequency scaling: spacing tightens from 680px (L2) down to 310px (L50)
+    val baseHazardSpacing = 680f - t * 370f
+
+    // Difficulty scaling for Swinging Pendulums
+    val pendulumAngularSpeed = 1.85f + t * 2.50f       // 1.85 rad/s -> 4.35 rad/s
+    val pendulumMaxAngle = 0.52f + t * 0.50f           // 0.52 rad (~30°) -> 1.02 rad (~58°)
+    val pendulumBobRadius = 18f + t * 8f               // 18px -> 26px
+
+    // Difficulty scaling for Vanishing Platforms
+    val platformWidth = 150f - t * 58f                 // 150px -> 92px
+    val platformCycleSeconds = 4.2f - t * 2.3f         // 4.2s -> 1.9s
+    val platformVisibleRatio = 0.72f - t * 0.30f       // 0.72 -> 0.42
+
+    val hazards = mutableListOf<DynamicHazard>()
+    var cursorX = startPlatformEnd + 240f
+    var hazardIndex = 0
+
+    while (cursorX < finishX - 180f) {
+      // Choose obstacle type deterministically:
+      // Levels 2..3 introduce Vanishing Platforms first; Level 4+ interleave Swinging Pendulums & Vanishing Platforms
+      val isPendulum = when {
+        clampedLevel <= 3 -> false
+        clampedLevel <= 6 -> (hazardIndex % 2 == 1)
+        else -> ((clampedLevel + hazardIndex) % 2 == 0) || (clampedLevel >= 25 && hazardIndex % 3 == 0)
+      }
+
+      val elevationShift = if (config.maxDeltaY <= 0.5f) {
+        0f
+      } else {
+        sin((clampedLevel * 1.1f + hazardIndex * 1.45f).toDouble()).toFloat() * (config.maxDeltaY * 0.65f)
+      }
+
+      val phaseOffset = ((clampedLevel * 0.65f) + (hazardIndex * 1.15f)) % 6.28f
+
+      if (isPendulum) {
+        val armLen = (160f + (hazardIndex % 3) * 14f).coerceIn(150f, 195f)
+        val pivotY = (WorldConstants.DEFAULT_GROUND_Y - armLen - 78f + elevationShift * 0.55f)
+          .coerceIn(70f, 210f)
+
+        hazards.add(
+          DynamicHazard(
+            id = clampedLevel * 1000 + hazardIndex,
+            type = HazardType.SWINGING_PENDULUM,
+            x = cursorX,
+            y = pivotY,
+            armLength = armLen,
+            bobRadius = pendulumBobRadius,
+            maxAngleRadians = pendulumMaxAngle,
+            angularSpeed = pendulumAngularSpeed,
+            phaseOffset = phaseOffset
+          )
+        )
+      } else {
+        val topY = (WorldConstants.DEFAULT_GROUND_Y - 12f + elevationShift)
+          .coerceIn(195f, 455f)
+        val halfW = platformWidth * 0.5f
+
+        hazards.add(
+          DynamicHazard(
+            id = clampedLevel * 1000 + hazardIndex,
+            type = HazardType.VANISHING_PLATFORM,
+            x = cursorX,
+            y = topY,
+            startX = cursorX - halfW,
+            endX = cursorX + halfW,
+            topY = topY,
+            cycleSeconds = platformCycleSeconds,
+            visibleRatio = platformVisibleRatio,
+            phaseOffset = phaseOffset
+          )
+        )
+      }
+
+      val jitterRatio = (((clampedLevel * 19 + hazardIndex * 43) % 41) - 20) / 100f // -0.20 .. +0.20
+      val stepX = (baseHazardSpacing * (1f + jitterRatio * 0.35f)).coerceAtLeast(250f)
+      cursorX += stepX
+      hazardIndex++
+    }
+
+    return hazards
+  }
+
   fun getLevel(levelNumber: Int): LevelDefinition {
     val clamped = levelNumber.coerceIn(1, TOTAL_LEVELS)
     return if (clamped == 1) {
@@ -200,6 +305,7 @@ object LevelCatalog {
         ChalkBit(id = 5, x = 1100f, y = groundY - 32f, inkAmount = 240f),
         ChalkBit(id = 6, x = 1220f, y = groundY - 26f, inkAmount = 240f)
       ),
+      hazards = getHazards(1, cfg),
       calloutScript = listOf(
         ScriptedCallout(triggerX = 760f, type = CalloutMoveType.BLITZ)
       )
@@ -207,10 +313,12 @@ object LevelCatalog {
   }
 
   /**
-   * Generates Levels 2..50 deterministically using `getLevelConfig(levelNumber)`:
+   * Generates Levels 2..50 deterministically using `getLevelConfig(levelNumber)` and `getHazards(levelNumber)`:
    * - No intermediate platforms where the character runs — open sky over lava from Start foothold to Finish line!
    * - Floating Chalk pickups (`ChalkBit`) are spaced by `[minGap, maxGap]` and vary vertically by `±maxDeltaY`
    *   so the player draws their line from chalk to chalk for additional chalk level.
+   * - Dynamic obstacles (`getHazards`) add Swinging Pendulums and Vanishing Platforms that scale in frequency
+   *   and difficulty across all 50 levels.
    */
   private fun createScaledLevel(levelNumber: Int): LevelDefinition {
     val cfg = getLevelConfig(levelNumber)
@@ -329,6 +437,7 @@ object LevelCatalog {
       chalkBits = bits,
       thumbtacks = emptyList(),
       scribblers = emptyList(),
+      hazards = getHazards(levelNumber, cfg),
       calloutScript = callouts
     )
   }
