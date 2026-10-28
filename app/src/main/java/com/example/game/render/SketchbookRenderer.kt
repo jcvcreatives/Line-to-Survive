@@ -297,69 +297,40 @@ object SketchbookRenderer {
     val left = toScreenX(platform.startX)
     val right = toScreenX(platform.endX)
     val top = toScreenY(platform.topY)
-    val bottom = size.height
 
-    val width = (right - left).coerceAtLeast(1f)
-    val height = (bottom - top).coerceAtLeast(1f)
-
-    // Charcoal shaded platform block
-    drawRect(
-      color = Color(0xFF252832),
-      topLeft = Offset(left, top),
-      size = Size(width, height)
-    )
-
-    // Hand-drawn diagonal graphite hatching inside platform
-    val hatchSpacing = 22f * worldScale
-    var hx = platform.startX
-    while (hx < platform.endX + 120f) {
-      val sx1 = toScreenX(hx.coerceIn(platform.startX, platform.endX))
-      val sy1 = top + 4f * worldScale
-      val sx2 = toScreenX((hx - 90f).coerceIn(platform.startX, platform.endX))
-      val sy2 = (top + 110f * worldScale).coerceAtMost(bottom)
-      drawLine(
-        color = PencilGraphite.copy(alpha = 0.16f),
-        start = Offset(sx1, sy1),
-        end = Offset(sx2, sy2),
-        strokeWidth = 2f * worldScale
-      )
-      hx += 24f
-    }
-
-    // Double-sketched chalk outline along top and sides
+    // Render only a sleek floating chalk line for the Start / Finish foothold (no ground block!)
     val topPath1 = reusablePlatformPath.apply {
       reset()
-      moveTo(left, bottom)
-      lineTo(left, top)
+      moveTo(left, top)
       var cx = platform.startX
       var idx = 0
       while (cx < platform.endX) {
         val nextX = (cx + 35f).coerceAtMost(platform.endX)
-        val jitterY = if (idx % 2 == 0) -1.4f else 1.4f
+        val jitterY = if (idx % 2 == 0) -1.2f else 1.2f
         lineTo(toScreenX(nextX), toScreenY(platform.topY + jitterY))
         cx = nextX
         idx++
       }
-      lineTo(right, bottom)
     }
 
     drawPath(
       path = topPath1,
-      color = ChalkWhite,
+      color = InkCyanAccent.copy(alpha = 0.35f),
       style = Stroke(
-        width = 4.2f * worldScale,
+        width = 9.0f * worldScale,
         cap = StrokeCap.Round,
         join = StrokeJoin.Round
       )
     )
 
-    // Secondary sketchy pencil pass
-    drawLine(
-      color = PencilGraphite.copy(alpha = 0.65f),
-      start = Offset(left + 2f * worldScale, top + 3.5f * worldScale),
-      end = Offset(right - 2f * worldScale, top + 2.5f * worldScale),
-      strokeWidth = 2f * worldScale,
-      cap = StrokeCap.Round
+    drawPath(
+      path = topPath1,
+      color = ChalkWhite,
+      style = Stroke(
+        width = 5.0f * worldScale,
+        cap = StrokeCap.Round,
+        join = StrokeJoin.Round
+      )
     )
   }
 
@@ -607,18 +578,26 @@ object SketchbookRenderer {
     val bob = sin(animTime * 3.2f + bit.id) * 3.5f
     val cx = toScreenX(bit.x)
     val cy = toScreenY(bit.y + bob)
-    if (cx < -40f || cx > size.width + 40f) return
+    if (cx < -50f || cx > size.width + 50f) return
+
+    val pulse = 0.85f + 0.15f * sin(animTime * 4.5f + bit.id)
 
     if (bit.isStar) {
       drawCircle(
-        color = LavaFlameYellow.copy(alpha = 0.25f),
-        radius = 22f * worldScale,
+        color = LavaFlameYellow.copy(alpha = 0.28f * pulse),
+        radius = 28f * worldScale,
         center = Offset(cx, cy)
+      )
+      drawCircle(
+        color = LavaFlameYellow.copy(alpha = 0.55f),
+        radius = 22f * worldScale * pulse,
+        center = Offset(cx, cy),
+        style = Stroke(width = 2.0f * worldScale)
       )
       val starPath = reusableStarPath.apply {
         reset()
         for (i in 0 until 10) {
-          val r = (if (i % 2 == 0) 14f else 6.5f) * worldScale
+          val r = (if (i % 2 == 0) 15f else 7f) * worldScale
           val angle = -PI.toFloat() / 2f + i * PI.toFloat() / 5f + sin(animTime * 2f) * 0.1f
           val px = cx + cos(angle) * r
           val py = cy + sin(angle) * r
@@ -630,20 +609,44 @@ object SketchbookRenderer {
       drawPath(
         path = starPath,
         color = ChalkWhite,
-        style = Stroke(width = 1.8f * worldScale)
+        style = Stroke(width = 2.0f * worldScale)
       )
     } else {
+      // Glowing cyan/white chalk refill target ring — draw line here for additional chalk level!
       drawCircle(
-        color = ChalkWhite.copy(alpha = 0.2f),
-        radius = 15f * worldScale,
+        color = InkCyanAccent.copy(alpha = 0.22f * pulse),
+        radius = 24f * worldScale,
         center = Offset(cx, cy)
       )
+      drawCircle(
+        color = InkCyanAccent.copy(alpha = 0.65f),
+        radius = 19f * worldScale * pulse,
+        center = Offset(cx, cy),
+        style = Stroke(width = 1.8f * worldScale)
+      )
+      // Outer chalk stick shadow/outline
+      drawLine(
+        color = Color(0xFF0F172A),
+        start = Offset(cx - 11f * worldScale, cy + 5.5f * worldScale),
+        end = Offset(cx + 11f * worldScale, cy - 5.5f * worldScale),
+        strokeWidth = 10.5f * worldScale,
+        cap = StrokeCap.Round
+      )
+      // Bright white chalk stick body
       drawLine(
         color = ChalkWhite,
-        start = Offset(cx - 8f * worldScale, cy + 4f * worldScale),
-        end = Offset(cx + 8f * worldScale, cy - 4f * worldScale),
-        strokeWidth = 6.5f * worldScale,
+        start = Offset(cx - 10f * worldScale, cy + 5f * worldScale),
+        end = Offset(cx + 10f * worldScale, cy - 5f * worldScale),
+        strokeWidth = 7.5f * worldScale,
         cap = StrokeCap.Round
+      )
+      // Cyan chalk wrapper band in the middle of the chalk stick
+      drawLine(
+        color = InkCyanAccent,
+        start = Offset(cx - 3f * worldScale, cy + 1.5f * worldScale),
+        end = Offset(cx + 3f * worldScale, cy - 1.5f * worldScale),
+        strokeWidth = 7.8f * worldScale,
+        cap = StrokeCap.Butt
       )
     }
   }

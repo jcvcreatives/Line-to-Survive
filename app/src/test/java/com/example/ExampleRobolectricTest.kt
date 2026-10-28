@@ -84,16 +84,16 @@ class ExampleRobolectricTest {
     composeTestRule.waitForIdle()
     assertEquals(ScreenState.PLAYING, viewModel.uiState.value.screenState)
 
-    // 5. Draw bridges across Gap 1 and Gap 2 -> triggers drawing sound -> Complete Level 1 -> Next Level button works
+    // 5. Draw lines across the open platform-free sky through floating chalk -> Complete Level 1 -> Next Level button works
     val y = WorldConstants.DEFAULT_GROUND_Y
-    viewModel.onDrawStart(Vec2(540f, y))
-    viewModel.onDrawMove(Vec2(710f, y - 16f))
-    viewModel.onDrawMove(Vec2(880f, y))
+    viewModel.onDrawStart(Vec2(500f, y))
+    viewModel.onDrawMove(Vec2(720f, y - 24f))
+    viewModel.onDrawMove(Vec2(940f, y))
     viewModel.onDrawEnd()
 
-    viewModel.onDrawStart(Vec2(1260f, y))
-    viewModel.onDrawMove(Vec2(1520f, y - 20f))
-    viewModel.onDrawMove(Vec2(1780f, y))
+    viewModel.onDrawStart(Vec2(900f, y))
+    viewModel.onDrawMove(Vec2(1130f, y - 24f))
+    viewModel.onDrawMove(Vec2(1360f, y))
     viewModel.onDrawEnd()
 
     assertTrue("Drawing sound trigger should fire when sketching lines", soundManager.drawTriggerCount > 0)

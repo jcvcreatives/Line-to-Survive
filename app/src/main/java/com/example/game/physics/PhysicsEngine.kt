@@ -471,10 +471,8 @@ object PhysicsEngine {
       )
     }
 
-    // Check if stickman crossed the finish line ON or ABOVE the finish platform surface
-    val finishPlatform = platforms.lastOrNull { level.finishLineX in it.startX..it.endX } ?: platforms.lastOrNull()
-    val finishTopY = finishPlatform?.topY ?: WorldConstants.DEFAULT_GROUND_Y
-    if (resolvedX >= level.finishLineX && resolvedY <= finishTopY + 18f) {
+    // Check if stickman crossed the finish line above the lava pit (on a player-drawn line or finish ledge)
+    if (resolvedX >= level.finishLineX && resolvedY < WorldConstants.LAVA_SURFACE_Y - 10f) {
       return state.copy(
         footX = resolvedX,
         footY = resolvedY,
@@ -732,37 +730,116 @@ object PhysicsEngine {
   }
 
   /**
-   * Collects Chalk Bits and Gold Stars within reach of the stickman, pulling nearby bits
-   * magnetically when a combo streak or Blitz is active.
+   * Shortest distance from point [p] to line segment `[a, b]`.
+   */
+  fun distancePointToSegment(p: Vec2, a: Vec2, b: Vec2): Float {
+    val abx = b.x - a.x
+    val aby = b.y - a.y
+    val lenSq = abx * abx + aby * aby
+    if (lenSq <= 0.0001f) return p.distanceTo(a)
+    val t = (((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq).coerceIn(0f, 1f)
+    val projX = a.x + t * abx
+    val projY = a.y + t * aby
+    val dx = p.x - projX
+    val dy = p.y - projY
+    return sqrt(dx * dx + dy * dy)
+  }
+
+  /**
+   * Collects any uncollected [ChalkBit]s that are touched by the player's drawn line segments
+   * ([strokePoints]), allowing the player to draw their line directly to floating chalk for
+   * additional chalk level (ink).
+   */
+  fun collectChalkBitsAlongStroke(
+    bits: List<ChalkBit>,
+    strokePoints: List<Vec2>,
+    collectionRadius: Float = 48f
+  ): Pair<List<ChalkBit>, List<ChalkBit>> {
+    if (bits.isEmpty() || strokePoints.isEmpty()) return bits to emptyList()
+
+    val newlyCollected = mutableListOf<ChalkBit>()
+    val updated = bits.map { bit ->
+      if (bit.collected) return@map bit
+      val bitPos = Vec2(bit.x, bit.y)
+      val touched = if (strokePoints.size == 1) {
+        strokePoints.first().distanceTo(bitPos) <= collectionRadius
+      } else {
+        var hitSegment = false
+        for (i in 0 until strokePoints.size - 1) {
+          if (distancePointToSegment(bitPos, strokePoints[i], strokePoints[i + 1]) <= collectionRadius) {
+            hitSegment = true
+            break
+          }
+        }
+        hitSegment
+      }
+
+      if (touched) {
+        val collectedBit = bit.copy(collected = true)
+        newlyCollected.add(collectedBit)
+        collectedBit
+      } else {
+        bit
+      }
+    }
+
+    return updated to newlyCollected
+  }
+
+  /**
+   * Collects Chalk Bits and Gold Stars when either the player's drawn line or the stickman
+   * reaches them, pulling nearby bits magnetically when a combo streak or Blitz is active.
    */
   fun updateChalkBits(
     bits: List<ChalkBit>,
     stickman: StickmanState,
     comboCount: Int,
-    dt: Float
+    dt: Float,
+    activeLines: List<DrawnLine> = emptyList()
   ): Pair<List<ChalkBit>, List<ChalkBit>> {
     if (bits.isEmpty()) return bits to emptyList()
 
     val newlyCollected = mutableListOf<ChalkBit>()
-    val magnetRadius = if (comboCount >= 2 || stickman.blitzTimer > 0f) 135f else 52f
+    val magnetRadius = if (comboCount >= 2 || stickman.blitzTimer > 0f) 135f else 56f
     val bodyCenterX = stickman.footX
     val bodyCenterY = stickman.footY - WorldConstants.STICKMAN_HEIGHT * 0.5f
 
     val updated = bits.map { bit ->
       if (bit.collected) return@map bit
+      val bitPos = Vec2(bit.x, bit.y)
       val dx = bodyCenterX - bit.x
       val dy = bodyCenterY - bit.y
-      val dist = sqrt(dx * dx + dy * dy)
+      val distToStickman = sqrt(dx * dx + dy * dy)
 
-      if (dist <= 38f) {
+      // Also check if any player-drawn line touches this floating chalk bit
+      var touchedByLine = false
+      for (line in activeLines) {
+        val pts = line.points
+        if (pts.size == 1) {
+          if (pts.first().distanceTo(bitPos) <= 48f) {
+            touchedByLine = true
+            break
+          }
+        } else {
+          for (i in 0 until pts.size - 1) {
+            if (distancePointToSegment(bitPos, pts[i], pts[i + 1]) <= 48f) {
+              touchedByLine = true
+              break
+            }
+          }
+          if (touchedByLine) break
+        }
+      }
+
+      if (distToStickman <= 42f || touchedByLine) {
         val collectedBit = bit.copy(collected = true)
         newlyCollected.add(collectedBit)
         collectedBit
-      } else if (dist <= magnetRadius && dist > 1f) {
+      } else if (distToStickman <= magnetRadius && distToStickman > 1f) {
         val pullSpeed = 280f * dt
         bit.copy(
-          x = bit.x + (dx / dist) * pullSpeed,
-          y = bit.y + (dy / dist) * pullSpeed
+          x = bit.x + (dx / distToStickman) * pullSpeed,
+          y = bit.y + (dy / distToStickman) * pullSpeed
         )
       } else {
         bit

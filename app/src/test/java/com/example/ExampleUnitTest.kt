@@ -59,19 +59,19 @@ class ExampleUnitTest {
       isGrounded = true
     )
 
-    // Draw bridge across Gap 1 (560..860) and Gap 2 (1280..1760)
+    // Draw continuous bridges across the open platform-free sky from 500..1360 through floating chalk
     val bridge1Points = PhysicsEngine.smoothStrokePoints(
       listOf(
-        Vec2(540f, WorldConstants.DEFAULT_GROUND_Y),
-        Vec2(710f, WorldConstants.DEFAULT_GROUND_Y - 18f),
-        Vec2(880f, WorldConstants.DEFAULT_GROUND_Y)
+        Vec2(500f, WorldConstants.DEFAULT_GROUND_Y),
+        Vec2(720f, WorldConstants.DEFAULT_GROUND_Y - 18f),
+        Vec2(940f, WorldConstants.DEFAULT_GROUND_Y)
       )
     )
     val bridge2Points = PhysicsEngine.smoothStrokePoints(
       listOf(
-        Vec2(1260f, WorldConstants.DEFAULT_GROUND_Y),
-        Vec2(1520f, WorldConstants.DEFAULT_GROUND_Y - 24f),
-        Vec2(1780f, WorldConstants.DEFAULT_GROUND_Y)
+        Vec2(900f, WorldConstants.DEFAULT_GROUND_Y),
+        Vec2(1130f, WorldConstants.DEFAULT_GROUND_Y - 20f),
+        Vec2(1360f, WorldConstants.DEFAULT_GROUND_Y)
       )
     )
 
@@ -248,15 +248,28 @@ class ExampleUnitTest {
     assertTrue("Ink capacity should tighten by Level 50", cfg50.maxInkPerLevel < cfg1.maxInkPerLevel)
     assertTrue("Ink regen rate should tighten by Level 50", cfg50.inkRechargeRate < cfg1.inkRechargeRate)
 
-    // Ensure all 50 levels generate valid LevelDefinitions with finish platforms
+    // Ensure all 50 levels have no intermediate ground platforms and provide floating chalk pickups
     val allConfigs = LevelCatalog.getAllLevelConfigs()
     assertEquals(50, allConfigs.size)
     for (lvl in 1..50) {
       val def = LevelCatalog.getLevel(lvl)
       assertEquals(lvl, def.levelNumber)
-      assertTrue("Level $lvl must have at least 3 platforms", def.platforms.size >= 3)
+      assertEquals("Level $lvl should have only Start and Finish footholds (no middle platforms)", 2, def.platforms.size)
+      assertTrue("Level $lvl must have floating chalk bits for additional chalk level", def.chalkBits.isNotEmpty())
       assertTrue("Level $lvl finishLineX must be positive", def.finishLineX > def.spawnPosition.x)
     }
+
+    // Verify drawing a line to floating chalk collects it for additional chalk level
+    val level1 = LevelCatalog.getLevel(1)
+    val firstBit = level1.chalkBits.first()
+    val strokeToChalk = listOf(
+      Vec2(firstBit.x - 80f, firstBit.y),
+      Vec2(firstBit.x + 20f, firstBit.y)
+    )
+    val (updatedBits, newlyCollected) = PhysicsEngine.collectChalkBitsAlongStroke(level1.chalkBits, strokeToChalk)
+    assertTrue("Drawing a line to floating chalk should collect it", newlyCollected.any { it.id == firstBit.id })
+    assertTrue("Collected chalk bit should be marked collected", updatedBits.first { it.id == firstBit.id }.collected)
+    assertTrue("Collected chalk bit should grant additional chalk ink", newlyCollected.sumOf { it.inkAmount.toDouble() } >= 200.0)
   }
 }
 

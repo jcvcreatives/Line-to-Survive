@@ -991,13 +991,13 @@
       // 5. Max Ink Capacity & Regen Rate: tighter relative to gap size
       const maxInkPerLevel = 1000 - t * 320;
       const inkRechargeRate = 120 - t * 52;
-      const parInkUsage = maxInkPerLevel * 0.92;
-      const maxStrokeLength = 760 - t * 240;
+      const parInkUsage = maxInkPerLevel * 1.6;
+      const maxStrokeLength = Math.max(1800, levelLength * 1.25);
       // 6. Line Lifespan (Decay Timer): 5.0s in Level 1 -> 1.8s by Level 50
       const lineLifespan = 5.0 - t * (5.0 - 1.8);
 
       const levelSubtitle = clampedLevel <= 3
-        ? `Flat platforms (0px elevation). Draw sturdy bridges before your chalk fades (${lineLifespan.toFixed(1)}s)!`
+        ? `No ground platforms! Draw your line to the floating chalk (+CHALK) to reach the Finish!`
         : `Speed ${baseSpeed.toFixed(1)}x • ΔY ±${Math.round(maxDeltaY)}px • Lines decay in ${lineLifespan.toFixed(1)}s!`;
 
       return {
@@ -1026,14 +1026,16 @@
       const groundY = DEFAULT_GROUND_Y;
 
       if (clamped === 1) {
+        const startEndX = 520;
+        const finishX = startEndX + cfg.levelLength;
         return {
           levelNumber: 1,
           title: cfg.levelTitle,
           subtitle: cfg.levelSubtitle,
           runSpeed: cfg.runSpeed,
           spawnPosition: { x: 110, y: groundY },
-          finishLineX: 1560,
-          levelEndX: 1880,
+          finishLineX: finishX,
+          levelEndX: finishX + 260,
           maxInkPerLevel: cfg.maxInkPerLevel,
           inkRechargeRate: cfg.inkRechargeRate,
           parInkUsage: cfg.parInkUsage,
@@ -1046,156 +1048,104 @@
           maxDeltaY: cfg.maxDeltaY,
           worldTitle: cfg.worldTitle,
           platforms: [
-            { startX: -80, endX: 560, topY: groundY, label: "START" },
-            { startX: 700, endX: 1280, topY: groundY, label: "CHECKPOINT" },
-            { startX: 1420, endX: 2020, topY: groundY, label: "FINISH" }
+            { startX: 20, endX: startEndX, topY: groundY, label: "START" },
+            { startX: finishX - 30, endX: finishX + 260, topY: groundY, label: "FINISH" }
           ],
           guideStrokes: [
             {
-              points: [{ x: 545, y: groundY - 4 }, { x: 630, y: groundY - 20 }, { x: 715, y: groundY - 4 }],
-              caption: "DRAG HERE TO BRIDGE GAP 1"
-            },
-            {
-              points: [{ x: 1265, y: groundY - 4 }, { x: 1350, y: groundY - 22 }, { x: 1435, y: groundY - 4 }],
-              caption: "BRIDGE GAP 2 TO FINISH"
+              points: [
+                { x: 500, y: groundY - 4 },
+                { x: 640, y: groundY - 28 },
+                { x: 780, y: groundY - 28 },
+                { x: 920, y: groundY - 42 },
+                { x: 1060, y: groundY - 28 },
+                { x: 1200, y: groundY - 24 },
+                { x: finishX + 20, y: groundY - 4 }
+              ],
+              caption: "DRAW LINE TO CHALK FOR +CHALK!"
             }
           ],
           chalkBits: [
-            { id: 1, x: 360, y: groundY - 34, inkAmount: 135, isStar: false },
-            { id: 2, x: 605, y: groundY - 42, inkAmount: 135, isStar: false },
-            { id: 3, x: 655, y: groundY - 42, inkAmount: 135, isStar: false },
-            { id: 4, x: 990, y: groundY - 36, inkAmount: 135, isStar: false },
-            { id: 5, x: 1320, y: groundY - 46, inkAmount: 135, isStar: false },
-            { id: 6, x: 1350, y: groundY - 72, inkAmount: 220, isStar: true },
-            { id: 7, x: 1385, y: groundY - 46, inkAmount: 135, isStar: false }
+            { id: 1, x: 620, y: groundY - 28, inkAmount: 240, isStar: false },
+            { id: 2, x: 740, y: groundY - 28, inkAmount: 240, isStar: false },
+            { id: 3, x: 860, y: groundY - 36, inkAmount: 240, isStar: false },
+            { id: 4, x: 980, y: groundY - 42, inkAmount: 340, isStar: true },
+            { id: 5, x: 1100, y: groundY - 32, inkAmount: 240, isStar: false },
+            { id: 6, x: 1220, y: groundY - 26, inkAmount: 240, isStar: false }
           ],
           thumbtacks: [],
           scribblers: [],
           calloutScript: [
-            { triggerX: 730, type: "BLITZ" }
+            { triggerX: 760, type: "BLITZ" }
           ]
         };
       }
 
-      const platforms = [];
       const chalkBits = [];
-      const thumbtacks = [];
-      const scribblers = [];
       const calloutScript = [];
       const guideStrokes = [];
       const calloutTypes = ["JUMP", "BLITZ", "GRAVITY", "WIPEOUT"];
 
       const spawnX = 110;
       let currentY = groundY;
-      const startPlatformEnd = 460;
-      platforms.push({ startX: -80, endX: startPlatformEnd, topY: currentY, label: "START" });
+      const startPlatformEnd = 520;
+      const finishX = startPlatformEnd + cfg.levelLength;
+      const finishPlatformEnd = finishX + 260;
 
       let cursorX = startPlatformEnd;
-      const targetFinishX = startPlatformEnd + cfg.levelLength;
       let segmentIndex = 0;
+      const guidePts = [{ x: startPlatformEnd - 20, y: currentY - 4 }];
 
-      while (cursorX < targetFinishX - cfg.maxGap - 180) {
+      while (cursorX < finishX - cfg.minGap * 0.6) {
         const hashRatio = ((clamped * 37 + segmentIndex * 73) % 101) / 100;
-        const gapWidth = cfg.minGap + (cfg.maxGap - cfg.minGap) * hashRatio;
-        const prevY = currentY;
+        const stepX = cfg.minGap + (cfg.maxGap - cfg.minGap) * hashRatio;
+        cursorX += stepX;
+        if (cursorX >= finishX - 50) break;
 
-        const nextY = cfg.maxDeltaY <= 0.5
-          ? groundY
-          : Math.max(210, Math.min(455, currentY + Math.sin(clamped * 1.7 + segmentIndex * 2.3) * cfg.maxDeltaY));
+        const targetY = cfg.maxDeltaY <= 0.5
+          ? groundY - 28
+          : Math.max(160, Math.min(445, groundY - 30 + Math.sin(clamped * 1.3 + segmentIndex * 1.15) * cfg.maxDeltaY));
+        currentY = targetY;
 
-        const midGapX = cursorX + gapWidth * 0.5;
-        const arcPeakY = Math.min(prevY, nextY) - 48;
-
+        const isGoldStar = (segmentIndex % 4 === 2);
         chalkBits.push({
-          id: clamped * 100 + segmentIndex * 2,
-          x: midGapX - gapWidth * 0.18,
-          y: Math.max(150, arcPeakY),
-          inkAmount: 130,
-          isStar: false
-        });
-        chalkBits.push({
-          id: clamped * 100 + segmentIndex * 2 + 1,
-          x: midGapX + gapWidth * 0.18,
-          y: Math.max(140, arcPeakY - 18),
-          inkAmount: segmentIndex % 3 === 1 ? 220 : 130,
-          isStar: segmentIndex % 3 === 1
+          id: clamped * 100 + segmentIndex,
+          x: cursorX,
+          y: currentY,
+          inkAmount: isGoldStar ? 340 : 240,
+          isStar: isGoldStar
         });
 
-        if (clamped <= 3 && segmentIndex === 0) {
-          guideStrokes.push({
-            points: [
-              { x: cursorX - 15, y: prevY - 4 },
-              { x: midGapX, y: Math.min(prevY, nextY) - 24 },
-              { x: cursorX + gapWidth + 15, y: nextY - 4 }
-            ],
-            caption: "DRAW SHORT RAMP ACROSS GAP"
-          });
+        if (clamped <= 3 && guidePts.length < 6) {
+          guidePts.push({ x: cursorX, y: currentY });
         }
 
-        if (segmentIndex % 2 === 1) {
+        if (segmentIndex > 0 && segmentIndex % 5 === 0) {
           calloutScript.push({
-            triggerX: Math.max(spawnX + 120, cursorX - 85),
+            triggerX: Math.max(spawnX + 180, cursorX - 90),
             type: calloutTypes[(clamped + segmentIndex) % calloutTypes.length]
           });
         }
 
-        cursorX += gapWidth;
-        currentY = nextY;
-
-        const remainingToTarget = Math.max(220, targetFinishX - cursorX);
-        const platWidth = Math.min(remainingToTarget, 240 + ((clamped * 19 + segmentIndex * 61) % 150));
-
-        platforms.push({
-          startX: cursorX,
-          endX: cursorX + platWidth,
-          topY: currentY,
-          label: segmentIndex === 1 ? "CHECKPOINT" : undefined
-        });
-
-        if (clamped >= 2 && platWidth >= 250 && segmentIndex % 2 === 0) {
-          scribblers.push({
-            id: clamped * 1000 + segmentIndex,
-            x: cursorX + platWidth * 0.72,
-            y: currentY,
-            speed: 110 + Math.min(95, clamped * 1.8)
-          });
-        } else if (clamped >= 4 && platWidth >= 270 && segmentIndex % 2 === 1) {
-          thumbtacks.push({
-            x: cursorX + platWidth * 0.52,
-            y: currentY - 2,
-            count: clamped >= 25 ? 4 : 3,
-            spacing: 26
-          });
-        }
-
-        cursorX += platWidth;
         segmentIndex++;
       }
 
-      const finalGapRatio = ((clamped * 53) % 101) / 100;
-      const finalGap = cfg.minGap + (cfg.maxGap - cfg.minGap) * finalGapRatio;
       const finishTopY = cfg.maxDeltaY <= 0.5
         ? groundY
-        : Math.max(240, Math.min(440, currentY + Math.sin(clamped * 3.1) * (cfg.maxDeltaY * 0.65)));
+        : Math.max(230, Math.min(440, groundY + Math.sin(clamped * 2.7) * (cfg.maxDeltaY * 0.55)));
 
-      chalkBits.push({
-        id: clamped * 100 + 99,
-        x: cursorX + finalGap * 0.5,
-        y: Math.max(150, Math.min(currentY, finishTopY) - 56),
-        inkAmount: 240,
-        isStar: true
-      });
+      if (clamped <= 3 && guidePts.length >= 2) {
+        guidePts.push({ x: finishX + 15, y: finishTopY - 4 });
+        guideStrokes.push({
+          points: guidePts,
+          caption: "DRAW LINE TO CHALK FOR +CHALK!"
+        });
+      }
 
-      cursorX += finalGap;
-      const finishX = Math.max(cursorX + 160, startPlatformEnd + cfg.levelLength);
-      const finishPlatformEnd = finishX + 360;
-
-      platforms.push({
-        startX: cursorX,
-        endX: finishPlatformEnd,
-        topY: finishTopY,
-        label: "FINISH"
-      });
+      const platforms = [
+        { startX: 20, endX: startPlatformEnd, topY: groundY, label: "START" },
+        { startX: finishX - 30, endX: finishPlatformEnd, topY: finishTopY, label: "FINISH" }
+      ];
 
       return {
         levelNumber: clamped,
@@ -1204,7 +1154,7 @@
         runSpeed: cfg.runSpeed,
         spawnPosition: { x: spawnX, y: groundY },
         finishLineX: finishX,
-        levelEndX: finishPlatformEnd - 80,
+        levelEndX: finishPlatformEnd - 40,
         maxInkPerLevel: cfg.maxInkPerLevel,
         inkRechargeRate: cfg.inkRechargeRate,
         parInkUsage: cfg.parInkUsage,
@@ -1219,8 +1169,8 @@
         platforms,
         guideStrokes,
         chalkBits,
-        thumbtacks,
-        scribblers,
+        thumbtacks: [],
+        scribblers: [],
         calloutScript
       };
     }
@@ -1718,18 +1668,7 @@
         };
       }
 
-      let finishPlatform = null;
-      for (const p of level.platforms) {
-        if (level.finishLineX >= p.startX && level.finishLineX <= p.endX) {
-          finishPlatform = p;
-        }
-      }
-      if (!finishPlatform && level.platforms.length > 0) {
-        finishPlatform = level.platforms[level.platforms.length - 1];
-      }
-      const finishTopY = finishPlatform ? finishPlatform.topY : DEFAULT_GROUND_Y;
-
-      if (resolvedX >= level.finishLineX && resolvedY <= finishTopY + 18) {
+      if (resolvedX >= level.finishLineX && resolvedY < LAVA_SURFACE_Y - 10) {
         return {
           ...st,
           footX: resolvedX,
@@ -1929,8 +1868,8 @@
       }
       state.scribblers = nextScribblers;
 
-      // 5. Update Chalk Bits & Magnet Combo collection
-      const magnetRadius = (state.comboCount >= 2 || state.stickman.blitzTimer > 0) ? 135 : 52;
+      // 5. Update Chalk Bits & Magnet Combo collection (by stickman OR by player-drawn lines)
+      const magnetRadius = (state.comboCount >= 2 || state.stickman.blitzTimer > 0) ? 135 : 56;
       const bodyCenterX = state.stickman.footX;
       const bodyCenterY = state.stickman.footY - STICKMAN_HEIGHT * 0.5;
       let collectedBonus = 0;
@@ -1940,7 +1879,27 @@
         const dx = bodyCenterX - bit.x;
         const dy = bodyCenterY - bit.y;
         const d = Math.hypot(dx, dy);
-        if (d <= 38) {
+
+        let touchedByLine = false;
+        for (const line of activeLines) {
+          const pts = line.points || [];
+          if (pts.length === 1) {
+            if (Math.hypot(pts[0].x - bit.x, pts[0].y - bit.y) <= 48) {
+              touchedByLine = true;
+              break;
+            }
+          } else {
+            for (let i = 0; i < pts.length - 1; i++) {
+              if (distancePointToSegment(bit, pts[i], pts[i + 1]) <= 48) {
+                touchedByLine = true;
+                break;
+              }
+            }
+            if (touchedByLine) break;
+          }
+        }
+
+        if (d <= 42 || touchedByLine) {
           bit.collected = true;
           collectedBonus += bit.inkAmount;
           state.comboCount += 1;
@@ -1958,7 +1917,10 @@
       const inkRecharge = (state.activeStrokePoints.length === 0 && state.currentInk < state.level.maxInkPerLevel)
         ? state.level.inkRechargeRate * comboBonusMult * clampedDt
         : 0;
-      state.currentInk = Math.min(state.level.maxInkPerLevel, state.currentInk + inkRecharge + collectedBonus);
+      const maxCap = (collectedBonus > 0 || state.currentInk > state.level.maxInkPerLevel)
+        ? state.level.maxInkPerLevel * 1.5
+        : state.level.maxInkPerLevel;
+      state.currentInk = Math.min(maxCap, state.currentInk + inkRecharge + collectedBonus);
 
       // Camera follow matching GameViewModel.kt
       const visW = getVisibleWorldWidth();
@@ -2156,6 +2118,44 @@
       return true;
     }
 
+    function distancePointToSegment(p, a, b) {
+      const abx = b.x - a.x;
+      const aby = b.y - a.y;
+      const lenSq = abx * abx + aby * aby;
+      if (lenSq <= 0.0001) return Math.hypot(p.x - a.x, p.y - a.y);
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq));
+      const projX = a.x + t * abx;
+      const projY = a.y + t * aby;
+      return Math.hypot(p.x - projX, p.y - projY);
+    }
+
+    function collectChalkBitsAlongStrokePoints(strokePts) {
+      if (!strokePts || strokePts.length === 0) return 0;
+      let bonusInk = 0;
+      for (const bit of state.chalkBits) {
+        if (bit.collected) continue;
+        let touched = false;
+        if (strokePts.length === 1) {
+          touched = Math.hypot(strokePts[0].x - bit.x, strokePts[0].y - bit.y) <= 48;
+        } else {
+          for (let i = 0; i < strokePts.length - 1; i++) {
+            if (distancePointToSegment(bit, strokePts[i], strokePts[i + 1]) <= 48) {
+              touched = true;
+              break;
+            }
+          }
+        }
+        if (touched) {
+          bit.collected = true;
+          bonusInk += bit.inkAmount;
+          state.comboCount += 1;
+          sound.playPickup(bit.isStar);
+          spawnLineSparks([{ x: bit.x, y: bit.y }]);
+        }
+      }
+      return bonusInk;
+    }
+
     canvas.addEventListener('pointerdown', (e) => {
       if (state.screenState !== 'PLAYING') return;
       canvas.setPointerCapture(e.pointerId);
@@ -2170,6 +2170,10 @@
       if (state.currentInk <= MIN_POINT_DISTANCE) return;
       isDrawing = true;
       state.activeStrokePoints = [worldPt];
+      const bonus = collectChalkBitsAlongStrokePoints(state.activeStrokePoints);
+      if (bonus > 0) {
+        state.currentInk = Math.min(state.level.maxInkPerLevel * 1.5, state.currentInk + bonus);
+      }
       spawnPencilShavings(worldPt);
       sound.playScratch();
       updateHudDOM();
@@ -2217,7 +2221,8 @@
 
       pts.push(addedPt);
       const inkSpent = usedDist * toolCost;
-      state.currentInk = Math.max(0, state.currentInk - inkSpent);
+      const bonusChalkInk = collectChalkBitsAlongStrokePoints(pts);
+      state.currentInk = Math.max(0, Math.min(state.level.maxInkPerLevel * 1.5, state.currentInk - inkSpent + bonusChalkInk));
       state.totalInkDrawn += inkSpent;
       spawnPencilShavings(addedPt);
       sound.playScratch();
@@ -2458,61 +2463,31 @@
       const left = toScreenX(platform.startX);
       const right = toScreenX(platform.endX);
       const top = toScreenY(platform.topY);
-      const bottom = h;
 
-      ctx.fillStyle = '#252832';
-      ctx.fillRect(left, top, Math.max(1, right - left), Math.max(1, bottom - top));
-
-      // Diagonal graphite hatching inside platform
-      ctx.strokeStyle = 'rgba(216, 219, 208, 0.16)';
-      ctx.lineWidth = 2 * worldScale;
-      for (let hx = platform.startX; hx < platform.endX + 120; hx += 24) {
-        const sx1 = toScreenX(Math.max(platform.startX, Math.min(platform.endX, hx)));
-        const sy1 = top + 4 * worldScale;
-        const sx2 = toScreenX(Math.max(platform.startX, Math.min(platform.endX, hx - 90)));
-        const sy2 = Math.min(bottom, top + 110 * worldScale);
-        ctx.beginPath();
-        ctx.moveTo(sx1, sy1);
-        ctx.lineTo(sx2, sy2);
-        ctx.stroke();
-      }
-
-      // Double-sketched chalk outline along top and sides
-      ctx.strokeStyle = COLORS.ChalkWhite;
-      ctx.lineWidth = 4.2 * worldScale;
+      // Render only a sleek floating chalk line for Start / Finish foothold (no ground block!)
+      ctx.save();
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+
+      ctx.strokeStyle = 'rgba(64, 196, 255, 0.35)';
+      ctx.lineWidth = 9.0 * worldScale;
       ctx.beginPath();
-      ctx.moveTo(left, bottom);
-      ctx.lineTo(left, top);
+      ctx.moveTo(left, top);
       let cx = platform.startX;
       let idx = 0;
       while (cx < platform.endX) {
         const nextX = Math.min(platform.endX, cx + 35);
-        const jitterY = idx % 2 === 0 ? -1.4 : 1.4;
+        const jitterY = idx % 2 === 0 ? -1.2 : 1.2;
         ctx.lineTo(toScreenX(nextX), toScreenY(platform.topY + jitterY));
         cx = nextX;
         idx++;
       }
-      ctx.lineTo(right, bottom);
       ctx.stroke();
 
-      // Secondary sketchy pencil pass
-      ctx.strokeStyle = 'rgba(216, 219, 208, 0.65)';
-      ctx.lineWidth = 2 * worldScale;
-      ctx.beginPath();
-      ctx.moveTo(left + 2 * worldScale, top + 3.5 * worldScale);
-      ctx.lineTo(right - 2 * worldScale, top + 2.5 * worldScale);
+      ctx.strokeStyle = COLORS.ChalkWhite;
+      ctx.lineWidth = 5.0 * worldScale;
       ctx.stroke();
-
-      if (platform.label) {
-        ctx.save();
-        ctx.font = `800 ${Math.max(10, Math.round(12 * worldScale))}px monospace`;
-        ctx.fillStyle = 'rgba(216, 219, 208, 0.42)';
-        ctx.textAlign = 'left';
-        ctx.fillText(platform.label, left + 16 * worldScale, top + 28 * worldScale);
-        ctx.restore();
-      }
+      ctx.restore();
     }
 
     function drawFinishLine(finishX, groundY, toScreenX, toScreenY, worldScale, w) {
@@ -2606,15 +2581,20 @@
       const bob = Math.sin(state.lavaAnimTime * 3.2 + bit.id) * 3.5;
       const cx = toScreenX(bit.x);
       const cy = toScreenY(bit.y + bob);
-      if (cx < -40 || cx > w + 40) return;
+      if (cx < -50 || cx > w + 50) return;
+
+      const pulse = 0.85 + 0.15 * Math.sin(state.lavaAnimTime * 4.5 + bit.id);
 
       if (bit.isStar) {
-        ctx.fillStyle = 'rgba(255, 202, 40, 0.25)';
-        ctx.beginPath(); ctx.arc(cx, cy, 22 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255, 202, 40, ${0.28 * pulse})`;
+        ctx.beginPath(); ctx.arc(cx, cy, 28 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 202, 40, 0.55)';
+        ctx.lineWidth = 2 * worldScale;
+        ctx.beginPath(); ctx.arc(cx, cy, 22 * worldScale * pulse, 0, Math.PI * 2); ctx.stroke();
 
         ctx.beginPath();
         for (let i = 0; i < 10; i++) {
-          const r = (i % 2 === 0 ? 14 : 6.5) * worldScale;
+          const r = (i % 2 === 0 ? 15 : 7) * worldScale;
           const ang = -Math.PI / 2 + i * Math.PI / 5 + Math.sin(state.lavaAnimTime * 2) * 0.1;
           const px = cx + Math.cos(ang) * r;
           const py = cy + Math.sin(ang) * r;
@@ -2624,17 +2604,36 @@
         ctx.fillStyle = COLORS.LavaFlameYellow;
         ctx.fill();
         ctx.strokeStyle = COLORS.ChalkWhite;
-        ctx.lineWidth = 1.8 * worldScale;
+        ctx.lineWidth = 2.0 * worldScale;
         ctx.stroke();
       } else {
-        ctx.fillStyle = 'rgba(247, 248, 242, 0.2)';
-        ctx.beginPath(); ctx.arc(cx, cy, 15 * worldScale, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = COLORS.ChalkWhite;
-        ctx.lineWidth = 6.5 * worldScale;
+        ctx.fillStyle = `rgba(64, 196, 255, ${0.22 * pulse})`;
+        ctx.beginPath(); ctx.arc(cx, cy, 24 * worldScale, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(64, 196, 255, 0.65)';
+        ctx.lineWidth = 1.8 * worldScale;
+        ctx.beginPath(); ctx.arc(cx, cy, 19 * worldScale * pulse, 0, Math.PI * 2); ctx.stroke();
+
         ctx.lineCap = 'round';
+        ctx.strokeStyle = '#0F172A';
+        ctx.lineWidth = 10.5 * worldScale;
         ctx.beginPath();
-        ctx.moveTo(cx - 8 * worldScale, cy + 4 * worldScale);
-        ctx.lineTo(cx + 8 * worldScale, cy - 4 * worldScale);
+        ctx.moveTo(cx - 11 * worldScale, cy + 5.5 * worldScale);
+        ctx.lineTo(cx + 11 * worldScale, cy - 5.5 * worldScale);
+        ctx.stroke();
+
+        ctx.strokeStyle = COLORS.ChalkWhite;
+        ctx.lineWidth = 7.5 * worldScale;
+        ctx.beginPath();
+        ctx.moveTo(cx - 10 * worldScale, cy + 5 * worldScale);
+        ctx.lineTo(cx + 10 * worldScale, cy - 5 * worldScale);
+        ctx.stroke();
+
+        ctx.lineCap = 'butt';
+        ctx.strokeStyle = '#40C4FF';
+        ctx.lineWidth = 7.8 * worldScale;
+        ctx.beginPath();
+        ctx.moveTo(cx - 3 * worldScale, cy + 1.5 * worldScale);
+        ctx.lineTo(cx + 3 * worldScale, cy - 1.5 * worldScale);
         ctx.stroke();
       }
     }

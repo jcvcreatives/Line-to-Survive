@@ -88,18 +88,18 @@ object LevelCatalog {
     // 5. Max Ink Capacity & Regen Rate: tighter relative to gap size at higher levels
     val maxInkPerLevel = 1000f - t * 320f // 1000f at L1 -> 680f at L50
     val inkRechargeRate = 120f - t * 52f // 120f/s at L1 -> 68f/s at L50
-    val parInkUsage = maxInkPerLevel * 0.92f
-    val maxStrokeLength = 760f - t * 240f // Shorter, smarter ramps required
+    val parInkUsage = maxInkPerLevel * 1.6f
+    val maxStrokeLength = max(1800f, levelLength * 1.25f) // Allow continuous line drawing through chalk pickups
 
     // 6. Line Lifespan (Decay Timer): 5.0s in Level 1 -> 1.8s by Level 50
     val lineLifespan = 5.0f - t * (5.0f - 1.8f)
 
     val subtitle = when {
-      clampedLevel <= 3 -> "Flat platforms (0px elevation). Draw sturdy bridges before your chalk fades (${String.format("%.1f", lineLifespan)}s)!"
-      clampedLevel <= 10 -> "Platforms shift up to ±${maxDeltaY.toInt()}px! Use angled ramps and Bounce chalk."
-      clampedLevel <= 25 -> "Speed ${String.format("%.1f", baseSpeed)}x • Lines decay in ${String.format("%.1f", lineLifespan)}s. Sketch short launch ramps!"
-      clampedLevel <= 40 -> "Tight ink budget & wide ${minGap.toInt()}–${maxGap.toInt()}px gaps. Chain Chalk Bits & Turbo!"
-      else -> "Master tier! ±${maxDeltaY.toInt()}px cliffs, ${String.format("%.1f", baseSpeed)}x speed, and ${String.format("%.1f", lineLifespan)}s line decay!"
+      clampedLevel <= 3 -> "No ground platforms! Draw your line to the floating chalk (+CHALK) to reach the Finish!"
+      clampedLevel <= 10 -> "Chalk pickups shift up to ±${maxDeltaY.toInt()}px! Draw lines through floating chalk for extra ink."
+      clampedLevel <= 25 -> "Speed ${String.format("%.1f", baseSpeed)}x • Lines decay in ${String.format("%.1f", lineLifespan)}s. Connect chalk in mid-air!"
+      clampedLevel <= 40 -> "Wide ${minGap.toInt()}–${maxGap.toInt()}px chalk spacing over open lava. Chain every floating chalk!"
+      else -> "Master tier! ±${maxDeltaY.toInt()}px sky waves, ${String.format("%.1f", baseSpeed)}x speed, and ${String.format("%.1f", lineLifespan)}s line decay!"
     }
 
     return LevelConfig(
@@ -136,22 +136,23 @@ object LevelCatalog {
   }
 
   /**
-   * Level 1 (Homeroom Sketch) built with `getLevelConfig(1)` parameters:
-   * - Flat platforms (`deltaY = 0px`, `topY = 420f`)
-   * - Gap widths within `80px–140px` (`140px` each)
-   * - `baseSpeed = 3.0f` (`175f` world speed), `lineLifespan = 5.0s`
+   * Level 1 (Homeroom Sketch):
+   * - No intermediate platforms! Only the initial starter chalk foothold (`20f..520f`) and Finish gate (`1320f`).
+   * - Player draws their line to the floating Chalk pickups across the open lava sea for additional chalk level.
    */
   private fun createLevel1(): LevelDefinition {
     val cfg = getLevelConfig(1)
     val groundY = WorldConstants.DEFAULT_GROUND_Y
+    val startEndX = 520f
+    val finishX = startEndX + cfg.levelLength // 1320f
     return LevelDefinition(
       levelNumber = 1,
       title = cfg.levelTitle,
       subtitle = cfg.levelSubtitle,
       runSpeed = cfg.runSpeed,
       spawnPosition = Vec2(x = 110f, y = groundY),
-      finishLineX = 1560f,
-      levelEndX = 1880f,
+      finishLineX = finishX,
+      levelEndX = finishX + 260f,
       maxInkPerLevel = cfg.maxInkPerLevel,
       inkRechargeRate = cfg.inkRechargeRate,
       parInkUsage = cfg.parInkUsage,
@@ -165,20 +166,14 @@ object LevelCatalog {
       worldTitle = cfg.worldTitle,
       platforms = listOf(
         Platform(
-          startX = -80f,
-          endX = 560f,
+          startX = 20f,
+          endX = startEndX,
           topY = groundY,
           label = "START"
         ),
         Platform(
-          startX = 700f,
-          endX = 1280f,
-          topY = groundY,
-          label = "CHECKPOINT"
-        ),
-        Platform(
-          startX = 1420f,
-          endX = 2020f,
+          startX = finishX - 30f,
+          endX = finishX + 260f,
           topY = groundY,
           label = "FINISH"
         )
@@ -186,196 +181,124 @@ object LevelCatalog {
       guideStrokes = listOf(
         GuideStroke(
           points = listOf(
-            Vec2(545f, groundY - 4f),
-            Vec2(630f, groundY - 20f),
-            Vec2(715f, groundY - 4f)
+            Vec2(500f, groundY - 4f),
+            Vec2(640f, groundY - 28f),
+            Vec2(780f, groundY - 28f),
+            Vec2(920f, groundY - 42f),
+            Vec2(1060f, groundY - 28f),
+            Vec2(1200f, groundY - 24f),
+            Vec2(finishX + 20f, groundY - 4f)
           ),
-          caption = "DRAG HERE TO BRIDGE GAP 1"
-        ),
-        GuideStroke(
-          points = listOf(
-            Vec2(1265f, groundY - 4f),
-            Vec2(1350f, groundY - 22f),
-            Vec2(1435f, groundY - 4f)
-          ),
-          caption = "BRIDGE GAP 2 TO FINISH"
+          caption = "DRAW LINE TO CHALK FOR +CHALK!"
         )
       ),
       chalkBits = listOf(
-        ChalkBit(id = 1, x = 360f, y = groundY - 34f),
-        ChalkBit(id = 2, x = 605f, y = groundY - 42f),
-        ChalkBit(id = 3, x = 655f, y = groundY - 42f),
-        ChalkBit(id = 4, x = 990f, y = groundY - 36f),
-        ChalkBit(id = 5, x = 1320f, y = groundY - 46f),
-        ChalkBit(id = 6, x = 1350f, y = groundY - 72f, isStar = true, inkAmount = 220f),
-        ChalkBit(id = 7, x = 1385f, y = groundY - 46f)
+        ChalkBit(id = 1, x = 620f, y = groundY - 28f, inkAmount = 240f),
+        ChalkBit(id = 2, x = 740f, y = groundY - 28f, inkAmount = 240f),
+        ChalkBit(id = 3, x = 860f, y = groundY - 36f, inkAmount = 240f),
+        ChalkBit(id = 4, x = 980f, y = groundY - 42f, isStar = true, inkAmount = 340f),
+        ChalkBit(id = 5, x = 1100f, y = groundY - 32f, inkAmount = 240f),
+        ChalkBit(id = 6, x = 1220f, y = groundY - 26f, inkAmount = 240f)
       ),
       calloutScript = listOf(
-        ScriptedCallout(triggerX = 730f, type = CalloutMoveType.BLITZ)
+        ScriptedCallout(triggerX = 760f, type = CalloutMoveType.BLITZ)
       )
     )
   }
 
   /**
-   * Generates Levels 2..50 deterministically using `getLevelConfig(levelNumber)`.
+   * Generates Levels 2..50 deterministically using `getLevelConfig(levelNumber)`:
+   * - No intermediate platforms where the character runs — open sky over lava from Start foothold to Finish line!
+   * - Floating Chalk pickups (`ChalkBit`) are spaced by `[minGap, maxGap]` and vary vertically by `±maxDeltaY`
+   *   so the player draws their line from chalk to chalk for additional chalk level.
    */
   private fun createScaledLevel(levelNumber: Int): LevelDefinition {
     val cfg = getLevelConfig(levelNumber)
-    val platforms = mutableListOf<Platform>()
     val bits = mutableListOf<ChalkBit>()
-    val thumbtacks = mutableListOf<ThumbtackCluster>()
-    val scribblers = mutableListOf<ScribblerEnemy>()
     val callouts = mutableListOf<ScriptedCallout>()
     val guides = mutableListOf<GuideStroke>()
 
     val spawnX = 110f
     var currentY = WorldConstants.DEFAULT_GROUND_Y
-    val startPlatformEnd = 460f
-    platforms.add(
-      Platform(
-        startX = -80f,
-        endX = startPlatformEnd,
-        topY = currentY,
-        label = "START"
-      )
-    )
+    val startPlatformEnd = 520f
+    val finishX = startPlatformEnd + cfg.levelLength
+    val finishPlatformEnd = finishX + 260f
 
     var cursorX = startPlatformEnd
-    val targetFinishX = startPlatformEnd + cfg.levelLength
     var segmentIndex = 0
+    val guidePts = mutableListOf(Vec2(startPlatformEnd - 20f, currentY - 4f))
 
-    while (cursorX < targetFinishX - cfg.maxGap - 180f) {
-      // Deterministic gap width in [cfg.minGap, cfg.maxGap]
+    while (cursorX < finishX - cfg.minGap * 0.6f) {
+      // Deterministic spacing between floating chalk refills in [cfg.minGap, cfg.maxGap]
       val hashRatio = ((levelNumber * 37 + segmentIndex * 73) % 101) / 100f
-      val gapWidth = cfg.minGap + (cfg.maxGap - cfg.minGap) * hashRatio
-      val prevY = currentY
+      val stepX = cfg.minGap + (cfg.maxGap - cfg.minGap) * hashRatio
+      cursorX += stepX
+      if (cursorX >= finishX - 50f) break
 
       // Elevation variance deltaY: 0px for Levels 1..3, scaling up to ±160px by Level 50
-      val nextY = if (cfg.maxDeltaY <= 0.5f) {
-        WorldConstants.DEFAULT_GROUND_Y
+      val targetY = if (cfg.maxDeltaY <= 0.5f) {
+        WorldConstants.DEFAULT_GROUND_Y - 28f
       } else {
-        val wave = sin((levelNumber * 1.7f + segmentIndex * 2.3f).toDouble()).toFloat()
+        val wave = sin((levelNumber * 1.3f + segmentIndex * 1.15f).toDouble()).toFloat()
         val rawDelta = wave * cfg.maxDeltaY
-        (currentY + rawDelta).coerceIn(210f, 455f)
+        (WorldConstants.DEFAULT_GROUND_Y - 30f + rawDelta).coerceIn(160f, 445f)
       }
+      currentY = targetY
 
-      val midGapX = cursorX + gapWidth * 0.5f
-      val arcPeakY = min(prevY, nextY) - 48f
-
-      // Floating Chalk Bits & Gold Star over the gap
+      val isGoldStar = (segmentIndex % 4 == 2)
       bits.add(
         ChalkBit(
-          id = levelNumber * 100 + segmentIndex * 2,
-          x = midGapX - gapWidth * 0.18f,
-          y = arcPeakY.coerceAtLeast(150f),
-          inkAmount = 130f
-        )
-      )
-      bits.add(
-        ChalkBit(
-          id = levelNumber * 100 + segmentIndex * 2 + 1,
-          x = midGapX + gapWidth * 0.18f,
-          y = (arcPeakY - 18f).coerceAtLeast(140f),
-          inkAmount = if (segmentIndex % 3 == 1) 220f else 130f,
-          isStar = (segmentIndex % 3 == 1)
+          id = levelNumber * 100 + segmentIndex,
+          x = cursorX,
+          y = currentY,
+          inkAmount = if (isGoldStar) 340f else 240f,
+          isStar = isGoldStar
         )
       )
 
-      // Guide hint on Levels 2..3
-      if (levelNumber <= 3 && segmentIndex == 0) {
-        guides.add(
-          GuideStroke(
-            points = listOf(
-              Vec2(cursorX - 15f, prevY - 4f),
-              Vec2(midGapX, min(prevY, nextY) - 24f),
-              Vec2(cursorX + gapWidth + 15f, nextY - 4f)
-            ),
-            caption = "DRAW SHORT RAMP ACROSS GAP"
-          )
-        )
+      if (levelNumber <= 3 && guidePts.size < 6) {
+        guidePts.add(Vec2(cursorX, currentY))
       }
 
-      // Scripted Callout Move before select gaps
-      if (segmentIndex % 2 == 1) {
+      if (segmentIndex > 0 && segmentIndex % 5 == 0) {
         val moveType = CalloutMoveType.entries[(levelNumber + segmentIndex) % CalloutMoveType.entries.size]
         callouts.add(
           ScriptedCallout(
-            triggerX = (cursorX - 85f).coerceAtLeast(spawnX + 120f),
+            triggerX = (cursorX - 90f).coerceAtLeast(spawnX + 180f),
             type = moveType
           )
         )
       }
 
-      cursorX += gapWidth
-      currentY = nextY
-
-      val remainingToTarget = (targetFinishX - cursorX).coerceAtLeast(220f)
-      val platWidth = min(
-        remainingToTarget,
-        240f + ((levelNumber * 19 + segmentIndex * 61) % 150)
-      )
-
-      val platLabel = if (segmentIndex == 1) "CHECKPOINT" else null
-      platforms.add(
-        Platform(
-          startX = cursorX,
-          endX = cursorX + platWidth,
-          topY = currentY,
-          label = platLabel
-        )
-      )
-
-      // Add Red Scribblers & Thumbtack hazards on wider platforms from Level 2+
-      if (levelNumber >= 2 && platWidth >= 250f && segmentIndex % 2 == 0) {
-        scribblers.add(
-          ScribblerEnemy(
-            id = levelNumber * 1000 + segmentIndex,
-            x = cursorX + platWidth * 0.72f,
-            y = currentY,
-            speed = 110f + min(95f, levelNumber * 1.8f)
-          )
-        )
-      } else if (levelNumber >= 4 && platWidth >= 270f && segmentIndex % 2 == 1) {
-        thumbtacks.add(
-          ThumbtackCluster(
-            x = cursorX + platWidth * 0.52f,
-            y = currentY - 2f,
-            count = if (levelNumber >= 25) 4 else 3
-          )
-        )
-      }
-
-      cursorX += platWidth
       segmentIndex++
     }
 
-    // Final gap before Finish Platform
-    val finalGapRatio = ((levelNumber * 53) % 101) / 100f
-    val finalGap = cfg.minGap + (cfg.maxGap - cfg.minGap) * finalGapRatio
     val finishTopY = if (cfg.maxDeltaY <= 0.5f) {
       WorldConstants.DEFAULT_GROUND_Y
     } else {
-      val finalDelta = sin((levelNumber * 3.1).toDouble()).toFloat() * (cfg.maxDeltaY * 0.65f)
-      (currentY + finalDelta).coerceIn(240f, 440f)
+      val finalDelta = sin((levelNumber * 2.7).toDouble()).toFloat() * (cfg.maxDeltaY * 0.55f)
+      (WorldConstants.DEFAULT_GROUND_Y + finalDelta).coerceIn(230f, 440f)
     }
 
-    bits.add(
-      ChalkBit(
-        id = levelNumber * 100 + 99,
-        x = cursorX + finalGap * 0.5f,
-        y = (min(currentY, finishTopY) - 56f).coerceAtLeast(150f),
-        inkAmount = 240f,
-        isStar = true
+    if (levelNumber <= 3 && guidePts.size >= 2) {
+      guidePts.add(Vec2(finishX + 15f, finishTopY - 4f))
+      guides.add(
+        GuideStroke(
+          points = guidePts,
+          caption = "DRAW LINE TO CHALK FOR +CHALK!"
+        )
       )
-    )
+    }
 
-    cursorX += finalGap
-    val finishX = max(cursorX + 160f, startPlatformEnd + cfg.levelLength)
-    val finishPlatformEnd = finishX + 360f
-
-    platforms.add(
+    val platforms = listOf(
       Platform(
-        startX = cursorX,
+        startX = 20f,
+        endX = startPlatformEnd,
+        topY = WorldConstants.DEFAULT_GROUND_Y,
+        label = "START"
+      ),
+      Platform(
+        startX = finishX - 30f,
         endX = finishPlatformEnd,
         topY = finishTopY,
         label = "FINISH"
@@ -389,7 +312,7 @@ object LevelCatalog {
       runSpeed = cfg.runSpeed,
       spawnPosition = Vec2(x = spawnX, y = WorldConstants.DEFAULT_GROUND_Y),
       finishLineX = finishX,
-      levelEndX = finishPlatformEnd - 80f,
+      levelEndX = finishPlatformEnd - 40f,
       maxInkPerLevel = cfg.maxInkPerLevel,
       inkRechargeRate = cfg.inkRechargeRate,
       parInkUsage = cfg.parInkUsage,
@@ -404,8 +327,8 @@ object LevelCatalog {
       platforms = platforms,
       guideStrokes = guides,
       chalkBits = bits,
-      thumbtacks = thumbtacks,
-      scribblers = scribblers,
+      thumbtacks = emptyList(),
+      scribblers = emptyList(),
       calloutScript = callouts
     )
   }

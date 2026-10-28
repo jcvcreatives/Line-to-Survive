@@ -293,14 +293,29 @@ class GameViewModel(
       y = worldPoint.y.coerceIn(4f, WorldConstants.WORLD_HEIGHT - 4f)
     )
 
+    val (bitsAfterStart, collectedAtStart) = PhysicsEngine.collectChalkBitsAlongStroke(
+      bits = state.chalkBits,
+      strokePoints = listOf(clamped)
+    )
+    val startBonusInk = collectedAtStart.sumOf { it.inkAmount.toDouble() }.toFloat()
+    val startSparkParticles = if (collectedAtStart.isNotEmpty()) {
+      soundManager.playLineCompleted()
+      PhysicsEngine.createLineCompletedParticles(collectedAtStart.map { Vec2(it.x, it.y) })
+    } else {
+      emptyList()
+    }
+
     soundManager.playDrawingScratch()
-    val tipParticles = PhysicsEngine.createPencilTipParticles(clamped, count = 1)
+    val tipParticles = PhysicsEngine.createPencilTipParticles(clamped, count = 1) + startSparkParticles
 
     updateState {
       it.copy(
         activeStrokePoints = listOf(clamped),
         activeStrokeRemainingRatio = 1f,
-        sketchParticles = (it.sketchParticles + tipParticles).takeLast(30)
+        currentInk = (it.currentInk + startBonusInk).coerceAtMost(it.levelDefinition.maxInkPerLevel * 1.5f),
+        chalkBits = bitsAfterStart,
+        comboCount = it.comboCount + collectedAtStart.size,
+        sketchParticles = (it.sketchParticles + tipParticles).takeLast(45)
       )
     }
   }
@@ -308,6 +323,7 @@ class GameViewModel(
   /**
    * Appends a dragged finger point in world coordinates. Automatically solidifies the line
    * if the player reaches the maximum drawing length per attempt or depletes the ink meter.
+   * Drawing the line to floating Chalk pickups immediately refills additional chalk level!
    */
   fun onDrawMove(worldPoint: Vec2) {
     val state = _uiState.value
@@ -344,15 +360,31 @@ class GameViewModel(
     val strokeLen = PhysicsEngine.calculatePolylineLength(updatedPoints)
     val deltaLen = (strokeLen - prevStrokeLen).coerceAtLeast(0f)
     val deltaInk = deltaLen * toolCostMult
-    val newInk = (state.currentInk - deltaInk).coerceAtLeast(0f)
+
+    // Check if the player's drawn line reached any floating Chalk pickups for additional chalk level
+    val (updatedBits, newlyCollectedBits) = PhysicsEngine.collectChalkBitsAlongStroke(
+      bits = state.chalkBits,
+      strokePoints = updatedPoints
+    )
+    val bonusChalkInk = newlyCollectedBits.sumOf { it.inkAmount.toDouble() }.toFloat()
+
+    val newInk = (state.currentInk - deltaInk + bonusChalkInk)
+      .coerceIn(0f, state.levelDefinition.maxInkPerLevel * 1.5f)
 
     val remainingStrokeRatio = ((maxStrokeLen - strokeLen) / maxStrokeLen).coerceIn(0f, 1f)
 
-    val tipParticles = if (addedNewPoint) {
-      soundManager.playDrawingScratch()
-      PhysicsEngine.createPencilTipParticles(updatedPoints.last(), count = 1)
+    val pickupSparks = if (newlyCollectedBits.isNotEmpty()) {
+      soundManager.playLineCompleted()
+      PhysicsEngine.createLineCompletedParticles(newlyCollectedBits.map { Vec2(it.x, it.y) })
     } else {
       emptyList()
+    }
+
+    val tipParticles = if (addedNewPoint) {
+      soundManager.playDrawingScratch()
+      PhysicsEngine.createPencilTipParticles(updatedPoints.last(), count = 1) + pickupSparks
+    } else {
+      pickupSparks
     }
 
     updateState {
@@ -361,7 +393,9 @@ class GameViewModel(
         activeStrokeRemainingRatio = remainingStrokeRatio,
         currentInk = newInk,
         totalInkDrawn = it.totalInkDrawn + deltaInk,
-        sketchParticles = (it.sketchParticles + tipParticles).takeLast(30)
+        chalkBits = updatedBits,
+        comboCount = it.comboCount + newlyCollectedBits.size,
+        sketchParticles = (it.sketchParticles + tipParticles).takeLast(45)
       )
     }
 
@@ -604,12 +638,13 @@ class GameViewModel(
       dt = clampedDt
     )
 
-    // 5. Update Chalk Bits & Magnet Combo collection
+    // 5. Update Chalk Bits & Magnet Combo collection (by stickman OR by player-drawn lines)
     val (nextChalkBits, newlyCollectedBits) = PhysicsEngine.updateChalkBits(
       bits = state.chalkBits,
       stickman = stickmanAfterEnemies,
       comboCount = state.comboCount,
-      dt = clampedDt
+      dt = clampedDt,
+      activeLines = activeLines
     )
 
     val collectedInkBonus = newlyCollectedBits.sumOf { it.inkAmount.toDouble() }.toFloat()
@@ -628,7 +663,12 @@ class GameViewModel(
     } else {
       0f
     }
-    val updatedInk = (currentInk + inkRecharge + collectedInkBonus).coerceAtMost(level.maxInkPerLevel)
+    val maxInkCap = if (collectedInkBonus > 0f || currentInk > level.maxInkPerLevel) {
+      level.maxInkPerLevel * 1.5f
+    } else {
+      level.maxInkPerLevel
+    }
+    val updatedInk = (currentInk + inkRecharge + collectedInkBonus).coerceAtMost(maxInkCap)
 
     val nextSketchParticles = PhysicsEngine.updateSketchParticles(
       existing = state.sketchParticles,
