@@ -451,7 +451,7 @@ object PhysicsEngine {
       )
     }
 
-    val phaseAdvance = if (grounded) dt * (vx / 20.5f) else dt * (vx / 23.5f)
+    val phaseAdvance = if (grounded) dt * (vx / 22.0f) else dt * 6.0f
 
     return state.copy(
       footX = newX,

@@ -1555,7 +1555,7 @@
         };
       }
 
-      const phaseAdvance = grounded ? dt * (vx / 20.5) : dt * (vx / 23.5);
+      const phaseAdvance = grounded ? dt * (vx / 22.0) : dt * 6.0;
       return {
         ...st,
         footX: newX,
@@ -2584,48 +2584,8 @@
     }
 
     // =========================================================================
-    // 60 FPS CONTINUOUS HARMONIC RUNNING KINEMATICS (Matches Reference Video)
+    // EXACT 16-JOINT CHALK-RUNNER RIG & KINEMATICS (From Claude Artifact)
     // =========================================================================
-    // Instead of stepped keyframes that freeze or snap between frames, the
-    // runner uses C-infinity smooth trigonometric curves evaluated at 60 FPS:
-    // - Full stride cycle = 2*PI (~0.64s at base speed, 1 step = 0.32s).
-    // - Thighs swing smoothly from -0.66 rad (rear push-off) to +0.86 rad (front high knee).
-    // - Knees stay nearly straight (-0.10 rad) during front strike & rear extension,
-    //   and fold smoothly up to -1.26 rad (heel-to-glute figure-4 recovery) as the
-    //   leg swings forward from the rear.
-    // - Supporting foot is dynamically ground-anchored so feet never sink or float.
-    function computeSmoothLegAngles(legPhase, airFactor, vyNorm, crouchFactor) {
-      const s = Math.sin(legPhase);
-      const runThigh = s * 0.76 + 0.10;
-      const foldWave = (1 - Math.sin(legPhase - 0.52)) * 0.5;
-      const runKnee = -0.10 - (foldWave * foldWave) * 1.16;
-
-      const airThigh = runThigh * 0.65 + (s >= 0 ? 0.36 : -0.26) - vyNorm * 0.12;
-      const airKnee = s >= 0 ? -0.92 : -0.48;
-
-      const lerp = (a, b, t) => a + (b - a) * t;
-      let thigh = lerp(runThigh, airThigh, airFactor);
-      let knee = lerp(runKnee, airKnee, airFactor);
-
-      thigh += crouchFactor * 0.28;
-      knee -= crouchFactor * 0.42;
-      return { thigh, knee };
-    }
-
-    function computeSmoothArmAngles(armPhase, airFactor, crouchFactor) {
-      const s = Math.sin(armPhase);
-      const runShoulder = s * 0.88 - 0.08;
-      const runElbow = 0.88 + (s + 1) * 0.24;
-
-      const airShoulder = runShoulder * 0.72 - 0.22;
-      const airElbow = 1.05;
-
-      const lerp = (a, b, t) => a + (b - a) * t;
-      const shoulder = lerp(runShoulder, airShoulder, airFactor) - crouchFactor * 0.25;
-      const elbow = lerp(runElbow, airElbow, airFactor) + crouchFactor * 0.22;
-      return { shoulder, elbow };
-    }
-
     function drawAnimatedStickman(stickman, toScreenX, toScreenY, worldScale) {
       const phase = stickman.runCyclePhase || 0;
       const animTime = state.lavaAnimTime || 0;
@@ -2907,27 +2867,59 @@
         }
       }
 
+      function drawCartoonCurve(x1, y1, cx, cy, x2, y2, fillColor, thicknessWorld, pass) {
+        const sx1 = toScreenX(x1), sy1 = toScreenY(y1);
+        const scx = toScreenX(cx), scy = toScreenY(cy);
+        const sx2 = toScreenX(x2), sy2 = toScreenY(y2);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (pass === 0) {
+          ctx.strokeStyle = 'rgba(183, 28, 28, 0.28)';
+          ctx.lineWidth = (thicknessWorld + 7.2) * worldScale;
+        } else if (pass === 1) {
+          ctx.strokeStyle = outlineBlack;
+          ctx.lineWidth = (thicknessWorld + 4.6) * worldScale;
+        } else {
+          ctx.strokeStyle = fillColor;
+          ctx.lineWidth = thicknessWorld * worldScale;
+        }
+        ctx.beginPath();
+        ctx.moveTo(sx1, sy1);
+        ctx.quadraticCurveTo(scx, scy, sx2, sy2);
+        ctx.stroke();
+      }
+
       function renderCartoonBodyPose(
         hipWX, hipWY, shWX, shWY, hdWX, hdWY,
         frontKnee, frontAnkle, backKnee, backAnkle,
         frontElbow, frontHand, backElbow, backHand,
-        faceDirX, expression, hasHair, headTilt, windDrag
+        faceDirX, expression, hasHair, headTilt, windDrag,
+        midWX = (hipWX + shWX) * 0.5, midWY = (hipWY + shWY) * 0.5,
+        nckWX = shWX, nckWY = shWY, ntpWX = shWX, ntpWY = shWY,
+        frontToe = null, backToe = null
       ) {
         for (let pass = 0; pass <= 2; pass++) {
-          drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.8, pass);
-          drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.4, pass, 3.0);
-          drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.6, pass);
-          drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 5.0, pass, 3.2);
+          drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.4, pass);
+          drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.0, pass, 2.4);
+          drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.0, pass);
+          drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 4.5, pass, backToe ? 0 : 2.8);
+          if (backToe) {
+            drawCartoonSegment(backAnkle.x, backAnkle.y, backToe.x, backToe.y, backLimbGrey, 4.2, pass, 2.2);
+          }
         }
         for (let pass = 0; pass <= 2; pass++) {
-          drawCartoonSegment(hipWX, hipWY, shWX, shWY, bodyWhite, 7.2, pass);
-          drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.8, pass);
-          drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 5.2, pass, 3.4);
+          drawCartoonCurve(hipWX, hipWY, midWX, midWY, nckWX, nckWY, bodyWhite, 6.4, pass);
+          drawCartoonSegment(nckWX, nckWY, ntpWX, ntpWY, bodyWhite, 5.4, pass);
+          drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.2, pass);
+          drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 4.7, pass, frontToe ? 0 : 3.0);
+          if (frontToe) {
+            drawCartoonSegment(frontAnkle.x, frontAnkle.y, frontToe.x, frontToe.y, bodyWhite, 4.4, pass, 2.4);
+          }
         }
         drawCartoonHeadAndFace(hdWX, hdWY, faceDirX, expression, hasHair, headTilt, windDrag);
         for (let pass = 0; pass <= 2; pass++) {
-          drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 5.0, pass);
-          drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.6, pass, 3.2);
+          drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 4.6, pass);
+          drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.2, pass, 2.6);
         }
       }
 
@@ -3043,118 +3035,193 @@
       }
 
       // =======================================================================
-      // ACTIVE GAMEPLAY: 60 FPS CONTINUOUS HARMONIC RUN, JUMP, FALL & LANDING
+      // EXACT 16-JOINT CHALK-RUNNER RIG & KINEMATICS (From Claude Artifact)
       // =======================================================================
-      const isBoosted = stickman.boostTimer > 0 || stickman.blitzTimer > 0;
+      const THIGH = 14, SHIN = 14, UPPER = 11, FORE = 10.5, TORSO = 21, NECK = 3, HEAD_R = 9.2, TOE = 4;
+      const HIP = 0, MID = 1, NCK = 2, NTP = 3, HED = 4, SHO = 5,
+            K1 = 6, F1 = 7, T1 = 8, K2 = 9, F2 = 10, T2 = 11, E1 = 12, H1 = 13, E2 = 14, H2 = 15, NJ = 16;
 
-      // Smooth continuous blend factors (no 1-frame boolean snaps!)
-      const airFactor = stickman.isGrounded ? 0 : Math.min(1, Math.max(0, Math.abs(stickman.velocityY) / 240));
-      const vyNorm = Math.min(1, Math.max(-1, stickman.velocityY / 420));
-      const crouchFactor = stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0
-        ? Math.sin(((stickman.landingSquashTimer || 0) / 0.26) * Math.PI)
-        : 0;
-      const expression = isBoosted ? 1 : 0;
+      const kpStretch = [0, -31, 0.08, -0.6, -0.3, 0.6, 1.0, -0.42, 0.2, 2.5, 0.1, 2.3, 0.35, 0.3, -0.5];
+      const kpTuck = [0, -33, 0.22, 1.4, -0.05, 1.35, 1.7, -0.45, 1.05, 1.75, 0.35, -1.25, -0.3, -0.2, -0.3];
+      const kpReach = [0, -30.5, 0.1, 0.4, 0.1, 0.5, 0.6, -0.08, 0.3, 2.3, 0.45, -2.35, -0.35, 0.2, 0.2];
 
-      // Evaluate 60 FPS continuous harmonic joint angles for Front & Back legs (PI out of phase)
-      const frontLeg = computeSmoothLegAngles(phase, airFactor, vyNorm, crouchFactor);
-      const backLeg = computeSmoothLegAngles(phase + Math.PI, airFactor, vyNorm, crouchFactor);
+      const clamp01 = x => Math.max(0, Math.min(1, x));
+      const smooth01 = x => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+      const lerp = (a, b, t) => a + (b - a) * t;
 
-      // Opposite arm swing (Front Arm paired with Back Leg, Back Arm paired with Front Leg)
-      const frontArm = computeSmoothArmAngles(phase + Math.PI, airFactor, crouchFactor);
-      const backArm = computeSmoothArmAngles(phase, airFactor, crouchFactor);
-
-      const thighLen = 13.8, shinLen = 13.8, upperArmLen = 11.6, foreArmLen = 11.4;
-
-      // Relative leg positions from hip
-      const fKneRelX = Math.sin(frontLeg.thigh) * thighLen;
-      const fKneRelY = Math.cos(frontLeg.thigh) * thighLen;
-      const fShnAng = frontLeg.thigh + frontLeg.knee;
-      const fAnkRelX = fKneRelX + Math.sin(fShnAng) * shinLen;
-      const fAnkRelY = fKneRelY + Math.cos(fShnAng) * shinLen;
-
-      const bKneRelX = Math.sin(backLeg.thigh) * thighLen;
-      const bKneRelY = Math.cos(backLeg.thigh) * thighLen;
-      const bShnAng = backLeg.thigh + backLeg.knee;
-      const bAnkRelX = bKneRelX + Math.sin(bShnAng) * shinLen;
-      const bAnkRelY = bKneRelY + Math.cos(bShnAng) * shinLen;
-
-      // Ground-anchored hip height: lowest foot touches ground during stance, with smooth flight bounce at peak split
-      const maxLegReachY = Math.max(fAnkRelY, bAnkRelY);
-      const strideFlightBounce = (1 - airFactor) * Math.abs(Math.sin(phase)) * 3.4;
-      const crouchDrop = crouchFactor * 3.5;
-
-      const hipWX = stickman.footX - 1.5;
-      const hipWY = stickman.footY - maxLegReachY - strideFlightBounce + crouchDrop;
-
-      // Balanced athletic forward lean matching the video (~16 degrees = 0.27 rad)
-      const speedRatio = Math.min(1.35, Math.max(0.8, stickman.velocityX / BASE_RUN_SPEED));
-      const baseTorsoTilt = 0.25 * speedRatio + (isBoosted ? 0.08 : 0) + crouchFactor * 0.14;
-      const slopePitch = stickman.isGrounded
-        ? Math.max(-0.35, Math.min(0.35, stickman.slopeRadians * 0.50))
-        : Math.max(-0.22, Math.min(0.26, vyNorm * 0.22));
-      const totalTorsoAngle = baseTorsoTilt + slopePitch + Math.sin(phase * 2) * 0.025;
-
-      const torsoLen = 21.0;
-      const shWX = hipWX + Math.sin(totalTorsoAngle) * torsoLen;
-      const shWY = hipWY - Math.cos(totalTorsoAngle) * torsoLen;
-      const hdWX = shWX + Math.sin(totalTorsoAngle * 0.65) * 9.5 + 1.2;
-      const hdWY = shWY - Math.cos(totalTorsoAngle * 0.65) * 10.5 - 1.5;
-
-      const auraIntensity = isBoosted ? 1.38 : (crouchFactor > 0.2 ? 1.25 : 1.02);
-      drawFieryFightingAura(stickman.footX, stickman.footY, auraIntensity, -8, isBoosted);
-
-      if (stickman.isGrounded) {
-        for (let s = 0; s <= 2; s++) {
-          const streakPhase = (animTime * 3.2 + s * 0.33) % 1;
-          const sx = toScreenX(stickman.footX - 16 - streakPhase * 32 - s * 8);
-          const sy = toScreenY(stickman.footY - 12 - s * 15);
-          ctx.strokeStyle = s % 2 === 0
-            ? `rgba(255, 109, 0, ${0.50 * (1 - streakPhase)})`
-            : `rgba(255, 255, 255, ${0.50 * (1 - streakPhase)})`;
-          ctx.lineWidth = 2.0 * worldScale;
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(sx - (16 + s * 5) * worldScale, sy);
-          ctx.stroke();
-        }
-        const stepWave = ((phase % Math.PI) + Math.PI) % Math.PI;
-        const puffAlpha = Math.max(0, Math.min(1, 1 - (stepWave / Math.PI)));
-        const dustX = toScreenX(stickman.footX - 12 - (1 - puffAlpha) * 20);
-        const dustY = toScreenY(stickman.footY - 3.5);
-        ctx.fillStyle = `rgba(141, 123, 104, ${0.58 * puffAlpha})`;
-        ctx.beginPath(); ctx.arc(dustX, dustY, (4.0 + (1 - puffAlpha) * 4.5) * worldScale, 0, Math.PI * 2); ctx.fill();
-        if (crouchFactor > 0.25) {
-          ctx.fillStyle = `rgba(255, 234, 0, ${crouchFactor * 0.85})`;
-          ctx.beginPath(); ctx.arc(toScreenX(stickman.footX + 6), toScreenY(stickman.footY - 2), 6.5 * worldScale, 0, Math.PI * 2); ctx.fill();
+      function runK(P, p, dash) {
+        const thA = dash ? 0.85 : 0.66, fold = dash ? 2.0 : 1.7, armA = dash ? 1.05 : 0.85;
+        P[0] = 0; P[1] = (dash ? -25.6 : -26.3) - (dash ? 2.6 : 3.4) * Math.abs(Math.sin(p));
+        P[2] = (dash ? 0.5 : 0.24) + 0.04 * Math.cos(2 * p); P[3] = dash ? 2.0 : 1.2;
+        P[4] = (dash ? -0.38 : -0.16) + 0.06 * Math.sin(2 * p - 0.8);
+        for (let side = 0; side < 2; side++) {
+          const q = p + side * Math.PI, sq = Math.sin(q), cq = Math.cos(q), sw = Math.max(0, Math.cos(q + 0.15));
+          P[5 + side * 2] = 0.05 + thA * sq;
+          P[6 + side * 2] = 0.2 + fold * sw * sw + 0.35 * Math.max(0, -cq);
+          P[9 + side * 2] = 0.1 - armA * sq;
+          P[10 + side * 2] = 1.5 - 0.3 * sq;
+          P[13 + side] = 0.25 * Math.max(0, -cq) - 0.45 * sw;
         }
       }
 
-      const fKneX = hipWX + fKneRelX, fKneY = hipWY + fKneRelY;
-      const fAnkX = hipWX + fAnkRelX, fAnkY = hipWY + fAnkRelY;
-      const bKneX = hipWX + bKneRelX, bKneY = hipWY + bKneRelY;
-      const bAnkX = hipWX + bAnkRelX, bAnkY = hipWY + bAnkRelY;
+      const setJ = (J, i, x, y) => { J[i * 2] = x; J[i * 2 + 1] = y; };
+      const limbJ = (J, r, m, e, a1, a2, l1, l2) => {
+        const x = J[r * 2] + Math.sin(a1) * l1, y = J[r * 2 + 1] + Math.cos(a1) * l1;
+        setJ(J, m, x, y); setJ(J, e, x + Math.sin(a2) * l2, y + Math.cos(a2) * l2);
+      };
+      const toeJ = (J, f, t, a) => setJ(J, t, J[f * 2] + Math.sin(a) * TOE, J[f * 2 + 1] + Math.cos(a) * TOE);
 
-      const fElbX = shWX + Math.sin(frontArm.shoulder) * upperArmLen;
-      const fElbY = shWY + Math.cos(frontArm.shoulder) * upperArmLen;
-      const fForAng = frontArm.shoulder + frontArm.elbow;
-      const fHndX = fElbX + Math.sin(fForAng) * foreArmLen;
-      const fHndY = fElbY + Math.cos(fForAng) * foreArmLen;
+      function buildRig(pose, ph, x, y, facing = 1, applySquashAndSlope = true) {
+        const K = new Float64Array(15);
+        let sx = 1, sy = 1, px = 0, py = 0, rot = 0, dy = 0;
 
-      const bElbX = shWX + Math.sin(backArm.shoulder) * upperArmLen;
-      const bElbY = shWY + Math.cos(backArm.shoulder) * upperArmLen;
-      const bForAng = backArm.shoulder + backArm.elbow;
-      const bHndX = bElbX + Math.sin(bForAng) * foreArmLen;
-      const bHndY = bElbY + Math.cos(bForAng) * foreArmLen;
+        if (pose === 'dash' || pose === 'run') {
+          runK(K, ph, pose === 'dash');
+        } else if (pose === 'jump') {
+          const k = clamp01(-stickman.velocityY / 520), sm = smooth01(k);
+          for (let i = 0; i < 15; i++) K[i] = lerp(kpTuck[i], kpStretch[i], sm);
+          px = K[0]; py = K[1]; rot = -0.14 * k;
+          const st = clamp01((-stickman.velocityY - 340) / 240);
+          sy = 1 + 0.16 * st; sx = 1 - 0.08 * st;
+        } else if (pose === 'fall') {
+          const k = clamp01(stickman.velocityY / 480), sm = smooth01(k), fl = Math.sin(animTime * 17) * 0.24 * k;
+          for (let i = 0; i < 15; i++) K[i] = lerp(kpTuck[i], kpReach[i], sm);
+          K[9] += fl; K[11] -= fl; K[10] += fl * 0.5;
+          px = K[0]; py = K[1]; rot = 0.08 * k;
+        } else if (pose === 'cheer') {
+          const hop = Math.abs(Math.sin(animTime * 6.5)), land = Math.pow(1 - hop, 6), pump = 0.18 * Math.sin(animTime * 13);
+          K[0] = 0; K[1] = -28.5; K[2] = 0.05; K[3] = -1.5; K[4] = -0.12;
+          K[5] = 0.25 + 0.6 * hop; K[6] = 0.25 + 0.9 * hop; K[7] = -0.15 + 0.45 * hop; K[8] = 0.2 + 0.8 * hop;
+          K[9] = 2.2 + pump; K[10] = 0.35; K[11] = -1.95 - pump; K[12] = -0.5; K[13] = K[14] = 0.3;
+          dy = -hop * 11; sy = 1 - 0.14 * land; sx = 1 + 0.09 * land;
+        }
 
-      const windDrag = Math.max(-1.25, Math.min(-0.35, -stickman.velocityX / 190)) + Math.max(-0.35, Math.min(0.4, vyNorm * 0.45));
+        if (applySquashAndSlope) {
+          if (stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0) {
+            const u = clamp01((stickman.landingSquashTimer || 0) / 0.26);
+            const s = u * u * 0.85;
+            sy *= 1 - 0.24 * s; sx *= 1 + 0.15 * s; K[2] += 0.15 * s; K[9] -= 0.3 * s; K[11] += 0.3 * s;
+          }
+          if (stickman.isGrounded) {
+            rot += Math.max(-0.35, Math.min(0.35, (stickman.slopeRadians || 0) * 0.45));
+          }
+        }
+
+        const J = new Float64Array(NJ * 2);
+        const hx = K[0], hy = K[1], lean = K[2], curl = K[3];
+        const ux = Math.sin(lean), uy = -Math.cos(lean), bx = -Math.cos(lean), by = -Math.sin(lean);
+        const nx = hx + ux * TORSO, ny = hy + uy * TORSO;
+        const mx = hx + ux * TORSO * 0.5 + bx * curl, my = hy + uy * TORSO * 0.5 + by * curl;
+        setJ(J, HIP, hx, hy); setJ(J, MID, mx, my); setJ(J, NCK, nx, ny);
+        const t = 0.84, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+        setJ(J, SHO, a * hx + b * mx + c * nx, a * hy + b * my + c * ny);
+        const ha = lean + K[4], hdx = Math.sin(ha), hdy = -Math.cos(ha);
+        setJ(J, NTP, nx + hdx * NECK, ny + hdy * NECK);
+        setJ(J, HED, nx + hdx * (NECK + HEAD_R), ny + hdy * (NECK + HEAD_R));
+        limbJ(J, HIP, K1, F1, K[5], K[5] - K[6], THIGH, SHIN); toeJ(J, F1, T1, K[5] - K[6] + 1.45 + K[13]);
+        limbJ(J, HIP, K2, F2, K[7], K[7] - K[8], THIGH, SHIN); toeJ(J, F2, T2, K[7] - K[8] + 1.45 + K[14]);
+        limbJ(J, SHO, E1, H1, K[9], K[9] + K[10], UPPER, FORE);
+        limbJ(J, SHO, E2, H2, K[11], K[11] + K[12], UPPER, FORE);
+
+        const cosR = Math.cos(rot), sinR = Math.sin(rot);
+        for (let i = 0; i < NJ * 2; i += 2) {
+          const lx = (J[i] - px) * sx, ly = (J[i + 1] - py) * sy;
+          J[i] = x + facing * (px + lx * cosR - ly * sinR);
+          J[i + 1] = y + py + lx * sinR + ly * cosR + dy;
+        }
+        return { J, faceAng: K[2] + K[4] + rot };
+      }
+
+      const isBoosted = stickman.boostTimer > 0 || stickman.blitzTimer > 0;
+      const pose = stickman.hasReachedFinish
+        ? 'cheer'
+        : (!stickman.isGrounded ? (stickman.velocityY < -40 ? 'jump' : 'fall') : (isBoosted ? 'dash' : 'run'));
+
+      // 1. Roaring 60 FPS Fiery Red-Orange Aura
+      const auraIntensity = isBoosted ? 1.40 : ((stickman.landingSquashTimer || 0) > 0.05 ? 1.25 : (!stickman.isGrounded ? 1.12 : 1.0));
+      drawFieryFightingAura(stickman.footX, stickman.footY, auraIntensity, -8, isBoosted);
+
+      // 2. Chalk Dust & Air Trail Effects from art-hero.js
+      const TAU = Math.PI * 2;
+      if (pose === 'jump' || pose === 'fall') {
+        for (let i = 1; i <= 7; i++) {
+          const dtBack = 0.032 * i;
+          const tx = stickman.footX - stickman.velocityX * dtBack;
+          const ty = stickman.footY - 30 - stickman.velocityY * dtBack + 0.5 * GRAVITY * dtBack * dtBack;
+          const r = (2.2 * (1 - i / 8) + 0.4) * worldScale;
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.48 * (1 - i / 8)})`;
+          ctx.beginPath(); ctx.arc(toScreenX(tx), toScreenY(ty), r, 0, TAU); ctx.fill();
+        }
+      } else if ((pose === 'run' || pose === 'dash') && stickman.isGrounded) {
+        for (let side = 0; side < 2; side++) {
+          let e = (phase + side * Math.PI - Math.PI * 1.35) % TAU;
+          if (e < 0) e += TAU;
+          if (e <= 1.1) {
+            const k = e / 1.1;
+            const dx = stickman.footX - (e * 24 + 6 + k * 6);
+            const dy = stickman.footY - 2 - k * 4.5;
+            const r = (1.6 + k * (pose === 'dash' ? 4.5 : 3.2)) * worldScale;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.52 * (1 - k)})`;
+            ctx.lineWidth = 1.6 * worldScale;
+            ctx.beginPath(); ctx.arc(toScreenX(dx), toScreenY(dy), r, Math.PI * 0.15, Math.PI * 1.6); ctx.stroke();
+          }
+        }
+      }
+
+      if (pose === 'dash') {
+        for (let i = 2; i >= 1; i--) {
+          const { J: gj } = buildRig('dash', phase - 0.45 * i, stickman.footX - 15 * i, stickman.footY, 1, false);
+          ctx.strokeStyle = `rgba(255, 109, 0, ${0.24 / i})`;
+          ctx.lineWidth = 3.8 * worldScale;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1]));
+          ctx.lineTo(toScreenX(gj[NCK * 2]), toScreenY(gj[NCK * 2 + 1]));
+          ctx.moveTo(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1]));
+          ctx.lineTo(toScreenX(gj[F1 * 2]), toScreenY(gj[F1 * 2 + 1]));
+          ctx.moveTo(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1]));
+          ctx.lineTo(toScreenX(gj[F2 * 2]), toScreenY(gj[F2 * 2 + 1]));
+          ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 2.0 * worldScale;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          const sy = toScreenY(stickman.footY - 10 - i * 14);
+          const jit = Math.sin(animTime * 9 + i * 3.7) * 10;
+          const sx0 = toScreenX(stickman.footX - (24 + i * 4 + jit * 0.3));
+          const sx1 = toScreenX(stickman.footX - (50 + i * 10 + jit));
+          ctx.moveTo(sx0, sy); ctx.lineTo(sx1, sy);
+        }
+        ctx.stroke();
+      }
+
+      if (stickman.isGrounded && (stickman.landingSquashTimer || 0) > 0) {
+        const k = 1 - clamp01((stickman.landingSquashTimer || 0) / 0.26);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - k) * 0.72})`;
+        ctx.lineWidth = 1.8 * worldScale;
+        for (const side of [-1, 1]) {
+          const cx = toScreenX(stickman.footX + side * (5 + 22 * k));
+          const cy = toScreenY(stickman.footY - 2.5 - 5 * k);
+          const r = (2 + 4.5 * k) * worldScale;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+        }
+      }
+
+      // 3. Build & Render the 16-Joint Hero Rig
+      const { J, faceAng } = buildRig(pose, phase, stickman.footX, stickman.footY, 1, true);
+      const windDrag = Math.max(-1.2, Math.min(-0.35, -stickman.velocityX / 190)) + Math.max(-0.35, Math.min(0.45, stickman.velocityY / 700));
+      const expression = isBoosted ? 1 : 0;
 
       renderCartoonBodyPose(
-        hipWX, hipWY, shWX, shWY, hdWX, hdWY,
-        { x: fKneX, y: fKneY }, { x: fAnkX, y: fAnkY },
-        { x: bKneX, y: bKneY }, { x: bAnkX, y: bAnkY },
-        { x: fElbX, y: fElbY }, { x: fHndX, y: fHndY },
-        { x: bElbX, y: bElbY }, { x: bHndX, y: bHndY },
-        1, expression, true, totalTorsoAngle * 0.35, windDrag
+        J[HIP * 2], J[HIP * 2 + 1], J[SHO * 2], J[SHO * 2 + 1], J[HED * 2], J[HED * 2 + 1],
+        { x: J[K1 * 2], y: J[K1 * 2 + 1] }, { x: J[F1 * 2], y: J[F1 * 2 + 1] },
+        { x: J[K2 * 2], y: J[K2 * 2 + 1] }, { x: J[F2 * 2], y: J[F2 * 2 + 1] },
+        { x: J[E1 * 2], y: J[E1 * 2 + 1] }, { x: J[H1 * 2], y: J[H1 * 2 + 1] },
+        { x: J[E2 * 2], y: J[E2 * 2 + 1] }, { x: J[H2 * 2], y: J[H2 * 2 + 1] },
+        1, expression, true, faceAng, windDrag,
+        J[MID * 2], J[MID * 2 + 1], J[NCK * 2], J[NCK * 2 + 1], J[NTP * 2], J[NTP * 2 + 1],
+        { x: J[T1 * 2], y: J[T1 * 2 + 1] }, { x: J[T2 * 2], y: J[T2 * 2 + 1] }
       );
     }
 

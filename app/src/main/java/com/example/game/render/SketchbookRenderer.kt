@@ -1161,6 +1161,41 @@ object SketchbookRenderer {
       }
     }
 
+    fun drawCartoonCurve(
+      x1: Float,
+      y1: Float,
+      cx: Float,
+      cy: Float,
+      x2: Float,
+      y2: Float,
+      fillColor: Color,
+      thicknessWorld: Float,
+      pass: Int
+    ) {
+      val path = reusablePrimaryLinePath.apply {
+        reset()
+        moveTo(toScreenX(x1), toScreenY(y1))
+        quadraticTo(toScreenX(cx), toScreenY(cy), toScreenX(x2), toScreenY(y2))
+      }
+      when (pass) {
+        0 -> drawPath(
+          path = path,
+          color = auraCrimson.copy(alpha = 0.28f),
+          style = Stroke(width = (thicknessWorld + 7.2f) * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+        1 -> drawPath(
+          path = path,
+          color = outlineBlack,
+          style = Stroke(width = (thicknessWorld + 4.6f) * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+        else -> drawPath(
+          path = path,
+          color = fillColor,
+          style = Stroke(width = thicknessWorld * worldScale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+      }
+    }
+
     fun renderCartoonBodyPose(
       hipWX: Float,
       hipWY: Float,
@@ -1180,21 +1215,36 @@ object SketchbookRenderer {
       expression: Int,
       hasHair: Boolean,
       headTilt: Float,
-      windDrag: Float
+      windDrag: Float,
+      midWX: Float = (hipWX + shWX) * 0.5f,
+      midWY: Float = (hipWY + shWY) * 0.5f,
+      nckWX: Float = shWX,
+      nckWY: Float = shWY,
+      ntpWX: Float = shWX,
+      ntpWY: Float = shWY,
+      frontToe: Offset? = null,
+      backToe: Offset? = null
     ) {
-      // 1. Rear Shaded Arm & Leg
+      // 1. Rear Shaded Arm & Leg (+ Articulated Toe)
       for (pass in 0..2) {
         drawCartoonSegment(shWX, shWY, backElbow.x, backElbow.y, backLimbGrey, 4.4f, pass)
-        drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.0f, pass, endCapRadiusWorld = 2.6f)
+        drawCartoonSegment(backElbow.x, backElbow.y, backHand.x, backHand.y, backLimbGrey, 4.0f, pass, endCapRadiusWorld = 2.4f)
         drawCartoonSegment(hipWX, hipWY, backKnee.x, backKnee.y, backLimbGrey, 5.0f, pass)
-        drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 4.5f, pass, endCapRadiusWorld = 2.8f)
+        drawCartoonSegment(backKnee.x, backKnee.y, backAnkle.x, backAnkle.y, backLimbGrey, 4.5f, pass, endCapRadiusWorld = if (backToe == null) 2.8f else 0f)
+        if (backToe != null) {
+          drawCartoonSegment(backAnkle.x, backAnkle.y, backToe.x, backToe.y, backLimbGrey, 4.2f, pass, endCapRadiusWorld = 2.2f)
+        }
       }
 
-      // 2. Unified White Torso + Hip + Front Leg
+      // 2. Curved Quadratic Spine (HIP -> MID -> NCK -> NTP) + Front Leg (+ Articulated Toe)
       for (pass in 0..2) {
-        drawCartoonSegment(hipWX, hipWY, shWX, shWY, bodyWhite, 6.4f, pass)
+        drawCartoonCurve(hipWX, hipWY, midWX, midWY, nckWX, nckWY, bodyWhite, 6.4f, pass)
+        drawCartoonSegment(nckWX, nckWY, ntpWX, ntpWY, bodyWhite, 5.4f, pass)
         drawCartoonSegment(hipWX, hipWY, frontKnee.x, frontKnee.y, bodyWhite, 5.2f, pass)
-        drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 4.7f, pass, endCapRadiusWorld = 3.0f)
+        drawCartoonSegment(frontKnee.x, frontKnee.y, frontAnkle.x, frontAnkle.y, bodyWhite, 4.7f, pass, endCapRadiusWorld = if (frontToe == null) 3.0f else 0f)
+        if (frontToe != null) {
+          drawCartoonSegment(frontAnkle.x, frontAnkle.y, frontToe.x, frontToe.y, bodyWhite, 4.4f, pass, endCapRadiusWorld = 2.4f)
+        }
       }
 
       // 3. Head, Spiky Crimson Hair & Expressive Face
@@ -1208,10 +1258,10 @@ object SketchbookRenderer {
         windDrag = windDrag
       )
 
-      // 4. Foreground White Arm & Clenched Fist
+      // 4. Foreground White Arm & Hand
       for (pass in 0..2) {
         drawCartoonSegment(shWX, shWY, frontElbow.x, frontElbow.y, bodyWhite, 4.6f, pass)
-        drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.2f, pass, endCapRadiusWorld = 2.8f)
+        drawCartoonSegment(frontElbow.x, frontElbow.y, frontHand.x, frontHand.y, bodyWhite, 4.2f, pass, endCapRadiusWorld = 2.6f)
       }
     }
 
@@ -1367,95 +1417,225 @@ object SketchbookRenderer {
     }
 
     // =========================================================================
-    // 60 FPS CONTINUOUS HARMONIC RUNNER KINEMATICS (MATCHES REFERENCE VIDEO)
+    // EXACT 16-JOINT CHALK-RUNNER RIG & KINEMATICS (From Claude Artifact)
     // =========================================================================
+    // Proportions in world units:
+    // THIGH = 14, SHIN = 14, UPPER = 11, FORE = 10.5, TORSO = 21, NECK = 3, HEAD_R = 9.2, TOE = 4
+    val THIGH = 14f
+    val SHIN = 14f
+    val UPPER = 11f
+    val FORE = 10.5f
+    val TORSO = 21f
+    val NECK = 3f
+    val HEAD_R = 9.2f
+    val TOE = 4f
+
+    // Joint indices: x at 2*i, y at 2*i+1
+    val HIP = 0
+    val MID = 1
+    val NCK = 2
+    val NTP = 3
+    val HED = 4
+    val SHO = 5
+    val K1 = 6
+    val F1 = 7
+    val T1 = 8
+    val K2 = 9
+    val F2 = 10
+    val T2 = 11
+    val E1 = 12
+    val H1 = 13
+    val E2 = 14
+    val H2 = 15
+    val NJ = 16
+
+    // Key poses from art-hero.js (KP)
+    val kpStretch = floatArrayOf(0f, -31f, 0.08f, -0.6f, -0.3f, 0.6f, 1.0f, -0.42f, 0.2f, 2.5f, 0.1f, 2.3f, 0.35f, 0.3f, -0.5f)
+    val kpTuck = floatArrayOf(0f, -33f, 0.22f, 1.4f, -0.05f, 1.35f, 1.7f, -0.45f, 1.05f, 1.75f, 0.35f, -1.25f, -0.3f, -0.2f, -0.3f)
+    val kpReach = floatArrayOf(0f, -30.5f, 0.1f, 0.4f, 0.1f, 0.5f, 0.6f, -0.08f, 0.3f, 2.3f, 0.45f, -2.35f, -0.35f, 0.2f, 0.2f)
+
+    fun smooth01(x: Float): Float {
+      val t = x.coerceIn(0f, 1f)
+      return t * t * (3f - 2f * t)
+    }
+
+    // Run cycle from art-hero.js: thigh swing, knee fold in the swing phase, soft knee in stance phase,
+    // pumping arms, hips lowest at mid-stance and highest in flight phase, head nod that lags the body.
+    fun runK(P: FloatArray, p: Float, dash: Boolean) {
+      val thA = if (dash) 0.85f else 0.66f
+      val fold = if (dash) 2.0f else 1.7f
+      val armA = if (dash) 1.05f else 0.85f
+      P[0] = 0f
+      P[1] = (if (dash) -25.6f else -26.3f) - (if (dash) 2.6f else 3.4f) * kotlin.math.abs(sin(p))
+      P[2] = (if (dash) 0.5f else 0.24f) + 0.04f * cos(2f * p)
+      P[3] = if (dash) 2.0f else 1.2f
+      P[4] = (if (dash) -0.38f else -0.16f) + 0.06f * sin(2f * p - 0.8f)
+      for (side in 0..1) {
+        val q = p + side * PI.toFloat()
+        val sq = sin(q)
+        val cq = cos(q)
+        val sw = kotlin.math.max(0f, cos(q + 0.15f))
+        P[5 + side * 2] = 0.05f + thA * sq
+        P[6 + side * 2] = 0.2f + fold * sw * sw + 0.35f * kotlin.math.max(0f, -cq)
+        P[9 + side * 2] = 0.1f - armA * sq
+        P[10 + side * 2] = 1.5f - 0.3f * sq
+        P[13 + side] = 0.25f * kotlin.math.max(0f, -cq) - 0.45f * sw
+      }
+    }
+
+    fun setJ(J: FloatArray, idx: Int, x: Float, y: Float) {
+      J[idx * 2] = x
+      J[idx * 2 + 1] = y
+    }
+
+    fun limbJ(J: FloatArray, r: Int, m: Int, e: Int, a1: Float, a2: Float, l1: Float, l2: Float) {
+      val x = J[r * 2] + sin(a1) * l1
+      val y = J[r * 2 + 1] + cos(a1) * l1
+      setJ(J, m, x, y)
+      setJ(J, e, x + sin(a2) * l2, y + cos(a2) * l2)
+    }
+
+    fun toeJ(J: FloatArray, f: Int, t: Int, a: Float) {
+      setJ(J, t, J[f * 2] + sin(a) * TOE, J[f * 2 + 1] + cos(a) * TOE)
+    }
+
+    fun buildRig(
+      pose: String,
+      ph: Float,
+      x: Float,
+      y: Float,
+      facing: Float = 1f,
+      applySquashAndSlope: Boolean = true
+    ): Pair<FloatArray, Float> {
+      val K = FloatArray(15)
+      var sx = 1f
+      var sy = 1f
+      var px = 0f
+      var py = 0f
+      var rot = 0f
+      var dy = 0f
+
+      when (pose) {
+        "dash", "run" -> {
+          runK(K, ph, pose == "dash")
+        }
+        "jump" -> {
+          val k = (-stickman.velocityY / 520f).coerceIn(0f, 1f)
+          val sm = smooth01(k)
+          for (i in 0 until 15) K[i] = lerp(kpTuck[i], kpStretch[i], sm)
+          px = K[0]
+          py = K[1]
+          rot = -0.14f * k
+          val st = ((-stickman.velocityY - 340f) / 240f).coerceIn(0f, 1f)
+          sy = 1f + 0.16f * st
+          sx = 1f - 0.08f * st
+        }
+        "fall" -> {
+          val k = (stickman.velocityY / 480f).coerceIn(0f, 1f)
+          val sm = smooth01(k)
+          val fl = sin(animTime * 17f) * 0.24f * k
+          for (i in 0 until 15) K[i] = lerp(kpTuck[i], kpReach[i], sm)
+          K[9] += fl
+          K[11] -= fl
+          K[10] += fl * 0.5f
+          px = K[0]
+          py = K[1]
+          rot = 0.08f * k
+        }
+        "cheer" -> {
+          val hop = kotlin.math.abs(sin(animTime * 6.5f))
+          val land = Math.pow((1f - hop).toDouble(), 6.0).toFloat()
+          val pump = 0.18f * sin(animTime * 13f)
+          K[0] = 0f; K[1] = -28.5f; K[2] = 0.05f; K[3] = -1.5f; K[4] = -0.12f
+          K[5] = 0.25f + 0.6f * hop; K[6] = 0.25f + 0.9f * hop
+          K[7] = -0.15f + 0.45f * hop; K[8] = 0.2f + 0.8f * hop
+          K[9] = 2.2f + pump; K[10] = 0.35f; K[11] = -1.95f - pump; K[12] = -0.5f
+          K[13] = 0.3f; K[14] = 0.3f
+          dy = -hop * 11f
+          sy = 1f - 0.14f * land
+          sx = 1f + 0.09f * land
+        }
+      }
+
+      if (applySquashAndSlope) {
+        // Squash on landing (about his feet) from art-hero.js
+        if (stickman.isGrounded && stickman.landingSquashTimer > 0f) {
+          val u = (stickman.landingSquashTimer / 0.26f).coerceIn(0f, 1f)
+          val s = u * u * 0.85f
+          sy *= 1f - 0.24f * s
+          sx *= 1f + 0.15f * s
+          K[2] += 0.15f * s
+          K[9] -= 0.3f * s
+          K[11] += 0.3f * s
+        }
+        if (stickman.isGrounded) {
+          rot += (stickman.slopeRadians * 0.45f).coerceIn(-0.35f, 0.35f)
+        }
+      }
+
+      // Build local skeleton (facing +x, feet at 0,0)
+      val J = FloatArray(NJ * 2)
+      val hx = K[0]
+      val hy = K[1]
+      val lean = K[2]
+      val curl = K[3]
+      val ux = sin(lean)
+      val uy = -cos(lean)
+      val bx = -cos(lean)
+      val by = -sin(lean)
+      val nx = hx + ux * TORSO
+      val ny = hy + uy * TORSO
+      val mx = hx + ux * TORSO * 0.5f + bx * curl
+      val my = hy + uy * TORSO * 0.5f + by * curl
+      setJ(J, HIP, hx, hy)
+      setJ(J, MID, mx, my)
+      setJ(J, NCK, nx, ny)
+      val t = 0.84f
+      val a = (1f - t) * (1f - t)
+      val b = 2f * (1f - t) * t
+      val c = t * t
+      setJ(J, SHO, a * hx + b * mx + c * nx, a * hy + b * my + c * ny)
+      val ha = lean + K[4]
+      val hdx = sin(ha)
+      val hdy = -cos(ha)
+      setJ(J, NTP, nx + hdx * NECK, ny + hdy * NECK)
+      setJ(J, HED, nx + hdx * (NECK + HEAD_R), ny + hdy * (NECK + HEAD_R))
+      limbJ(J, HIP, K1, F1, K[5], K[5] - K[6], THIGH, SHIN)
+      toeJ(J, F1, T1, K[5] - K[6] + 1.45f + K[13])
+      limbJ(J, HIP, K2, F2, K[7], K[7] - K[8], THIGH, SHIN)
+      toeJ(J, F2, T2, K[7] - K[8] + 1.45f + K[14])
+      limbJ(J, SHO, E1, H1, K[9], K[9] + K[10], UPPER, FORE)
+      limbJ(J, SHO, E2, H2, K[11], K[11] + K[12], UPPER, FORE)
+
+      // Place into world coordinates with squash/stretch & rotation about pivot (px, py)
+      val cosR = cos(rot)
+      val sinR = sin(rot)
+      for (i in 0 until NJ * 2 step 2) {
+        val lx = (J[i] - px) * sx
+        val ly = (J[i + 1] - py) * sy
+        J[i] = x + facing * (px + lx * cosR - ly * sinR)
+        J[i + 1] = y + py + lx * sinR + ly * cosR + dy
+      }
+
+      val faceAng = K[2] + K[4] + rot
+      return J to faceAng
+    }
+
     val isBoosted = stickman.boostTimer > 0f || stickman.blitzTimer > 0f
-    // Continuous blend weights so there is NEVER a 1-frame snap when leaving/touching ground
-    val airFactor = if (stickman.isGrounded) 0f else (kotlin.math.abs(stickman.velocityY) / 240f).coerceIn(0f, 1f)
-    val crouchFactor = if (stickman.isGrounded && stickman.landingSquashTimer > 0f) {
-      sin((stickman.landingSquashTimer / 0.26f).coerceIn(0f, 1f) * PI.toFloat())
-    } else {
-      0f
+    val pose = when {
+      stickman.hasReachedFinish -> "cheer"
+      !stickman.isGrounded && stickman.velocityY < -40f -> "jump"
+      !stickman.isGrounded -> "fall"
+      isBoosted -> "dash"
+      else -> "run"
     }
-
-    // Compute smooth 60 FPS leg angles for legIndex (0 = Front leg, 1 = Back leg)
-    fun computeSmoothLegAngles(legIndex: Int): Pair<Float, Float> {
-      val p = phase + legIndex * PI.toFloat()
-      // Base 60 FPS harmonic running stride matching video_run_strip.jpg:
-      // Swings from -0.66 rad (behind) to +0.86 rad (front reach)
-      val runThigh = sin(p) * 0.76f + 0.10f
-      // Smooth heel kick-up on recovery (-1.26 rad figure-4 fold) and straight extension on front plant (-0.10 rad)
-      val foldWave = (1f - sin(p - 0.52f)) * 0.5f
-      val runKnee = -0.10f - (foldWave * foldWave) * 1.16f
-
-      // Airborne split adjustment (wider stride + slightly deeper knee tuck while in mid-air)
-      val airThigh = sin(p) * 0.88f + 0.14f
-      val airKnee = runKnee - 0.18f
-
-      val thigh = lerp(runThigh, airThigh, airFactor) + crouchFactor * (if (legIndex == 0) 0.22f else -0.18f)
-      val knee = lerp(runKnee, airKnee, airFactor) - crouchFactor * 0.32f
-      return thigh to knee
-    }
-
-    // Compute smooth 60 FPS arm angles in opposition to legs
-    fun computeSmoothArmAngles(armIndex: Int): Pair<Float, Float> {
-      val ap = phase + (armIndex + 1) * PI.toFloat()
-      val runArm = sin(ap) * 0.78f + 0.05f
-      val armForward01 = (sin(ap) + 1f) * 0.5f
-      val runElbow = 0.58f + armForward01 * 0.58f
-
-      // In mid-air, arms lift slightly higher like Row 4 Cols 3-5 of the video
-      val airLift = if (armIndex == 0) 0.42f else -0.35f
-      val upperArm = runArm + airFactor * airLift - crouchFactor * 0.25f
-      val elbow = lerp(runElbow, 0.72f, airFactor) + crouchFactor * 0.22f
-      return upperArm to elbow
-    }
-
-    val (fThigh, fKnee) = computeSmoothLegAngles(0)
-    val (bThigh, bKnee) = computeSmoothLegAngles(1)
-    val (fArm, fElbow) = computeSmoothArmAngles(0)
-    val (bArm, bElbow) = computeSmoothArmAngles(1)
-
-    val thighLen = 13.5f
-    val shinLen = 13.5f
-    val upperArmLen = 11.5f
-    val foreArmLen = 11.5f
-
-    // Calculate relative vertical reach of both legs so the lowest foot anchors cleanly to stickman.footY
-    val fKneeRelY = cos(fThigh) * thighLen
-    val fAnkleRelY = fKneeRelY + cos(fThigh + fKnee) * shinLen
-    val bKneeRelY = cos(bThigh) * thighLen
-    val bAnkleRelY = bKneeRelY + cos(bThigh + bKnee) * shinLen
-    val maxLegReachY = kotlin.math.max(fAnkleRelY, bAnkleRelY).coerceAtLeast(18f)
-
-    // Subtle 60fps double-frequency runner flight bounce at peak split (abs(sin(phase)) == 1)
-    val flightBounce = kotlin.math.abs(sin(phase)) * 3.4f * (1f - airFactor)
-    val crouchDrop = crouchFactor * 4.5f
-
-    val slopePitch = if (stickman.isGrounded) {
-      (stickman.slopeRadians * 0.55f).coerceIn(-0.38f, 0.38f)
-    } else {
-      (stickman.velocityY / 1100f).coerceIn(-0.26f, 0.30f)
-    }
-
-    // Balanced athletic forward tilt (~16 degrees, matching video_run_strip.jpg)
-    val baseTorsoTilt = 0.27f + (if (isBoosted) 0.10f else 0f) + crouchFactor * 0.14f
-    val totalTorsoAngle = baseTorsoTilt + slopePitch
-    val torsoLen = 20.5f
-
-    val hipWX = stickman.footX - 2.0f
-    val hipWY = stickman.footY - maxLegReachY - flightBounce + crouchDrop
-    val shWX = hipWX + sin(totalTorsoAngle) * torsoLen
-    val shWY = hipWY - cos(totalTorsoAngle) * torsoLen
-    val hdWX = shWX + sin(totalTorsoAngle) * 6.5f + 1.2f
-    val hdWY = shWY - cos(totalTorsoAngle) * 9.5f - 2.2f
 
     // 1. Roaring 60 FPS Fiery Red-Orange Aura
     val auraIntensity = when {
       isBoosted -> 1.40f
-      crouchFactor > 0.2f -> 1.25f
-      airFactor > 0.2f -> 1.10f
-      else -> 0.98f
+      stickman.landingSquashTimer > 0.05f -> 1.25f
+      !stickman.isGrounded -> 1.12f
+      else -> 1.0f
     }
     drawFieryFightingAura(
       centerWorldX = stickman.footX,
@@ -1465,51 +1645,134 @@ object SketchbookRenderer {
       isBoosted = isBoosted
     )
 
-    // 2. Compute Articulated Joint Coordinates
-    val fKneX = hipWX + sin(fThigh) * thighLen
-    val fKneY = hipWY + fKneeRelY
-    val fAnkX = fKneX + sin(fThigh + fKnee) * shinLen
-    val fAnkY = hipWY + fAnkleRelY
+    // 2. Chalk Dust & Air Trail Effects from art-hero.js
+    val tau = (PI * 2.0).toFloat()
+    if (pose == "jump" || pose == "fall") {
+      // Parabolic airTrail dots behind the airborne runner
+      for (i in 1..7) {
+        val dtBack = 0.032f * i
+        val tx = stickman.footX - stickman.velocityX * dtBack
+        val ty = stickman.footY - 30f - stickman.velocityY * dtBack + 0.5f * WorldConstants.GRAVITY * dtBack * dtBack
+        val r = (2.2f * (1f - i / 8f) + 0.4f) * worldScale
+        drawCircle(
+          color = bodyWhite.copy(alpha = 0.48f * (1f - i / 8f)),
+          radius = r,
+          center = Offset(toScreenX(tx), toScreenY(ty))
+        )
+      }
+    } else if ((pose == "run" || pose == "dash") && stickman.isGrounded) {
+      // Rolling footDust kicks from art-hero.js (one per foot push-off)
+      for (side in 0..1) {
+        var e = (phase + side * PI.toFloat() - PI.toFloat() * 1.35f) % tau
+        if (e < 0f) e += tau
+        if (e <= 1.1f) {
+          val k = e / 1.1f
+          val dx = stickman.footX - (e * 24f + 6f + k * 6f)
+          val dy = stickman.footY - 2f - k * 4.5f
+          val r = (1.6f + k * (if (pose == "dash") 4.5f else 3.2f)) * worldScale
+          drawCircle(
+            color = bodyWhite.copy(alpha = 0.52f * (1f - k)),
+            radius = r,
+            center = Offset(toScreenX(dx), toScreenY(dy)),
+            style = Stroke(width = 1.6f * worldScale)
+          )
+        }
+      }
+    }
 
-    val bKneX = hipWX + sin(bThigh) * thighLen
-    val bKneY = hipWY + bKneeRelY
-    val bAnkX = bKneX + sin(bThigh + bKnee) * shinLen
-    val bAnkY = hipWY + bAnkleRelY
+    // Dash afterimages & speed lines from art-hero.js
+    if (pose == "dash") {
+      for (i in 2 downTo 1) {
+        val (gj, _) = buildRig("dash", phase - 0.45f * i, stickman.footX - 15f * i, stickman.footY, 1f, false)
+        val ghostAlpha = 0.24f / i
+        val ghostColor = auraOrange.copy(alpha = ghostAlpha)
+        drawLine(
+          color = ghostColor,
+          start = Offset(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1])),
+          end = Offset(toScreenX(gj[NCK * 2]), toScreenY(gj[NCK * 2 + 1])),
+          strokeWidth = 4.2f * worldScale,
+          cap = StrokeCap.Round
+        )
+        drawLine(
+          color = ghostColor,
+          start = Offset(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1])),
+          end = Offset(toScreenX(gj[F1 * 2]), toScreenY(gj[F1 * 2 + 1])),
+          strokeWidth = 3.6f * worldScale,
+          cap = StrokeCap.Round
+        )
+        drawLine(
+          color = ghostColor,
+          start = Offset(toScreenX(gj[HIP * 2]), toScreenY(gj[HIP * 2 + 1])),
+          end = Offset(toScreenX(gj[F2 * 2]), toScreenY(gj[F2 * 2 + 1])),
+          strokeWidth = 3.6f * worldScale,
+          cap = StrokeCap.Round
+        )
+      }
+      for (i in 0..3) {
+        val sy = toScreenY(stickman.footY - 10f - i * 14f)
+        val jit = sin(animTime * 9f + i * 3.7f) * 10f
+        val sx0 = toScreenX(stickman.footX - (24f + i * 4f + jit * 0.3f))
+        val sx1 = toScreenX(stickman.footX - (50f + i * 10f + jit))
+        drawLine(
+          color = bodyWhite.copy(alpha = 0.55f),
+          start = Offset(sx0, sy),
+          end = Offset(sx1, sy),
+          strokeWidth = 2.0f * worldScale,
+          cap = StrokeCap.Round
+        )
+      }
+    }
 
-    val fElbX = shWX + sin(fArm) * upperArmLen
-    val fElbY = shWY + cos(fArm) * upperArmLen
-    val fHndX = fElbX + sin(fArm + fElbow) * foreArmLen
-    val fHndY = fElbY + cos(fArm + fElbow) * foreArmLen
+    // Landing puff curls from art-hero.js
+    if (stickman.isGrounded && stickman.landingSquashTimer > 0f) {
+      val k = 1f - (stickman.landingSquashTimer / 0.26f).coerceIn(0f, 1f)
+      val alpha = (1f - k) * 0.72f
+      for (side in -1..1 step 2) {
+        val cx = toScreenX(stickman.footX + side * (5f + 22f * k))
+        val cy = toScreenY(stickman.footY - 2.5f - 5f * k)
+        val r = (2f + 4.5f * k) * worldScale
+        drawCircle(
+          color = bodyWhite.copy(alpha = alpha),
+          radius = r,
+          center = Offset(cx, cy),
+          style = Stroke(width = 1.8f * worldScale)
+        )
+      }
+    }
 
-    val bElbX = shWX + sin(bArm) * upperArmLen
-    val bElbY = shWY + cos(bArm) * upperArmLen
-    val bHndX = bElbX + sin(bArm + bElbow) * foreArmLen
-    val bHndY = bElbY + cos(bArm + bElbow) * foreArmLen
-
-    val windDrag = (-stickman.velocityX / 200f).coerceIn(-1.15f, -0.35f) + (stickman.velocityY / 700f).coerceIn(-0.35f, 0.45f)
+    // 3. Build & Render the 16-Joint Hero Rig
+    val (J, faceAng) = buildRig(pose, phase, stickman.footX, stickman.footY, 1f, true)
+    val windDrag = (-stickman.velocityX / 190f).coerceIn(-1.2f, -0.35f) + (stickman.velocityY / 700f).coerceIn(-0.35f, 0.45f)
     val expression = if (isBoosted) 1 else 0
 
-    // 3. Render Complete 2D Cartoon Body
     renderCartoonBodyPose(
-      hipWX = hipWX,
-      hipWY = hipWY,
-      shWX = shWX,
-      shWY = shWY,
-      hdWX = hdWX,
-      hdWY = hdWY,
-      frontKnee = Offset(fKneX, fKneY),
-      frontAnkle = Offset(fAnkX, fAnkY),
-      backKnee = Offset(bKneX, bKneY),
-      backAnkle = Offset(bAnkX, bAnkY),
-      frontElbow = Offset(fElbX, fElbY),
-      frontHand = Offset(fHndX, fHndY),
-      backElbow = Offset(bElbX, bElbY),
-      backHand = Offset(bHndX, bHndY),
+      hipWX = J[HIP * 2],
+      hipWY = J[HIP * 2 + 1],
+      shWX = J[SHO * 2],
+      shWY = J[SHO * 2 + 1],
+      hdWX = J[HED * 2],
+      hdWY = J[HED * 2 + 1],
+      frontKnee = Offset(J[K1 * 2], J[K1 * 2 + 1]),
+      frontAnkle = Offset(J[F1 * 2], J[F1 * 2 + 1]),
+      backKnee = Offset(J[K2 * 2], J[K2 * 2 + 1]),
+      backAnkle = Offset(J[F2 * 2], J[F2 * 2 + 1]),
+      frontElbow = Offset(J[E1 * 2], J[E1 * 2 + 1]),
+      frontHand = Offset(J[H1 * 2], J[H1 * 2 + 1]),
+      backElbow = Offset(J[E2 * 2], J[E2 * 2 + 1]),
+      backHand = Offset(J[H2 * 2], J[H2 * 2 + 1]),
       faceDirX = 1f,
       expression = expression,
       hasHair = true,
-      headTilt = totalTorsoAngle * 0.35f,
-      windDrag = windDrag
+      headTilt = faceAng,
+      windDrag = windDrag,
+      midWX = J[MID * 2],
+      midWY = J[MID * 2 + 1],
+      nckWX = J[NCK * 2],
+      nckWY = J[NCK * 2 + 1],
+      ntpWX = J[NTP * 2],
+      ntpWY = J[NTP * 2 + 1],
+      frontToe = Offset(J[T1 * 2], J[T1 * 2 + 1]),
+      backToe = Offset(J[T2 * 2], J[T2 * 2 + 1])
     )
   }
 
