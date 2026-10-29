@@ -1,6 +1,10 @@
 package com.example.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -52,10 +56,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -161,6 +172,26 @@ fun GameplayHudOverlay(
           } else {
             0f
           }
+          val animatedBossRatio by animateFloatAsState(
+            targetValue = bossRatio,
+            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+            label = "bossHpProgressTransition"
+          )
+          var previousBossHp by remember(hudState.currentLevel) { mutableIntStateOf(hudState.bossHp) }
+          val bossDamagePulse = remember { Animatable(0f) }
+          LaunchedEffect(hudState.bossHp, hudState.currentLevel) {
+            if (hudState.bossHp < previousBossHp) {
+              previousBossHp = hudState.bossHp
+              bossDamagePulse.snapTo(1f)
+              bossDamagePulse.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 560, easing = FastOutSlowInEasing)
+              )
+            } else {
+              previousBossHp = hudState.bossHp
+            }
+          }
+          val pulseVal = bossDamagePulse.value
           val isBossDefeated = hudState.bossHp <= 0
           val isSuperAuraActive = hudState.superAuraSeconds > 0f
 
@@ -205,9 +236,19 @@ fun GameplayHudOverlay(
               )
             }
 
-            // Row 1 Right: Ignis Titan Boss HP
+            // Row 1 Right: Ignis Titan Boss HP (with damage pulse & flash animation)
+            val baseBossTextColor = if (isBossDefeated) FinishBannerGreen else LavaOrange
+            val animatedBossTextColor = lerp(baseBossTextColor, ChalkWhite, (pulseVal * 1.25f).coerceIn(0f, 1f))
+            val animatedBossBarColor = lerp(LavaDeepRed, LavaFlameYellow, (pulseVal * 1.35f).coerceIn(0f, 1f))
+            val animatedBossTrackColor = lerp(SketchCharcoalBg, LavaDeepRed.copy(alpha = 0.55f), pulseVal)
             Column(
-              modifier = Modifier.weight(1f),
+              modifier = Modifier
+                .weight(1f)
+                .graphicsLayer {
+                  val scaleBoost = kotlin.math.sin(pulseVal * Math.PI.toFloat())
+                  scaleX = 1f + scaleBoost * 0.08f
+                  scaleY = 1f + scaleBoost * 0.16f
+                },
               verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
               Row(
@@ -217,7 +258,11 @@ fun GameplayHudOverlay(
                 Image(
                   painter = painterResource(id = R.drawable.dragon_boss_icon),
                   contentDescription = null,
-                  modifier = Modifier.size(16.dp)
+                  modifier = Modifier
+                    .size(16.dp)
+                    .graphicsLayer {
+                      rotationZ = kotlin.math.sin(pulseVal * Math.PI.toFloat() * 4f) * 14f
+                    }
                 )
                 Text(
                   text = if (isBossDefeated) {
@@ -226,19 +271,30 @@ fun GameplayHudOverlay(
                     "BOSS HP: ${hudState.bossHp}/${hudState.bossMaxHp}"
                   },
                   style = MaterialTheme.typography.labelSmall,
-                  color = if (isBossDefeated) FinishBannerGreen else LavaOrange,
+                  color = animatedBossTextColor,
                   modifier = Modifier.testTag("boss_hp_text")
                 )
               }
               LinearProgressIndicator(
-                progress = { bossRatio },
+                progress = { animatedBossRatio },
                 modifier = Modifier
                   .fillMaxWidth()
                   .height(6.dp)
                   .clip(RoundedCornerShape(3.dp))
+                  .then(
+                    if (pulseVal > 0.02f) {
+                      Modifier.border(
+                        width = 1.dp,
+                        color = ChalkWhite.copy(alpha = pulseVal.coerceIn(0f, 1f)),
+                        shape = RoundedCornerShape(3.dp)
+                      )
+                    } else {
+                      Modifier
+                    }
+                  )
                   .testTag("boss_hp_bar"),
-                color = LavaDeepRed,
-                trackColor = SketchCharcoalBg
+                color = animatedBossBarColor,
+                trackColor = animatedBossTrackColor
               )
             }
           }

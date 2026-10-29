@@ -175,6 +175,71 @@
       transition: width 0.06s linear, background-color 0.15s ease;
     }
 
+    #hudBossHpFill {
+      transition: width 0.36s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    @keyframes bossHpBarPulseFlash {
+      0% {
+        transform: scale(1, 1);
+        background-color: #FFFFFF;
+        box-shadow: 0 0 14px #FFD700, 0 0 6px #FFFFFF;
+      }
+      30% {
+        transform: scale(1.04, 1.45);
+        background-color: var(--lava-flame-yellow);
+        box-shadow: 0 0 18px #FF6D00, 0 0 8px #FFD700;
+      }
+      65% {
+        transform: scale(1.01, 1.15);
+        background-color: var(--lava-orange);
+        box-shadow: 0 0 10px #D50000;
+      }
+      100% {
+        transform: scale(1, 1);
+        background-color: var(--lava-deep-red);
+        box-shadow: none;
+      }
+    }
+
+    @keyframes bossHpTrackShake {
+      0%, 100% { transform: translateX(0) scale(1); border-color: transparent; }
+      20% { transform: translateX(-3px) scale(1.05, 1.25); border-color: #FFFFFF; }
+      45% { transform: translateX(3px) scale(1.04, 1.2); border-color: var(--lava-flame-yellow); }
+      70% { transform: translateX(-2px) scale(1.02, 1.1); border-color: var(--lava-orange); }
+    }
+
+    @keyframes bossHpTextFlash {
+      0% {
+        color: #FFFFFF !important;
+        text-shadow: 0 0 12px #FFD700, 0 0 6px #FFFFFF;
+        transform: scale(1.12);
+      }
+      50% {
+        color: var(--lava-flame-yellow) !important;
+        text-shadow: 0 0 10px #FF6D00;
+        transform: scale(1.06);
+      }
+      100% {
+        text-shadow: none;
+        transform: scale(1);
+      }
+    }
+
+    .boss-hp-fill-hit {
+      animation: bossHpBarPulseFlash 0.56s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .boss-hp-track-hit {
+      border: 1px solid transparent;
+      animation: bossHpTrackShake 0.56s ease-out;
+    }
+
+    .boss-hp-text-hit {
+      display: inline-block;
+      animation: bossHpTextFlash 0.56s ease-out;
+    }
+
     .hud-action-buttons {
       display: flex;
       align-items: center;
@@ -804,7 +869,7 @@
             <div class="linear-progress-track ink-track" style="flex: 1;">
               <div class="linear-progress-fill" id="hudInkFill" style="width: 100%; background: var(--ink-cyan-accent);"></div>
             </div>
-            <div class="linear-progress-track ink-track" style="flex: 1;">
+            <div class="linear-progress-track ink-track" id="hudBossHpTrack" style="flex: 1;">
               <div class="linear-progress-fill" id="hudBossHpFill" style="width: 100%; background: var(--lava-deep-red);"></div>
             </div>
           </div>
@@ -4790,7 +4855,25 @@
       if (state.ignisBoss) {
         const bossHpEl = document.getElementById('hudBossHpText');
         const bossFillEl = document.getElementById('hudBossHpFill');
+        const bossTrackEl = document.getElementById('hudBossHpTrack');
         if (bossHpEl && bossFillEl) {
+          if (
+            typeof state.lastRenderedBossHp === 'number' &&
+            state.lastRenderedBossLevel === state.currentLevel &&
+            state.ignisBoss.hp < state.lastRenderedBossHp
+          ) {
+            bossFillEl.classList.remove('boss-hp-fill-hit');
+            bossHpEl.classList.remove('boss-hp-text-hit');
+            if (bossTrackEl) bossTrackEl.classList.remove('boss-hp-track-hit');
+            // Force reflow so rapid successive hits re-trigger the CSS animation cleanly
+            void bossFillEl.offsetWidth;
+            bossFillEl.classList.add('boss-hp-fill-hit');
+            bossHpEl.classList.add('boss-hp-text-hit');
+            if (bossTrackEl) bossTrackEl.classList.add('boss-hp-track-hit');
+          }
+          state.lastRenderedBossHp = state.ignisBoss.hp;
+          state.lastRenderedBossLevel = state.currentLevel;
+
           bossHpEl.textContent = state.ignisBoss.isDefeated
             ? '🐉 IGNIS SLAIN!'
             : `🐉 BOSS HP: ${state.ignisBoss.hp}/${state.ignisBoss.maxHp}`;
