@@ -4,12 +4,17 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.example.game.model.BreakableRockWall
 import com.example.game.model.CalloutMove
 import com.example.game.model.ChalkBit
@@ -95,6 +100,7 @@ object SketchbookRenderer {
     rockWalls: List<BreakableRockWall> = emptyList(),
     lavaMonsters: List<LeapingLavaMonster> = emptyList(),
     ignisBoss: IgnisTitanBoss = IgnisTitanBoss(isDefeated = true),
+    dragonSpriteSheet: ImageBitmap? = null,
     equippedSkin: String = "DEFAULT",
     equippedTrail: String = "STANDARD_INK",
     activeCallout: CalloutMove? = null,
@@ -222,16 +228,15 @@ object SketchbookRenderer {
         drawScribblerEnemy(enemy, ::toScreenX, ::toScreenY, worldScale)
       }
     }
-    if (!ignisBoss.isDefeated) {
-      drawIgnisTitanBoss(
-        boss = ignisBoss,
-        stickman = stickman,
-        animTime = lavaAnimTime,
-        toScreenX = ::toScreenX,
-        toScreenY = ::toScreenY,
-        worldScale = worldScale
-      )
-    }
+    drawIgnisTitanBoss(
+      boss = ignisBoss,
+      stickman = stickman,
+      animTime = lavaAnimTime,
+      dragonSpriteSheet = dragonSpriteSheet,
+      toScreenX = ::toScreenX,
+      toScreenY = ::toScreenY,
+      worldScale = worldScale
+    )
 
     // 11. Hand-drawn Chalk Dust & Pencil Spark Particles
     if (sketchParticles.isNotEmpty()) {
@@ -2599,13 +2604,14 @@ object SketchbookRenderer {
     boss: IgnisTitanBoss,
     stickman: StickmanState,
     animTime: Float,
+    dragonSpriteSheet: ImageBitmap? = null,
     toScreenX: (Float) -> Float,
     toScreenY: (Float) -> Float,
     worldScale: Float
   ) {
     val distToPlayer = stickman.footX - boss.x
-    // Red screen-edge danger vignette when Ignis Titan is within 400px
-    if (distToPlayer < 400f) {
+    // Red screen-edge danger vignette when active Ignis Titan is within 400px
+    if (!boss.isDefeated && distToPlayer < 400f) {
       val dangerAlpha = ((400f - distToPlayer) / 400f).coerceIn(0f, 1f) * 0.42f
       drawRect(
         brush = Brush.horizontalGradient(
@@ -2619,13 +2625,97 @@ object SketchbookRenderer {
 
     val headX = toScreenX(boss.x)
     val headY = toScreenY(boss.y)
-    if (headX < -220f || headX > size.width + 120f) return
+    if (headX < -280f * worldScale || headX > size.width + 180f * worldScale) return
 
     val isFlashingHurt = boss.hurtCooldown > 0f && ((animTime * 20f).toInt() % 2 == 0)
+
+    if (dragonSpriteSheet != null) {
+      // Select one of the 10 dragon poses (5 columns x 2 rows, 320x320 per cell):
+      // 0: Menacing front stance | 1: Quadruped charge | 2: Flying fireball breath | 3: Aerial swoop | 4: Rearing flame roar
+      // 5: Low lunging bite     | 6: Magma ground slam| 7: Upright winged stride  | 8: Hurt recoil  | 9: Defeated curled-up
+      val chaseCyclePoses = intArrayOf(1, 7, 5, 3)
+      val poseIndex = when {
+        boss.isDefeated || boss.hp <= 0 -> 9
+        boss.hurtCooldown > 0f -> 8
+        boss.biteCooldown > 1.8f -> 6
+        distToPlayer < 115f || boss.biteCooldown > 1.0f -> 5
+        distToPlayer < 215f -> if (((animTime * 3.2f).toInt() % 2) == 0) 2 else 4
+        animTime < 0.75f -> 0
+        else -> chaseCyclePoses[((animTime * 5.6f).toInt().let { if (it < 0) -it else it }) % chaseCyclePoses.size]
+      }
+
+      val col = poseIndex % 5
+      val row = poseIndex / 5
+      val cellW = dragonSpriteSheet.width / 5
+      val cellH = dragonSpriteSheet.height / 2
+
+      val wingFlapBob = if (boss.isDefeated) {
+        0f
+      } else {
+        sin(animTime * 6.8f) * 7f * worldScale
+      }
+
+      val spriteSizePx = (168f * worldScale).toInt().coerceAtLeast(48)
+      val dstLeft = (headX - spriteSizePx * 0.62f).toInt()
+      val dstTop = (headY - spriteSizePx * 0.54f + wingFlapBob).toInt()
+
+      // Fiery volcanic aura glow behind the dragon
+      val auraCenter = Offset(
+        x = dstLeft + spriteSizePx * 0.52f,
+        y = dstTop + spriteSizePx * 0.54f
+      )
+      val auraPulse = 0.88f + 0.12f * sin(animTime * 9f)
+      if (!boss.isDefeated) {
+        drawCircle(
+          brush = Brush.radialGradient(
+            colors = listOf(
+              (if (isFlashingHurt) ChalkWhite else LavaOrange).copy(alpha = 0.42f * auraPulse),
+              LavaDeepRed.copy(alpha = 0.18f * auraPulse),
+              Color.Transparent
+            ),
+            center = auraCenter,
+            radius = spriteSizePx * 0.58f
+          ),
+          radius = spriteSizePx * 0.58f,
+          center = auraCenter
+        )
+      }
+
+      val hurtColorFilter = if (isFlashingHurt) {
+        ColorFilter.lighting(multiply = Color.White, add = Color(0xFF7A3800))
+      } else {
+        null
+      }
+
+      drawImage(
+        image = dragonSpriteSheet,
+        srcOffset = IntOffset(col * cellW, row * cellH),
+        srcSize = IntSize(cellW, cellH),
+        dstOffset = IntOffset(dstLeft, dstTop),
+        dstSize = IntSize(spriteSizePx, spriteSizePx),
+        filterQuality = FilterQuality.None,
+        colorFilter = hurtColorFilter
+      )
+
+      // Orbiting magma embers around the dragon's wings and tail
+      if (!boss.isDefeated) {
+        for (i in 0..4) {
+          val phase = animTime * 4.5f + i * 1.25f
+          val ex = auraCenter.x + cos(phase) * (spriteSizePx * (0.28f + (i % 3) * 0.08f))
+          val ey = auraCenter.y + sin(phase * 1.3f) * (spriteSizePx * 0.30f) - (phase % 1f) * 14f * worldScale
+          drawCircle(
+            color = if (i % 2 == 0) LavaFlameYellow else LavaOrange,
+            radius = (2.4f + (i % 2) * 1.2f) * worldScale,
+            center = Offset(ex, ey)
+          )
+        }
+      }
+      return
+    }
+
+    // Fallback vector dragon if sprite sheet is unavailable in headless tests
     val bodyColor = if (isFlashingHurt) ChalkWhite else LavaDeepRed
     val coreColor = if (isFlashingHurt) InkCyanAccent else LavaOrange
-
-    // 5 Serpentine Trailing Dragon Body Segments
     for (seg in 5 downTo 1) {
       val segX = headX - seg * 26f * worldScale
       val waveY = sin(animTime * 6.5f - seg * 0.85f) * 14f * worldScale
@@ -2633,46 +2723,8 @@ object SketchbookRenderer {
       val segR = (26f - seg * 2.6f) * worldScale
       drawCircle(color = coreColor.copy(alpha = 0.28f), radius = segR * 1.35f, center = Offset(segX, segY))
       drawCircle(color = bodyColor, radius = segR, center = Offset(segX, segY))
-      drawCircle(color = LavaFlameYellow, radius = segR * 0.45f, center = Offset(segX, segY))
       drawCircle(color = ChalkWhite, radius = segR, center = Offset(segX, segY), style = Stroke(width = 2.2f * worldScale))
     }
-
-    // Colossal Dragon Head + Snapping Jaw
-    val headR = 30f * worldScale
-    drawCircle(color = LavaOrange.copy(alpha = 0.38f), radius = headR * 1.5f, center = Offset(headX, headY))
-    drawCircle(color = bodyColor, radius = headR, center = Offset(headX, headY))
-    drawCircle(color = ChalkWhite, radius = headR, center = Offset(headX, headY), style = Stroke(width = 3.0f * worldScale))
-
-    // Dragon Horns
-    drawLine(
-      color = LavaFlameYellow,
-      start = Offset(headX - 8f * worldScale, headY - headR * 0.7f),
-      end = Offset(headX - 28f * worldScale, headY - headR * 1.45f),
-      strokeWidth = 5.5f * worldScale,
-      cap = StrokeCap.Round
-    )
-    // Snapping Jaw
-    val jawOpen = (0.35f + 0.35f * sin(animTime * 8.5f)) * 18f * worldScale
-    drawLine(
-      color = LavaFlameYellow,
-      start = Offset(headX + 6f * worldScale, headY - 4f * worldScale),
-      end = Offset(headX + headR * 1.25f, headY - jawOpen),
-      strokeWidth = 6.0f * worldScale,
-      cap = StrokeCap.Round
-    )
-    drawLine(
-      color = LavaFlameYellow,
-      start = Offset(headX + 6f * worldScale, headY + 6f * worldScale),
-      end = Offset(headX + headR * 1.25f, headY + jawOpen),
-      strokeWidth = 6.0f * worldScale,
-      cap = StrokeCap.Round
-    )
-    // Glowing Dragon Eye
-    drawCircle(
-      color = LavaFlameYellow,
-      radius = 5.5f * worldScale,
-      center = Offset(headX + 8f * worldScale, headY - 8f * worldScale)
-    )
   }
 
   private fun DrawScope.drawHeroCosmeticsAndShield(

@@ -3321,32 +3321,59 @@
           }
         }
       }
-      if (state.ignisBoss && !state.ignisBoss.isDefeated && state.stickman) {
+      if (state.ignisBoss && state.stickman) {
         const boss = state.ignisBoss;
+        if (!window._dragonSheetImg) {
+          window._dragonSheetImg = new Image();
+          window._dragonSheetImg.src = '/assets/aistudio/dragon_boss_sheet.png';
+        }
         const distToPlayer = Math.max(0, state.stickman.footX - boss.x);
-        if (distToPlayer < 400) {
+        if (!boss.isDefeated && distToPlayer < 400) {
           const vigAlpha = ((1 - distToPlayer / 400) * 0.34);
           ctx.fillStyle = `rgba(213, 0, 0, ${vigAlpha})`;
           ctx.fillRect(0, 0, 36 * worldScale, h);
         }
         const hx = toScreenX(boss.x);
         const hy = toScreenY(boss.y);
-        for (let seg = 4; seg >= 1; seg--) {
-          const bx = hx - seg * 26 * worldScale;
-          const by = hy + Math.sin(state.lavaAnimTime * 5.2 - seg * 0.9) * 12 * worldScale;
-          const br = (28 - seg * 3.5) * worldScale;
-          ctx.fillStyle = boss.hurtCooldown > 0 ? COLORS.ChalkWhite : COLORS.LavaDeepRed;
-          ctx.strokeStyle = COLORS.LavaOrange;
-          ctx.lineWidth = 2 * worldScale;
-          ctx.beginPath();
-          ctx.arc(bx, by, br, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
+        let poseIdx = 1;
+        if (boss.isDefeated || boss.hp <= 0) {
+          poseIdx = 9;
+        } else if (boss.hurtCooldown > 0) {
+          poseIdx = 8;
+        } else if (boss.biteCooldown > 0.7) {
+          poseIdx = 5;
+        } else if (boss.biteCooldown > 0.25) {
+          poseIdx = 6;
+        } else if (distToPlayer < 145) {
+          poseIdx = (Math.floor(state.lavaAnimTime * 5) % 2 === 0) ? 5 : 2;
+        } else if (distToPlayer < 250) {
+          const cycle = [2, 3, 4, 6];
+          poseIdx = cycle[Math.floor(state.lavaAnimTime * 3.8) % 4];
+        } else {
+          const cycle = [1, 7, 3, 0];
+          poseIdx = cycle[Math.floor(state.lavaAnimTime * 4.5) % 4];
         }
-        ctx.fillStyle = boss.hurtCooldown > 0 ? COLORS.ChalkWhite : COLORS.LavaOrange;
+        const hoverY = (boss.isDefeated || boss.hp <= 0) ? 16 * worldScale : Math.sin(state.lavaAnimTime * 4.6) * 8 * worldScale;
+        ctx.save();
+        ctx.fillStyle = (boss.hurtCooldown > 0) ? 'rgba(255,255,255,0.45)' : 'rgba(255,109,0,0.24)';
         ctx.beginPath();
-        ctx.arc(hx, hy, 30 * worldScale, 0, Math.PI * 2);
+        ctx.arc(hx - 14 * worldScale, hy + hoverY, 58 * worldScale, 0, Math.PI * 2);
         ctx.fill();
+        if (window._dragonSheetImg && window._dragonSheetImg.complete && window._dragonSheetImg.naturalWidth > 0) {
+          const col = poseIdx % 5;
+          const row = Math.floor(poseIdx / 5);
+          const sprSize = 148 * worldScale;
+          if (boss.hurtCooldown > 0) {
+            ctx.filter = 'brightness(1.85) contrast(1.2)';
+          }
+          ctx.drawImage(
+            window._dragonSheetImg,
+            col * 320, row * 320, 320, 320,
+            hx - sprSize * 0.56, hy + hoverY - sprSize * 0.52, sprSize, sprSize
+          );
+          ctx.filter = 'none';
+        }
+        ctx.restore();
       }
 
       // 11. Hand-drawn Chalk Dust & Pencil Spark Particles

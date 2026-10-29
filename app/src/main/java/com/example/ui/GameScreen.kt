@@ -28,6 +28,9 @@ import com.example.game.render.SketchbookRenderer.renderGameWorld
 import kotlinx.coroutines.isActive
 
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import com.example.R
 
 /**
  * Main interactive screen for Draw to Survive:
@@ -43,6 +46,7 @@ fun DrawToSurviveScreen(
 ) {
   val screenState by viewModel.screenState.collectAsStateWithLifecycle()
   val hudState by viewModel.hudState.collectAsStateWithLifecycle()
+  val dragonSpriteSheet = ImageBitmap.imageResource(id = R.drawable.dragon_boss_sheet)
 
   var canvasWidthPx by remember { mutableFloatStateOf(1920f) }
   var canvasHeightPx by remember { mutableFloatStateOf(1080f) }
@@ -148,6 +152,7 @@ fun DrawToSurviveScreen(
         rockWalls = state.rockWalls,
         lavaMonsters = state.lavaMonsters,
         ignisBoss = state.ignisBoss,
+        dragonSpriteSheet = dragonSpriteSheet,
         equippedSkin = state.equippedSkin,
         equippedTrail = state.equippedTrail,
         activeCallout = state.activeCallout,

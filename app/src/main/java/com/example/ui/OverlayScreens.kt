@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -208,16 +210,26 @@ fun GameplayHudOverlay(
               modifier = Modifier.weight(1f),
               verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-              Text(
-                text = if (isBossDefeated) {
-                  "🐉 IGNIS SLAIN!"
-                } else {
-                  "🐉 BOSS HP: ${hudState.bossHp}/${hudState.bossMaxHp}"
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isBossDefeated) FinishBannerGreen else LavaOrange,
-                modifier = Modifier.testTag("boss_hp_text")
-              )
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+              ) {
+                Image(
+                  painter = painterResource(id = R.drawable.dragon_boss_icon),
+                  contentDescription = null,
+                  modifier = Modifier.size(16.dp)
+                )
+                Text(
+                  text = if (isBossDefeated) {
+                    "IGNIS SLAIN!"
+                  } else {
+                    "BOSS HP: ${hudState.bossHp}/${hudState.bossMaxHp}"
+                  },
+                  style = MaterialTheme.typography.labelSmall,
+                  color = if (isBossDefeated) FinishBannerGreen else LavaOrange,
+                  modifier = Modifier.testTag("boss_hp_text")
+                )
+              }
               LinearProgressIndicator(
                 progress = { bossRatio },
                 modifier = Modifier

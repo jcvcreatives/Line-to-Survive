@@ -1003,7 +1003,7 @@ object PhysicsEngine {
       }
 
       nextBoss = nextBoss.copy(
-        x = if (nextBossHp <= 0) nextBossX - 240f else nextBossX,
+        x = nextBossX,
         y = nextBossY,
         hp = nextBossHp,
         hurtCooldown = finalHurtCd,
