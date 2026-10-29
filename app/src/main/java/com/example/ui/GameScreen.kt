@@ -145,6 +145,11 @@ fun DrawToSurviveScreen(
         selectedTool = state.selectedTool,
         chalkBits = state.chalkBits,
         scribblers = state.scribblers,
+        rockWalls = state.rockWalls,
+        lavaMonsters = state.lavaMonsters,
+        ignisBoss = state.ignisBoss,
+        equippedSkin = state.equippedSkin,
+        equippedTrail = state.equippedTrail,
         activeCallout = state.activeCallout,
         lavaAnimTime = state.lavaAnimTime,
         embers = state.embers,
@@ -178,7 +183,11 @@ fun DrawToSurviveScreen(
             },
             onToggleSoundClick = { viewModel.toggleSound() },
             onSelectDifficultyClick = { diff -> viewModel.selectDifficulty(diff) },
-            onSelectMapClick = { map -> viewModel.selectMapBiome(map) }
+            onSelectMapClick = { map -> viewModel.selectMapBiome(map) },
+            onOpenShopClick = { viewModel.openShop() },
+            onCloseShopClick = { viewModel.closeShop() },
+            onBuyOrEquipShopItemClick = { item -> viewModel.buyOrEquipShopItem(item) },
+            onStartDailyChallengeClick = { viewModel.startDailyChallenge() }
           )
         }
 

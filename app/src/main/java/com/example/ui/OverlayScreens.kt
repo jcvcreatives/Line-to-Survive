@@ -75,12 +75,15 @@ import com.example.ui.theme.SketchPaperSurface
 import kotlin.math.roundToInt
 
 import com.example.game.model.GameplayHudState
+import com.example.game.model.RuneType
+import com.example.game.model.ShopCategory
+import com.example.game.model.ShopCatalog
+import com.example.game.model.ShopItem
 
 /**
  * Top HUD bar displayed during active gameplay:
+ * - Compact 2x2 Grid HUD (Magic Ink, Ignis Titan Boss HP, AI Rune Inspector badge, DIST & SCORE)
  * - Level indicator & title
- * - Level progress bar & percentage
- * - Remaining pencil ink meter
  * - Clear Drawn Lines button, Sound toggle button, and Pause button
  * - Floating "DRAW A PATH TO SURVIVE!" instruction banner
  */
@@ -97,15 +100,15 @@ fun GameplayHudOverlay(
     modifier = modifier
       .fillMaxWidth()
       .windowInsetsPadding(WindowInsets.safeDrawing)
-      .padding(horizontal = 16.dp, vertical = 10.dp),
+      .padding(horizontal = 14.dp, vertical = 8.dp),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    // Top control bar
+    // Top control bar with Compact 2x2 Grid HUD
     Surface(
       modifier = Modifier
         .fillMaxWidth()
         .testTag("gameplay_hud_bar"),
-      color = SketchPaperSurface.copy(alpha = 0.90f),
+      color = SketchPaperSurface.copy(alpha = 0.92f),
       shape = RoundedCornerShape(18.dp),
       border = BorderStroke(1.5.dp, ChalkWhite.copy(alpha = 0.25f)),
       tonalElevation = 6.dp
@@ -113,7 +116,7 @@ fun GameplayHudOverlay(
       Row(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 14.dp, vertical = 8.dp),
+          .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
       ) {
@@ -128,17 +131,20 @@ fun GameplayHudOverlay(
           )
           Text(
             text = hudState.levelTitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = PencilGraphite
+            style = MaterialTheme.typography.bodySmall,
+            color = PencilGraphite,
+            maxLines = 1
           )
         }
 
-        // Center: Progress indicator & Ink bar
+        // Center: Compact 2x2 Grid HUD
+        // Row 1 Left: Magic Ink | Row 1 Right: Ignis Titan Boss HP
+        // Row 2 Left: AI Rune Inspector Badge | Row 2 Right: DIST & SCORE
         Column(
           modifier = Modifier
             .weight(1f)
-            .padding(horizontal = 16.dp),
-          verticalArrangement = Arrangement.spacedBy(6.dp)
+            .padding(horizontal = 12.dp),
+          verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
           val pct = (hudState.levelProgress * 100f).roundToInt().coerceIn(0, 100)
           val inkPct = (hudState.inkRemainingRatio * 100).roundToInt().coerceIn(0, 100)
@@ -148,59 +154,152 @@ fun GameplayHudOverlay(
             hudState.inkRemainingRatio <= 0.60f -> LavaFlameYellow
             else -> InkCyanAccent
           }
+          val bossRatio = if (hudState.bossMaxHp > 0) {
+            (hudState.bossHp.toFloat() / hudState.bossMaxHp.toFloat()).coerceIn(0f, 1f)
+          } else {
+            0f
+          }
+          val isBossDefeated = hudState.bossHp <= 0
+          val isSuperAuraActive = hudState.superAuraSeconds > 0f
 
+          // 2x2 Grid Row 1: Magic Ink (Left) & Ignis Titan Boss HP (Right)
           Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
-            Text(
-              text = stringResource(R.string.label_progress, pct),
-              style = MaterialTheme.typography.bodyMedium,
-              color = ChalkWhite,
-              modifier = Modifier.testTag("progress_indicator_text")
-            )
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // Row 1 Left: Magic Ink
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+              ) {
+                Text(
+                  text = "${stringResource(R.string.label_ink_meter)}: $inkPct%",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = inkColor,
+                  modifier = Modifier.testTag("ink_indicator_text")
+                )
+                if (hudState.isInkRecharging && hudState.inkRemainingRatio < 0.98f) {
+                  Text(
+                    text = "(+⚡)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = LavaFlameYellow
+                  )
+                }
+              }
+              LinearProgressIndicator(
+                progress = { hudState.inkRemainingRatio },
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(6.dp)
+                  .clip(RoundedCornerShape(3.dp))
+                  .testTag("ink_progress_bar"),
+                color = inkColor,
+                trackColor = SketchCharcoalBg
+              )
+            }
+
+            // Row 1 Right: Ignis Titan Boss HP
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
               Text(
-                text = "${stringResource(R.string.label_ink_meter)}: $inkPct%",
-                style = MaterialTheme.typography.bodyMedium,
-                color = inkColor,
-                modifier = Modifier.testTag("ink_indicator_text")
+                text = if (isBossDefeated) {
+                  "🐉 IGNIS SLAIN!"
+                } else {
+                  "🐉 BOSS HP: ${hudState.bossHp}/${hudState.bossMaxHp}"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isBossDefeated) FinishBannerGreen else LavaOrange,
+                modifier = Modifier.testTag("boss_hp_text")
               )
-              if (hudState.isInkRecharging && hudState.inkRemainingRatio < 0.98f) {
-                Text(
-                  text = "(+⚡)",
-                  style = MaterialTheme.typography.bodySmall,
-                  color = LavaFlameYellow
-                )
-              }
+              LinearProgressIndicator(
+                progress = { bossRatio },
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(6.dp)
+                  .clip(RoundedCornerShape(3.dp))
+                  .testTag("boss_hp_bar"),
+                color = LavaDeepRed,
+                trackColor = SketchCharcoalBg
+              )
             }
           }
 
-          LinearProgressIndicator(
-            progress = { hudState.levelProgress },
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(8.dp)
-              .clip(RoundedCornerShape(4.dp))
-              .testTag("level_progress_bar"),
-            color = FinishBannerGreen,
-            trackColor = SketchCharcoalBg
-          )
+          // 2x2 Grid Row 2: AI Rune Inspector Badge (Left) & DIST / SCORE (Right)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            // Row 2 Left: AI Rune Inspector Badge
+            val runeColor = when {
+              isSuperAuraActive || hudState.lastRuneType == RuneType.STAR_SPARK -> LavaFlameYellow
+              hudState.lastRuneType == RuneType.ZIGZAG_COIL -> InkCyanAccent
+              hudState.lastRuneType == RuneType.RAMP_SLOPE -> FinishBannerGreen
+              else -> ChalkWhite
+            }
+            Surface(
+              modifier = Modifier
+                .weight(1f)
+                .testTag("rune_inspector_badge"),
+              color = SketchCharcoalBg.copy(alpha = 0.85f),
+              shape = RoundedCornerShape(6.dp),
+              border = BorderStroke(1.dp, runeColor.copy(alpha = 0.65f))
+            ) {
+              Text(
+                text = if (isSuperAuraActive) {
+                  "✨ SUPER AURA!"
+                } else {
+                  hudState.lastRuneType.badgeLabel
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = runeColor,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+              )
+            }
 
-          LinearProgressIndicator(
-            progress = { hudState.inkRemainingRatio },
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(6.dp)
-              .clip(RoundedCornerShape(3.dp))
-              .testTag("ink_progress_bar"),
-            color = inkColor,
-            trackColor = SketchCharcoalBg
-          )
+            // Row 2 Right: Compact DIST & SCORE counters + progress bar
+            Column(
+              modifier = Modifier.weight(1f),
+              verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = stringResource(R.string.label_progress, pct),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = ChalkWhite,
+                  modifier = Modifier.testTag("progress_indicator_text")
+                )
+                Text(
+                  text = "PTS ${hudState.score}",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = LavaFlameYellow,
+                  modifier = Modifier.testTag("score_indicator_text")
+                )
+              }
+              LinearProgressIndicator(
+                progress = { hudState.levelProgress },
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(6.dp)
+                  .clip(RoundedCornerShape(3.dp))
+                  .testTag("level_progress_bar"),
+                color = FinishBannerGreen,
+                trackColor = SketchCharcoalBg
+              )
+            }
+          }
         }
 
         // Right: Action buttons (Clear Ink, Sound, Pause)
@@ -314,6 +413,23 @@ fun GameplayHudOverlay(
           )
         }
       }
+
+      if (hudState.hasTitanShield) {
+        Surface(
+          shape = RoundedCornerShape(50),
+          color = SketchCharcoalBg.copy(alpha = 0.88f),
+          border = BorderStroke(1.dp, InkCyanAccent)
+        ) {
+          Text(
+            text = "🛡️ SHIELD",
+            style = MaterialTheme.typography.bodySmall,
+            color = InkCyanAccent,
+            modifier = Modifier
+              .padding(horizontal = 10.dp, vertical = 6.dp)
+              .testTag("shield_indicator_text")
+          )
+        }
+      }
     }
 
     Spacer(modifier = Modifier.height(6.dp))
@@ -387,6 +503,13 @@ fun GameplayHudOverlay(
       isInkRecharging = uiState.isInkRecharging,
       soundEnabled = uiState.soundEnabled,
       selectedTool = uiState.selectedTool,
+      lastRuneType = uiState.lastRuneType,
+      superAuraSeconds = uiState.stickman.superAuraTimer,
+      hasTitanShield = uiState.stickman.hasTitanShield,
+      bossHp = uiState.ignisBoss.hp,
+      bossMaxHp = uiState.ignisBoss.maxHp,
+      score = uiState.score,
+      currency = uiState.currency,
       totalBitsInLevel = uiState.totalBitsInLevel,
       bitsCollectedCount = uiState.bitsCollectedCount,
       comboCount = uiState.comboCount,
@@ -403,7 +526,8 @@ fun GameplayHudOverlay(
 }
 
 /**
- * Start screen with the title DRAW TO SURVIVE, 50-Level Candy Crush Saga Map, scaling stats inspector, and Play button.
+ * Start screen with the title DRAW TO SURVIVE, 50-Level Candy Crush Saga Map, scaling stats inspector,
+ * Daily Challenge launcher, Alchemist's Bazaar Shop, and Play button.
  */
 @Composable
 fun StartMenuOverlay(
@@ -412,7 +536,11 @@ fun StartMenuOverlay(
   onSelectLevelClick: (Int) -> Unit,
   onToggleSoundClick: () -> Unit,
   onSelectDifficultyClick: (com.example.game.model.DifficultyMode) -> Unit = {},
-  onSelectMapClick: (com.example.game.model.MapBiome) -> Unit = {}
+  onSelectMapClick: (com.example.game.model.MapBiome) -> Unit = {},
+  onOpenShopClick: () -> Unit = {},
+  onCloseShopClick: () -> Unit = {},
+  onBuyOrEquipShopItemClick: (ShopItem) -> Unit = {},
+  onStartDailyChallengeClick: () -> Unit = {}
 ) {
   val selectedConfig = com.example.game.level.LevelCatalog.getLevelConfig(
     level = uiState.currentLevel,
@@ -542,7 +670,7 @@ fun StartMenuOverlay(
           modifier = Modifier
             .fillMaxWidth()
             .weight(1f, fill = false)
-            .height(175.dp)
+            .height(162.dp)
         )
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -555,7 +683,53 @@ fun StartMenuOverlay(
           onStepLevel = onSelectLevelClick
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Daily Challenge & Alchemist's Bazaar Shop Row
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          OutlinedButton(
+            onClick = onStartDailyChallengeClick,
+            modifier = Modifier
+              .weight(1f)
+              .height(40.dp)
+              .testTag("daily_challenge_button"),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.5.dp, InkCyanAccent)
+          ) {
+            Text(
+              text = if (uiState.dailyChallengeCompleted) {
+                "✓ DAILY (${uiState.dailyChallengeModifier})"
+              } else {
+                "⚡ DAILY: ${uiState.dailyChallengeModifier}"
+              },
+              style = MaterialTheme.typography.labelMedium,
+              color = InkCyanAccent,
+              maxLines = 1
+            )
+          }
+
+          OutlinedButton(
+            onClick = onOpenShopClick,
+            modifier = Modifier
+              .weight(1f)
+              .height(40.dp)
+              .testTag("shop_button"),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.5.dp, LavaFlameYellow)
+          ) {
+            Text(
+              text = "⚗️ BAZAAR • 🪙 ${uiState.currency}",
+              style = MaterialTheme.typography.labelMedium,
+              color = LavaFlameYellow,
+              maxLines = 1
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Large Play Button
         Button(
@@ -580,6 +754,198 @@ fun StartMenuOverlay(
             text = "${stringResource(R.string.action_play)} (LVL ${uiState.currentLevel} • ${uiState.selectedDifficulty.displayName.uppercase()})",
             style = MaterialTheme.typography.titleLarge
           )
+        }
+      }
+    }
+
+    if (uiState.showShopModal) {
+      AlchemistsBazaarModal(
+        uiState = uiState,
+        onCloseClick = onCloseShopClick,
+        onBuyOrEquipItem = onBuyOrEquipShopItemClick
+      )
+    }
+  }
+}
+
+@Composable
+fun AlchemistsBazaarModal(
+  uiState: GameUiState,
+  onCloseClick: () -> Unit,
+  onBuyOrEquipItem: (ShopItem) -> Unit
+) {
+  val selectedCategoryState = androidx.compose.runtime.remember {
+    androidx.compose.runtime.mutableStateOf(ShopCategory.SKIN)
+  }
+  val activeCategory = selectedCategoryState.value
+  val displayedItems = when (activeCategory) {
+    ShopCategory.SKIN -> ShopCatalog.SKINS
+    ShopCategory.TRAIL -> ShopCatalog.TRAILS
+    ShopCategory.PERK -> ShopCatalog.PERKS
+  }
+  Box(
+    modifier = Modifier
+      .fillMaxSize()
+      .background(SketchCharcoalBg.copy(alpha = 0.88f))
+      .padding(16.dp)
+      .testTag("alchemists_bazaar_modal"),
+    contentAlignment = Alignment.Center
+  ) {
+    Card(
+      modifier = Modifier
+        .fillMaxWidth()
+        .widthIn(max = 580.dp)
+        .border(2.dp, LavaFlameYellow, RoundedCornerShape(22.dp)),
+      shape = RoundedCornerShape(22.dp),
+      colors = CardDefaults.cardColors(containerColor = SketchPaperSurface)
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Column {
+            Text(
+              text = "⚗️ ALCHEMIST'S BAZAAR",
+              style = MaterialTheme.typography.titleLarge,
+              color = LavaFlameYellow,
+              modifier = Modifier.testTag("shop_title_text")
+            )
+            Text(
+              text = "🪙 ${uiState.currency} ORBS",
+              style = MaterialTheme.typography.titleMedium,
+              color = FinishBannerGreen,
+              modifier = Modifier.testTag("shop_currency_text")
+            )
+          }
+
+          OutlinedButton(
+            onClick = onCloseClick,
+            modifier = Modifier
+              .height(38.dp)
+              .testTag("close_shop_button"),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.5.dp, ChalkWhite)
+          ) {
+            Text(
+              text = "CLOSE",
+              style = MaterialTheme.typography.labelLarge,
+              color = ChalkWhite
+            )
+          }
+        }
+
+        // Category Switcher Row: SKINS | TRAILS | PERKS
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          for (cat in ShopCategory.entries) {
+            val isCatSelected = cat == activeCategory
+            Surface(
+              onClick = { selectedCategoryState.value = cat },
+              modifier = Modifier
+                .weight(1f)
+                .testTag("shop_tab_${cat.name}"),
+              shape = RoundedCornerShape(10.dp),
+              color = if (isCatSelected) LavaFlameYellow.copy(alpha = 0.22f) else SketchCharcoalBg.copy(alpha = 0.7f),
+              border = BorderStroke(
+                width = if (isCatSelected) 1.5.dp else 1.dp,
+                color = if (isCatSelected) LavaFlameYellow else ChalkWhite.copy(alpha = 0.25f)
+              )
+            ) {
+              Text(
+                text = "${cat.name}S",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isCatSelected) LavaFlameYellow else ChalkWhite,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 6.dp)
+              )
+            }
+          }
+        }
+
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f, fill = false),
+          verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+          for (item in displayedItems) {
+            val isUnlocked = when (item.category) {
+              ShopCategory.SKIN -> item.id in uiState.unlockedSkins
+              ShopCategory.TRAIL -> item.id in uiState.unlockedTrails
+              ShopCategory.PERK -> item.id in uiState.unlockedPerks
+            }
+            val isEquipped = when (item.category) {
+              ShopCategory.SKIN -> uiState.equippedSkin == item.id
+              ShopCategory.TRAIL -> uiState.equippedTrail == item.id
+              ShopCategory.PERK -> uiState.equippedPerk == item.id
+            }
+            Surface(
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("shop_item_${item.id}"),
+              color = SketchCharcoalBg.copy(alpha = 0.82f),
+              shape = RoundedCornerShape(12.dp),
+              border = BorderStroke(
+                1.dp,
+                if (isEquipped) FinishBannerGreen else ChalkWhite.copy(alpha = 0.2f)
+              )
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 12.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(
+                    text = "${item.name} (${item.category.name})",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isEquipped) FinishBannerGreen else ChalkWhite
+                  )
+                  Text(
+                    text = item.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PencilGraphite,
+                    maxLines = 1
+                  )
+                }
+                Button(
+                  onClick = { onBuyOrEquipItem(item) },
+                  enabled = isUnlocked || uiState.currency >= item.cost,
+                  modifier = Modifier
+                    .height(32.dp)
+                    .testTag("shop_action_${item.id}"),
+                  colors = ButtonDefaults.buttonColors(
+                    containerColor = when {
+                      isEquipped -> FinishBannerGreen
+                      isUnlocked -> InkCyanAccent
+                      else -> LavaOrange
+                    },
+                    contentColor = SketchCharcoalBg
+                  )
+                ) {
+                  Text(
+                    text = when {
+                      isEquipped -> "EQUIPPED"
+                      isUnlocked -> "EQUIP"
+                      else -> "BUY ${item.cost}"
+                    },
+                    style = MaterialTheme.typography.labelSmall
+                  )
+                }
+              }
+            }
+          }
         }
       }
     }

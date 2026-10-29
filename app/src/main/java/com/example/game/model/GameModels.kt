@@ -28,15 +28,133 @@ object WorldConstants {
   const val GRAVITY = 960f
   const val MAX_FALL_SPEED = 680f
 
-  // Camera keeps the stickman around 24% from the left edge of the screen
-  const val CAMERA_LEAD_RATIO = 0.24f
+  // Camera keeps the stickman around 28% from the left edge of the screen
+  const val CAMERA_LEAD_RATIO = 0.28f
 
   // Maximum length of a single drawn line per finger drag attempt
   const val MAX_STROKE_LENGTH = 760f
   const val MIN_POINT_DISTANCE = 10f
 
   // Default lifetime for fading chalk lines before they crumble
-  const val DEFAULT_LINE_LIFETIME = 7.5f
+  const val DEFAULT_LINE_LIFETIME = 5.5f
+}
+
+/**
+ * Pure Line-Drawing & Rune Classification Engine output types:
+ * 1. [STANDARD_INK]: Straight bridge (`straightnessRatio > 0.88` and `directionFlips < 2`).
+ * 2. [STAR_SPARK]: Closed circle on runner (`isClosedLoop` near player) -> +25% Ink & 5.0s Super Aura Sonic Dash.
+ * 3. [ZIGZAG_COIL]: Zig-zag / W-shape (`directionFlips >= 2`) -> Neon Cyan trampoline (`1.8x` bounce) & +15% Ink.
+ * 4. [RAMP_SLOPE]: Curved ramp / loop ahead -> Neon Green turbo conveyor (`1.9x` speed) & +12% Ink.
+ */
+enum class RuneType(
+  val badgeLabel: String,
+  val description: String
+) {
+  STANDARD_INK("BRIDGE", "Solid White/Cyan Ink Bridge"),
+  STAR_SPARK("STAR SPARK", "Gold Super Aura Dash (+25% Ink)"),
+  ZIGZAG_COIL("BOUNCE COIL", "Neon Cyan Trampoline (+15% Ink)"),
+  RAMP_SLOPE("TURBO RAMP", "Neon Green Conveyor (+12% Ink)")
+}
+
+data class RuneClassification(
+  val runeType: RuneType,
+  val effectiveTool: ChalkTool,
+  val inkRefundRatio: Float = 0f,
+  val triggersSuperAura: Boolean = false,
+  val triggersImmediateBounce: Boolean = false
+)
+
+/**
+ * Breakable stone pillar hazard that blocks/kills normal runners,
+ * but is smashed apart by Super Aura or Turbo runners for +25 Score and flying rock debris.
+ */
+data class BreakableRockWall(
+  val id: Int,
+  val x: Float,
+  val topY: Float,
+  val bottomY: Float,
+  val width: Float = 30f,
+  val isSmashed: Boolean = false
+)
+
+/**
+ * Spiky magma imp that leaps vertically out of lava gaps.
+ * Normal contact triggers lethal hazard/knockback, while Super Aura blasts the monster for +35 Score & +15% Ink.
+ */
+data class LeapingLavaMonster(
+  val id: Int,
+  val x: Float,
+  val baseY: Float = WorldConstants.LAVA_SURFACE_Y,
+  val peakY: Float = 250f,
+  val cycleSeconds: Float = 2.6f,
+  val phaseOffset: Float = 0f,
+  val radius: Float = 18f,
+  val isDefeated: Boolean = false
+) {
+  fun currentYAt(timeSeconds: Float): Float {
+    val safeCycle = cycleSeconds.coerceAtLeast(1.0f)
+    val prog = (((timeSeconds + phaseOffset) % safeCycle).let { if (it < 0f) it + safeCycle else it }) / safeCycle
+    if (prog < 0.35f) return baseY + 12f
+    val leapProg = (prog - 0.35f) / 0.65f
+    val arc = sin(leapProg * Math.PI.toFloat()).coerceIn(0f, 1f)
+    return baseY - (baseY - peakY) * arc
+  }
+}
+
+/**
+ * Colossal Lava Dragon Boss (Ignis Titan) chasing from the left with decoupled velocity and i-frame recoil.
+ */
+data class IgnisTitanBoss(
+  val x: Float = -240f,
+  val y: Float = WorldConstants.DEFAULT_GROUND_Y - 36f,
+  val hp: Int = 5,
+  val maxHp: Int = 5,
+  val hurtCooldown: Float = 0f,
+  val biteCooldown: Float = 0f,
+  val knockbackVx: Float = 0f,
+  val isDefeated: Boolean = false
+) {
+  val hpRatio: Float
+    get() = if (maxHp > 0) (hp.toFloat() / maxHp).coerceIn(0f, 1f) else 0f
+}
+
+/**
+ * Alchemist's Bazaar Shop Item definitions (Skins, Trails, and Perks).
+ */
+enum class ShopCategory {
+  SKIN,
+  TRAIL,
+  PERK
+}
+
+data class ShopItem(
+  val id: String,
+  val name: String,
+  val description: String,
+  val cost: Int,
+  val category: ShopCategory
+)
+
+object ShopCatalog {
+  val SKINS = listOf(
+    ShopItem("DEFAULT", "Crimson Striker", "Classic fighting stickman with spiky crimson hair", 0, ShopCategory.SKIN),
+    ShopItem("CYBER_NINJA", "Cyber-Ninja", "Neon cyan visor & plasma scarf", 350, ShopCategory.SKIN),
+    ShopItem("MAGMA_STRIKER", "Magma Striker", "Molten obsidian core & ember trail", 500, ShopCategory.SKIN),
+    ShopItem("GOLDEN_TITAN", "Golden Titan God", "Radiant sovereign gold aura", 800, ShopCategory.SKIN)
+  )
+
+  val TRAILS = listOf(
+    ShopItem("STANDARD_INK", "Standard Chalk", "Crisp sketchbook white & cyan ink", 0, ShopCategory.TRAIL),
+    ShopItem("RAINBOW_PRISM", "Rainbow Prism", "Iridescent prismatic bridge strokes", 300, ShopCategory.TRAIL),
+    ShopItem("SAKURA_BLOSSOM", "Sakura Blossom", "Vivid cherry-blossom pink ink", 400, ShopCategory.TRAIL),
+    ShopItem("LIGHTNING_SPARK", "Lightning Spark", "High-voltage electric gold & cyan", 600, ShopCategory.TRAIL)
+  )
+
+  val PERKS = listOf(
+    ShopItem("INK_MAGNET", "Ink Magnet", "+35% magnetic pull radius on orbs & chalk", 300, ShopCategory.PERK),
+    ShopItem("REFINED_CATALYST", "Refined Catalyst", "-18% Magic Ink drain when drawing", 450, ShopCategory.PERK),
+    ShopItem("TITAN_SHIELD", "Titan's Shield", "Absorbs 1 lethal obstacle hit per run", 650, ShopCategory.PERK)
+  )
 }
 
 /**
@@ -136,7 +254,7 @@ enum class MapBiome(
 
 /**
  * Switchable chalk tools introducing the evolved mechanics:
- * - WHITE: Standard chalk floor + steep strokes act as knee-high vault hurdles
+ * - WHITE: Standard chalk floor + Rune classification on finger release
  * - SPRING: Blue bouncy trampoline chalk that launches the stickman into a high arc
  * - BOOST: Gold steel turbo chalk that never crumbles, speeds up the runner, and rams enemies
  * - CUTTER: Snips a drawn line to refund 60% chalk and emit an enemy-stunning shockwave
@@ -177,7 +295,7 @@ data class CalloutMove(
 }
 
 /**
- * A collectible chalk stub or gold star floating in the level.
+ * A collectible chalk stub or gold star/orb floating in the level.
  */
 data class ChalkBit(
   val id: Int,
@@ -231,6 +349,7 @@ data class DrawnLine(
   val points: List<Vec2>,
   val isCompleted: Boolean = true,
   val tool: ChalkTool = ChalkTool.WHITE,
+  val runeType: RuneType = RuneType.STANDARD_INK,
   val ageSeconds: Float = 0f,
   val maxLifetime: Float = WorldConstants.DEFAULT_LINE_LIFETIME,
   val segments: List<LineSegment> =
@@ -456,7 +575,6 @@ data class DynamicHazard(
    * Returns `0f` when dormant/bubbling, or `0f..1f` eruption height ratio when active.
    */
   fun geyserEruptionRatioAt(timeSeconds: Float): Float {
-    val safeCycle = cycleSeconds.coerceAtLeast(1.0f)
     val prog = vanishingCycleProgressAt(timeSeconds)
     // First 58% of cycle is warning bubble at lava surface; remaining 42% is vertical fireball eruption
     if (prog < 0.58f) return 0f
@@ -583,6 +701,11 @@ data class LevelDefinition(
   val thumbtacks: List<ThumbtackCluster> = emptyList(),
   val scribblers: List<ScribblerEnemy> = emptyList(),
   val hazards: List<DynamicHazard> = emptyList(),
+  val rockWalls: List<BreakableRockWall> = emptyList(),
+  val lavaMonsters: List<LeapingLavaMonster> = emptyList(),
+  val bossMaxHp: Int = 5,
+  val scoreMultiplier: Float = 1.0f,
+  val dailyModifier: String? = null,
   val calloutScript: List<ScriptedCallout> = emptyList()
 )
 
@@ -602,6 +725,9 @@ data class StickmanState(
   val boostTimer: Float = 0f,
   val lowGravityTimer: Float = 0f,
   val blitzTimer: Float = 0f,
+  val superAuraTimer: Float = 0f,
+  val invulnerableTimer: Float = 0f,
+  val hasTitanShield: Boolean = false,
   val landingSquashTimer: Float = 0f,
   val deathTimer: Float = 0f
 )
@@ -669,6 +795,7 @@ data class GameUiState(
   val stickman: StickmanState,
   val cameraX: Float = 0f,
   val selectedTool: ChalkTool = ChalkTool.WHITE,
+  val lastRuneType: RuneType = RuneType.STANDARD_INK,
   val completedLines: List<DrawnLine> = emptyList(),
   val activeStrokePoints: List<Vec2> = emptyList(),
   val activeStrokeRemainingRatio: Float = 1f,
@@ -676,16 +803,33 @@ data class GameUiState(
   val totalInkDrawn: Float = 0f,
   val chalkBits: List<ChalkBit> = emptyList(),
   val scribblers: List<ScribblerEnemy> = emptyList(),
+  val rockWalls: List<BreakableRockWall> = emptyList(),
+  val lavaMonsters: List<LeapingLavaMonster> = emptyList(),
+  val ignisBoss: IgnisTitanBoss = IgnisTitanBoss(),
+  val bossFlawless: Boolean = true,
   val activeCallout: CalloutMove? = null,
   val triggeredCalloutIndices: Set<Int> = emptySet(),
   val comboCount: Int = 0,
+  val score: Int = 0,
   val starsEarned: Int = 3,
   val levelProgress: Float = 0f,
   val lavaAnimTime: Float = 0f,
   val embers: List<EmberParticle> = emptyList(),
   val sketchParticles: List<SketchParticle> = emptyList(),
   val soundEnabled: Boolean = true,
-  val showInstructionBanner: Boolean = true
+  val showInstructionBanner: Boolean = true,
+  val currency: Int = 500,
+  val equippedSkin: String = "DEFAULT",
+  val equippedTrail: String = "STANDARD_INK",
+  val equippedPerk: String = "",
+  val unlockedSkins: Set<String> = setOf("DEFAULT"),
+  val unlockedTrails: Set<String> = setOf("STANDARD_INK"),
+  val unlockedPerks: Set<String> = emptySet(),
+  val dailyChallengeDate: String = "2026-10-29",
+  val dailyChallengeModifier: String = "Turbo Ignis",
+  val dailyChallengeCompleted: Boolean = false,
+  val isDailyChallengeRun: Boolean = false,
+  val showShopModal: Boolean = false
 ) {
   val totalStarsEarned: Int
     get() = levelStars.values.sum()
@@ -727,18 +871,18 @@ data class GameUiState(
     get() = totalInkDrawn <= levelDefinition.parInkUsage
 
   val earnedCollectibleStar: Boolean
-    get() = allCollectiblesCount == 0 || allCollectiblesGotCount >= collectibleTargetCount
+    get() = (allCollectiblesCount == 0 || allCollectiblesGotCount >= collectibleTargetCount) && bossFlawless
 
   fun calculateEarnedStars(): Int {
     var stars = 1 // 1st star: Crossing completed
     if (earnedInkEfficiencyStar) stars++ // 2nd star: Ink efficiency within par budget
-    if (earnedCollectibleStar) stars++ // 3rd star: Collectibles target met
+    if (earnedCollectibleStar) stars++ // 3rd star: Collectibles target & Boss Flawless
     return stars.coerceIn(1, 3)
   }
 }
 
 /**
- * Isolated state representation for the top Gameplay HUD.
+ * Isolated state representation for the top Gameplay 2x2 Grid HUD.
  * Only recomposes when key values change rather than on every 60 FPS physics tick.
  */
 data class GameplayHudState(
@@ -749,6 +893,13 @@ data class GameplayHudState(
   val isInkRecharging: Boolean = false,
   val soundEnabled: Boolean = true,
   val selectedTool: ChalkTool = ChalkTool.WHITE,
+  val lastRuneType: RuneType = RuneType.STANDARD_INK,
+  val superAuraSeconds: Float = 0f,
+  val hasTitanShield: Boolean = false,
+  val bossHp: Int = 5,
+  val bossMaxHp: Int = 5,
+  val score: Int = 0,
+  val currency: Int = 500,
   val totalBitsInLevel: Int = 0,
   val bitsCollectedCount: Int = 0,
   val comboCount: Int = 0,

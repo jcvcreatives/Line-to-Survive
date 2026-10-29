@@ -2,8 +2,10 @@ package com.example.game
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
 import com.example.audio.SoundEffectManager
 import com.example.data.ProgressRepository
+import com.example.data.local.GameRepository
 import com.example.game.level.LevelCatalog
 import com.example.game.model.CalloutMove
 import com.example.game.model.CalloutMoveType
@@ -11,9 +13,14 @@ import com.example.game.model.ChalkTool
 import com.example.game.model.DifficultyMode
 import com.example.game.model.DrawnLine
 import com.example.game.model.GameUiState
+import com.example.game.model.GameplayHudState
+import com.example.game.model.IgnisTitanBoss
 import com.example.game.model.LevelDefinition
 import com.example.game.model.MapBiome
+import com.example.game.model.RuneType
 import com.example.game.model.ScreenState
+import com.example.game.model.ShopCategory
+import com.example.game.model.ShopItem
 import com.example.game.model.StickmanState
 import com.example.game.model.Vec2
 import com.example.game.model.WorldConstants
@@ -22,16 +29,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 
 /**
  * Manages the game state, 50-level progression matrix, DifficultyModes, MapBiomes,
- * multi-chalk palette tools, callout move bubbles, chalk bit magnet collection, and 60 FPS simulation.
+ * Pure Line-Drawing & Rune Classification Engine, Colossal Lava Dragon Boss (Ignis Titan),
+ * Daily Challenge modifiers, Room Database Alchemist's Bazaar Shop, and 60 FPS simulation.
  */
 class GameViewModel(
   private val progressRepository: ProgressRepository,
-  private val soundManager: SoundEffectManager
+  private val soundManager: SoundEffectManager,
+  private val gameRepository: GameRepository = GameRepository()
 ) : ViewModel() {
 
   private var nextLineId = 1L
@@ -43,13 +53,65 @@ class GameViewModel(
   val screenState: StateFlow<ScreenState> = _screenState.asStateFlow()
 
   private val _hudState = MutableStateFlow(createInitialHudState(_uiState.value))
-  val hudState: StateFlow<com.example.game.model.GameplayHudState> = _hudState.asStateFlow()
+  val hudState: StateFlow<GameplayHudState> = _hudState.asStateFlow()
+
+  init {
+    viewModelScope.launch {
+      val (initialPlayer, initialChallenge) = gameRepository.ensureInitialized()
+      updateState { state ->
+        state.copy(
+          currency = initialPlayer.currency,
+          equippedSkin = initialPlayer.equippedSkin,
+          equippedTrail = initialPlayer.equippedTrail,
+          equippedPerk = initialPlayer.equippedPerk,
+          unlockedSkins = initialPlayer.unlockedSkins,
+          unlockedTrails = initialPlayer.unlockedTrails,
+          unlockedPerks = initialPlayer.unlockedPerks,
+          dailyChallengeDate = initialChallenge.dateKey,
+          dailyChallengeModifier = initialChallenge.modifierName,
+          dailyChallengeCompleted = initialChallenge.completed
+        )
+      }
+    }
+
+    viewModelScope.launch {
+      gameRepository.observePlayerProfile().collect { player ->
+        if (player != null) {
+          updateState { state ->
+            state.copy(
+              currency = player.currency,
+              equippedSkin = player.equippedSkin,
+              equippedTrail = player.equippedTrail,
+              equippedPerk = player.equippedPerk,
+              unlockedSkins = player.unlockedSkins,
+              unlockedTrails = player.unlockedTrails,
+              unlockedPerks = player.unlockedPerks
+            )
+          }
+        }
+      }
+    }
+
+    viewModelScope.launch {
+      gameRepository.observeTodayChallenge().collect { challenge ->
+        if (challenge != null) {
+          updateState { state ->
+            state.copy(
+              dailyChallengeDate = challenge.dateKey,
+              dailyChallengeModifier = challenge.modifierName,
+              dailyChallengeCompleted = challenge.completed
+            )
+          }
+        }
+      }
+    }
+  }
 
   fun currentGameState(): GameUiState = _uiState.value
   fun currentCameraX(): Float = _uiState.value.cameraX
 
-  private fun createInitialHudState(state: GameUiState): com.example.game.model.GameplayHudState {
-    return com.example.game.model.GameplayHudState(
+  private fun createInitialHudState(state: GameUiState): GameplayHudState {
+    return GameplayHudState(
       currentLevel = state.currentLevel,
       levelTitle = state.levelDefinition.title,
       levelProgress = state.levelProgress,
@@ -57,6 +119,13 @@ class GameViewModel(
       isInkRecharging = state.isInkRecharging,
       soundEnabled = state.soundEnabled,
       selectedTool = state.selectedTool,
+      lastRuneType = state.lastRuneType,
+      superAuraSeconds = state.stickman.superAuraTimer,
+      hasTitanShield = state.stickman.hasTitanShield,
+      bossHp = state.ignisBoss.hp,
+      bossMaxHp = state.ignisBoss.maxHp,
+      score = state.score,
+      currency = state.currency,
       totalBitsInLevel = state.totalBitsInLevel,
       bitsCollectedCount = state.bitsCollectedCount,
       comboCount = state.comboCount,
@@ -83,10 +152,19 @@ class GameViewModel(
     val nextInkPct = (state.inkRemainingRatio * 100f).toInt()
     val curProgPct = (cur.levelProgress * 100f).toInt()
     val nextProgPct = (state.levelProgress * 100f).toInt()
+    val curAuraTenths = (cur.superAuraSeconds * 10f).toInt()
+    val nextAuraTenths = (state.stickman.superAuraTimer * 10f).toInt()
     val hasLines = state.completedLines.isNotEmpty()
 
     if (cur.currentLevel != state.currentLevel ||
       cur.selectedTool != state.selectedTool ||
+      cur.lastRuneType != state.lastRuneType ||
+      curAuraTenths != nextAuraTenths ||
+      cur.hasTitanShield != state.stickman.hasTitanShield ||
+      cur.bossHp != state.ignisBoss.hp ||
+      cur.bossMaxHp != state.ignisBoss.maxHp ||
+      cur.score != state.score ||
+      cur.currency != state.currency ||
       cur.soundEnabled != state.soundEnabled ||
       cur.comboCount != state.comboCount ||
       cur.bitsCollectedCount != state.bitsCollectedCount ||
@@ -99,7 +177,7 @@ class GameViewModel(
       curProgPct != nextProgPct ||
       cur.levelTitle != state.levelDefinition.title
     ) {
-      _hudState.value = com.example.game.model.GameplayHudState(
+      _hudState.value = GameplayHudState(
         currentLevel = state.currentLevel,
         levelTitle = state.levelDefinition.title,
         levelProgress = state.levelProgress,
@@ -107,6 +185,13 @@ class GameViewModel(
         isInkRecharging = state.isInkRecharging,
         soundEnabled = state.soundEnabled,
         selectedTool = state.selectedTool,
+        lastRuneType = state.lastRuneType,
+        superAuraSeconds = state.stickman.superAuraTimer,
+        hasTitanShield = state.stickman.hasTitanShield,
+        bossHp = state.ignisBoss.hp,
+        bossMaxHp = state.ignisBoss.maxHp,
+        score = state.score,
+        currency = state.currency,
         totalBitsInLevel = state.totalBitsInLevel,
         bitsCollectedCount = state.bitsCollectedCount,
         comboCount = state.comboCount,
@@ -125,6 +210,8 @@ class GameViewModel(
     val defaultDifficulty = DifficultyMode.NORMAL
     val defaultMap = MapBiome.MAP_1_VOLCANO
     val level1 = LevelCatalog.getLevel(1, defaultDifficulty, defaultMap)
+    val todayKey = gameRepository.currentUtcDateKey()
+    val todayChallenge = gameRepository.createDefaultDailyChallenge(todayKey)
     return GameUiState(
       screenState = ScreenState.START_MENU,
       currentLevel = 1,
@@ -133,24 +220,74 @@ class GameViewModel(
       selectedDifficulty = defaultDifficulty,
       selectedMap = defaultMap,
       levelDefinition = level1,
-      stickman = createInitialStickman(level1),
+      stickman = createInitialStickman(level1, equippedPerk = ""),
       cameraX = 0f,
       selectedTool = ChalkTool.WHITE,
       currentInk = level1.maxInkPerLevel,
       chalkBits = level1.chalkBits,
       scribblers = level1.scribblers,
+      rockWalls = level1.rockWalls,
+      lavaMonsters = level1.lavaMonsters,
+      ignisBoss = createInitialBoss(level1),
       soundEnabled = soundOn,
-      showInstructionBanner = true
+      showInstructionBanner = true,
+      dailyChallengeDate = todayChallenge.dateKey,
+      dailyChallengeModifier = todayChallenge.modifierName,
+      dailyChallengeCompleted = todayChallenge.completed
     )
   }
 
-  private fun createInitialStickman(level: LevelDefinition): StickmanState {
+  private fun createInitialStickman(level: LevelDefinition, equippedPerk: String): StickmanState {
     return StickmanState(
       footX = level.spawnPosition.x,
       footY = level.spawnPosition.y,
       velocityX = level.runSpeed,
       velocityY = 0f,
-      isGrounded = true
+      isGrounded = true,
+      hasTitanShield = (equippedPerk == "TITAN_SHIELD")
+    )
+  }
+
+  private fun createInitialBoss(level: LevelDefinition): IgnisTitanBoss {
+    return IgnisTitanBoss(
+      x = level.spawnPosition.x - 245f,
+      y = level.spawnPosition.y - 36f,
+      hp = level.bossMaxHp,
+      maxHp = level.bossMaxHp
+    )
+  }
+
+  fun openShop() {
+    soundManager.playButtonClick()
+    updateState { it.copy(showShopModal = true) }
+  }
+
+  fun closeShop() {
+    soundManager.playButtonClick()
+    updateState { it.copy(showShopModal = false) }
+  }
+
+  fun buyOrEquipShopItem(item: ShopItem) {
+    soundManager.playButtonClick()
+    viewModelScope.launch {
+      when (item.category) {
+        ShopCategory.SKIN -> gameRepository.purchaseOrEquipSkin(item.id, item.cost)
+        ShopCategory.TRAIL -> gameRepository.purchaseOrEquipTrail(item.id, item.cost)
+        ShopCategory.PERK -> gameRepository.purchaseOrEquipPerk(item.id, item.cost)
+      }
+    }
+  }
+
+  fun startDailyChallenge() {
+    soundManager.playButtonClick()
+    val cur = _uiState.value
+    val dailyLevelIndex = (( kotlin.math.abs(cur.dailyChallengeDate.hashCode()) % 40) + 10).coerceIn(5, 50)
+    loadLevel(
+      levelNumber = dailyLevelIndex,
+      targetScreenState = ScreenState.PLAYING,
+      difficulty = DifficultyMode.HARD,
+      mapBiome = cur.selectedMap,
+      isDailyChallenge = true
     )
   }
 
@@ -200,7 +337,14 @@ class GameViewModel(
 
   fun retryCurrentLevel() {
     soundManager.playButtonClick()
-    loadLevel(_uiState.value.currentLevel, targetScreenState = ScreenState.PLAYING)
+    val cur = _uiState.value
+    loadLevel(
+      levelNumber = cur.currentLevel,
+      targetScreenState = ScreenState.PLAYING,
+      difficulty = cur.selectedDifficulty,
+      mapBiome = cur.selectedMap,
+      isDailyChallenge = cur.isDailyChallengeRun
+    )
   }
 
   fun startNextLevel() {
@@ -262,10 +406,36 @@ class GameViewModel(
     levelNumber: Int,
     targetScreenState: ScreenState,
     difficulty: DifficultyMode = _uiState.value.selectedDifficulty,
-    mapBiome: MapBiome = _uiState.value.selectedMap
+    mapBiome: MapBiome = _uiState.value.selectedMap,
+    isDailyChallenge: Boolean = false
   ) {
     val validLevel = levelNumber.coerceIn(1, LevelCatalog.TOTAL_LEVELS)
-    val levelDef = LevelCatalog.getLevel(validLevel, difficulty, mapBiome)
+    val rawLevelDef = LevelCatalog.getLevel(validLevel, difficulty, mapBiome)
+    val modifierName = if (isDailyChallenge) _uiState.value.dailyChallengeModifier else null
+    val levelDef = when (modifierName) {
+      "Glass Cannon" -> rawLevelDef.copy(
+        title = "DAILY: GLASS CANNON",
+        maxInkPerLevel = rawLevelDef.maxInkPerLevel * 0.75f,
+        scoreMultiplier = rawLevelDef.scoreMultiplier * 2.0f,
+        dailyModifier = modifierName
+      )
+      "Zero Gravity Ink" -> rawLevelDef.copy(
+        title = "DAILY: ZERO GRAV INK",
+        mapBiome = MapBiome.MAP_2_CRYO_LAB,
+        dailyModifier = modifierName
+      )
+      "Turbo Ignis" -> rawLevelDef.copy(
+        title = "DAILY: TURBO IGNIS",
+        runSpeed = rawLevelDef.runSpeed * 1.15f,
+        dailyModifier = modifierName
+      )
+      "Thick Fog" -> rawLevelDef.copy(
+        title = "DAILY: THICK FOG",
+        dailyModifier = modifierName
+      )
+      else -> rawLevelDef
+    }
+
     val savedBest = progressRepository.getBestLevel().coerceIn(1, LevelCatalog.TOTAL_LEVELS)
     val savedStars = progressRepository.getAllLevelStars()
 
@@ -284,9 +454,10 @@ class GameViewModel(
         selectedDifficulty = difficulty,
         selectedMap = mapBiome,
         levelDefinition = levelDef,
-        stickman = createInitialStickman(levelDef),
+        stickman = createInitialStickman(levelDef, state.equippedPerk),
         cameraX = 0f,
         selectedTool = ChalkTool.WHITE,
+        lastRuneType = RuneType.STANDARD_INK,
         completedLines = emptyList(),
         activeStrokePoints = emptyList(),
         activeStrokeRemainingRatio = 1f,
@@ -294,13 +465,20 @@ class GameViewModel(
         totalInkDrawn = 0f,
         chalkBits = levelDef.chalkBits,
         scribblers = levelDef.scribblers,
+        rockWalls = levelDef.rockWalls,
+        lavaMonsters = levelDef.lavaMonsters,
+        ignisBoss = createInitialBoss(levelDef),
+        bossFlawless = true,
         activeCallout = null,
         triggeredCalloutIndices = emptySet(),
         comboCount = 0,
+        score = 0,
         starsEarned = 3,
         levelProgress = 0f,
         sketchParticles = emptyList(),
-        showInstructionBanner = true
+        showInstructionBanner = true,
+        isDailyChallengeRun = isDailyChallenge,
+        showShopModal = false
       )
     }
   }
@@ -354,6 +532,7 @@ class GameViewModel(
         currentInk = (it.currentInk + startBonusInk).coerceAtMost(it.levelDefinition.maxInkPerLevel * 1.5f),
         chalkBits = bitsAfterStart,
         comboCount = it.comboCount + collectedAtStart.size,
+        score = it.score + collectedAtStart.size * 15,
         sketchParticles = (it.sketchParticles + tipParticles).takeLast(45)
       )
     }
@@ -373,8 +552,9 @@ class GameViewModel(
 
     if (state.activeStrokePoints.isEmpty()) return
 
+    val catalystDiscount = if (state.equippedPerk == "REFINED_CATALYST") 0.82f else 1.0f
     val toolCostMult = (state.selectedTool.inkCostMultiplier.coerceAtLeast(1f)) *
-      state.selectedDifficulty.inkDrainMult
+      state.selectedDifficulty.inkDrainMult * catalystDiscount
     val maxStrokeLen = state.levelDefinition.maxStrokeLength
     val remainingInk = state.currentInk.coerceAtLeast(0f)
     val maxAffordableDistance = remainingInk / toolCostMult
@@ -434,6 +614,7 @@ class GameViewModel(
         totalInkDrawn = it.totalInkDrawn + deltaInk,
         chalkBits = updatedBits,
         comboCount = it.comboCount + newlyCollectedBits.size,
+        score = it.score + newlyCollectedBits.size * 15,
         sketchParticles = (it.sketchParticles + tipParticles).takeLast(45)
       )
     }
@@ -501,29 +682,59 @@ class GameViewModel(
     }
 
     val smoothedPoints = PhysicsEngine.smoothStrokePoints(rawPoints)
-    val lifetime = if (state.selectedTool == ChalkTool.BOOST) {
+    val classification = PhysicsEngine.classifyRuneStroke(
+      points = smoothedPoints,
+      stickman = state.stickman,
+      selectedTool = state.selectedTool
+    )
+
+    val effectiveTool = classification.effectiveTool
+    val lifetime = if (effectiveTool == ChalkTool.BOOST) {
       9999f
     } else {
       state.levelDefinition.lineLifespan
     }
+
     val newLine = DrawnLine(
       id = nextLineId++,
       points = smoothedPoints,
       isCompleted = true,
-      tool = state.selectedTool,
+      tool = effectiveTool,
+      runeType = classification.runeType,
       ageSeconds = 0f,
       maxLifetime = lifetime
     )
 
     val lineBurstParticles = PhysicsEngine.createLineCompletedParticles(smoothedPoints)
+    val inkRefund = state.levelDefinition.maxInkPerLevel * classification.inkRefundRatio
 
-    soundManager.playLineCompleted()
+    if (classification.triggersImmediateBounce) {
+      soundManager.playJump()
+    } else {
+      soundManager.playLineCompleted()
+    }
 
     updateState { current ->
+      var nextStickman = current.stickman
+      if (classification.triggersSuperAura) {
+        nextStickman = nextStickman.copy(
+          superAuraTimer = 5.0f,
+          boostTimer = max(nextStickman.boostTimer, 1.5f)
+        )
+      }
+      if (classification.triggersImmediateBounce) {
+        nextStickman = nextStickman.copy(
+          velocityY = -540f,
+          isGrounded = false
+        )
+      }
       current.copy(
+        stickman = nextStickman,
+        lastRuneType = classification.runeType,
         completedLines = current.completedLines + newLine,
         activeStrokePoints = emptyList(),
         activeStrokeRemainingRatio = 1f,
+        currentInk = (current.currentInk + inkRefund).coerceAtMost(current.levelDefinition.maxInkPerLevel * 1.5f),
         sketchParticles = (current.sketchParticles + lineBurstParticles).takeLast(30),
         showInstructionBanner = false
       )
@@ -638,7 +849,7 @@ class GameViewModel(
       }
     }
 
-    // 3. Step stickman physics
+    // 3. Step stickman physics (includes continuous swept obstacle hitboxes)
     val activeLines = if (state.activeStrokePoints.size >= 2) {
       agedLines + DrawnLine(
         id = -1L,
@@ -666,7 +877,7 @@ class GameViewModel(
     }
 
     // 4. Step Red Scribbler enemies
-    val (nextScribblers, stickmanAfterEnemies) = PhysicsEngine.stepScribblers(
+    val (nextScribblers, stickmanAfterScribblers) = PhysicsEngine.stepScribblers(
       scribblers = state.scribblers,
       stickman = tickResult.stickman,
       platforms = level.platforms,
@@ -674,16 +885,32 @@ class GameViewModel(
       dt = clampedDt
     )
 
+    // 4b. Step Ignis Titan Boss, Breakable Rock Walls & Leaping Lava Monsters
+    val combatResult = PhysicsEngine.stepCombatEntities(
+      stickman = stickmanAfterScribblers,
+      level = level,
+      rockWalls = state.rockWalls,
+      lavaMonsters = state.lavaMonsters,
+      ignisBoss = state.ignisBoss,
+      animTime = state.lavaAnimTime,
+      dt = clampedDt
+    )
+    val stickmanAfterEnemies = combatResult.stickman
+    if (combatResult.bossTookDamage || combatResult.wallSmashed || combatResult.monsterBlasted) {
+      soundManager.playLineCompleted()
+    }
+
     // 5. Update Chalk Bits & Magnet Combo collection
     val (nextChalkBits, newlyCollectedBits) = PhysicsEngine.updateChalkBits(
       bits = state.chalkBits,
       stickman = stickmanAfterEnemies,
       comboCount = state.comboCount,
       dt = clampedDt,
-      activeLines = activeLines
+      activeLines = activeLines,
+      hasInkMagnetPerk = state.equippedPerk == "INK_MAGNET"
     )
 
-    val collectedInkBonus = newlyCollectedBits.sumOf { it.inkAmount.toDouble() }.toFloat()
+    val collectedInkBonus = newlyCollectedBits.sumOf { it.inkAmount.toDouble() }.toFloat() + combatResult.inkDelta
     val nextCombo = if (newlyCollectedBits.isNotEmpty()) {
       soundManager.playLineCompleted()
       state.comboCount + newlyCollectedBits.size
@@ -691,11 +918,16 @@ class GameViewModel(
       state.comboCount
     }
 
-    // 6. Ink recharges slowly over time while not actively drawing
+    // 6. Ink recharges slowly over time while not actively drawing (Milestone 40: -40%, Milestone 50: 0 natural regen)
+    val milestoneRegenMult = when (level.levelNumber) {
+      50 -> 0f
+      40 -> 0.6f
+      else -> 1f
+    }
     val comboBonusMult = 1f + min(nextCombo, 5) * 0.08f
     val currentInk = state.currentInk
     val inkRecharge = if (state.activeStrokePoints.isEmpty() && currentInk < level.maxInkPerLevel) {
-      level.inkRechargeRate * comboBonusMult * clampedDt
+      level.inkRechargeRate * comboBonusMult * milestoneRegenMult * clampedDt
     } else {
       0f
     }
@@ -704,15 +936,15 @@ class GameViewModel(
     } else {
       level.maxInkPerLevel
     }
-    val updatedInk = (currentInk + inkRecharge + collectedInkBonus).coerceAtMost(maxInkCap)
+    val updatedInk = (currentInk + inkRecharge + collectedInkBonus).coerceIn(0f, maxInkCap)
 
-    val nextSketchParticles = PhysicsEngine.updateSketchParticles(
+    val nextSketchParticles = (PhysicsEngine.updateSketchParticles(
       existing = state.sketchParticles,
       stickman = stickmanAfterEnemies,
       justLanded = tickResult.justLanded,
       dt = clampedDt,
       emitFootsteps = true
-    )
+    ) + combatResult.extraParticles).takeLast(120)
 
     val desiredCameraX = (stickmanAfterEnemies.footX - visibleWorldWidth * WorldConstants.CAMERA_LEAD_RATIO)
       .coerceIn(0f, (level.levelEndX - visibleWorldWidth * 0.5f).coerceAtLeast(0f))
@@ -722,6 +954,8 @@ class GameViewModel(
     val totalRunDistance = (level.finishLineX - level.spawnPosition.x).coerceAtLeast(1f)
     val coveredDistance = (stickmanAfterEnemies.footX - level.spawnPosition.x).coerceAtLeast(0f)
     val progress = (coveredDistance / totalRunDistance).coerceIn(0f, 1f)
+    val nextScore = state.score + combatResult.scoreDelta + newlyCollectedBits.size * 15
+    val nextBossFlawless = state.bossFlawless && !combatResult.playerTookBossBite
 
     when {
       tickResult.hitLava || !stickmanAfterEnemies.isAlive -> {
@@ -736,8 +970,13 @@ class GameViewModel(
             currentInk = updatedInk,
             chalkBits = nextChalkBits,
             scribblers = nextScribblers,
+            rockWalls = combatResult.rockWalls,
+            lavaMonsters = combatResult.lavaMonsters,
+            ignisBoss = combatResult.ignisBoss,
+            bossFlawless = nextBossFlawless,
             activeCallout = null,
             comboCount = 0,
+            score = nextScore,
             levelProgress = progress,
             lavaAnimTime = nextLavaTime,
             embers = nextEmbers,
@@ -757,10 +996,18 @@ class GameViewModel(
         val totalBits = nextChalkBits.size
         val gotBits = nextChalkBits.count { it.collected }
         val targetBits = if (totalBits == 0) 0 else max(1, (totalBits + 1) / 2)
-        if (totalBits == 0 || gotBits >= targetBits) stars++
+        if ((totalBits == 0 || gotBits >= targetBits) && nextBossFlawless) stars++
 
         progressRepository.recordLevelStars(state.currentLevel, stars)
         val updatedLevelStars = progressRepository.getAllLevelStars()
+
+        val levelCurrencyReward = stars * 120 + (if (combatResult.ignisBoss.isDefeated) 250 else 0)
+        viewModelScope.launch {
+          if (state.isDailyChallengeRun) {
+            gameRepository.markDailyChallengeCompleted()
+          }
+          gameRepository.addCurrency(levelCurrencyReward)
+        }
 
         updateState {
           it.copy(
@@ -774,7 +1021,12 @@ class GameViewModel(
             currentInk = updatedInk,
             chalkBits = nextChalkBits,
             scribblers = nextScribblers,
+            rockWalls = combatResult.rockWalls,
+            lavaMonsters = combatResult.lavaMonsters,
+            ignisBoss = combatResult.ignisBoss,
+            bossFlawless = nextBossFlawless,
             activeCallout = null,
+            score = nextScore + stars * 150,
             starsEarned = stars,
             levelProgress = 1f,
             lavaAnimTime = nextLavaTime,
@@ -793,9 +1045,14 @@ class GameViewModel(
             currentInk = updatedInk,
             chalkBits = nextChalkBits,
             scribblers = nextScribblers,
+            rockWalls = combatResult.rockWalls,
+            lavaMonsters = combatResult.lavaMonsters,
+            ignisBoss = combatResult.ignisBoss,
+            bossFlawless = nextBossFlawless,
             activeCallout = nextCallout,
             triggeredCalloutIndices = nextTriggeredIndices,
             comboCount = nextCombo,
+            score = nextScore,
             levelProgress = progress,
             lavaAnimTime = nextLavaTime,
             embers = nextEmbers,
@@ -808,11 +1065,12 @@ class GameViewModel(
 
   class Factory(
     private val progressRepository: ProgressRepository,
-    private val soundManager: SoundEffectManager
+    private val soundManager: SoundEffectManager,
+    private val gameRepository: GameRepository = GameRepository()
   ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-      return GameViewModel(progressRepository, soundManager) as T
+      return GameViewModel(progressRepository, soundManager, gameRepository) as T
     }
   }
 }

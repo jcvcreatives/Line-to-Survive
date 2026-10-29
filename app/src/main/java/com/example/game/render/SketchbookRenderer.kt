@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.example.game.model.BreakableRockWall
 import com.example.game.model.CalloutMove
 import com.example.game.model.ChalkBit
 import com.example.game.model.ChalkTool
@@ -18,6 +19,8 @@ import com.example.game.model.DynamicHazard
 import com.example.game.model.EmberParticle
 import com.example.game.model.GuideStroke
 import com.example.game.model.HazardType
+import com.example.game.model.IgnisTitanBoss
+import com.example.game.model.LeapingLavaMonster
 import com.example.game.model.LevelDefinition
 import com.example.game.model.Platform
 import com.example.game.model.ScribblerEnemy
@@ -89,6 +92,11 @@ object SketchbookRenderer {
     selectedTool: ChalkTool = ChalkTool.WHITE,
     chalkBits: List<ChalkBit> = emptyList(),
     scribblers: List<ScribblerEnemy> = emptyList(),
+    rockWalls: List<BreakableRockWall> = emptyList(),
+    lavaMonsters: List<LeapingLavaMonster> = emptyList(),
+    ignisBoss: IgnisTitanBoss = IgnisTitanBoss(isDefeated = true),
+    equippedSkin: String = "DEFAULT",
+    equippedTrail: String = "STANDARD_INK",
     activeCallout: CalloutMove? = null,
     lavaAnimTime: Float,
     embers: List<EmberParticle>,
@@ -146,7 +154,7 @@ object SketchbookRenderer {
       worldScale = worldScale
     )
 
-    // 6. Thumbtack & All 8 Modular Obstacles
+    // 6. Thumbtack & All 8 Modular Obstacles + Combat Rock Walls & Lava Monsters
     for (cluster in level.thumbtacks) {
       drawThumbtackCluster(cluster, ::toScreenX, ::toScreenY, worldScale)
     }
@@ -162,6 +170,16 @@ object SketchbookRenderer {
         worldScale = worldScale
       )
     }
+    for (wall in rockWalls) {
+      if (!wall.isSmashed) {
+        drawBreakableRockWall(wall, stickman.superAuraTimer > 0f, ::toScreenX, ::toScreenY, worldScale)
+      }
+    }
+    for (monster in lavaMonsters) {
+      if (!monster.isDefeated) {
+        drawLeapingLavaMonster(monster, lavaAnimTime, ::toScreenX, ::toScreenY, worldScale)
+      }
+    }
 
     // 7. Collectible Chalk Bits & Gold Stars
     for (bit in chalkBits) {
@@ -170,11 +188,12 @@ object SketchbookRenderer {
       }
     }
 
-    // 8. Completed Player-Drawn Chalk Platforms (White, Blue Bounce, Gold Turbo)
+    // 8. Completed Player-Drawn Chalk Platforms (White, Blue Bounce, Gold Turbo + Trail Cosmetics)
     for (line in completedLines) {
       drawPencilLine(
         points = line.points,
         tool = line.tool,
+        equippedTrail = equippedTrail,
         alpha = line.alpha,
         isCompleted = true,
         toScreenX = ::toScreenX,
@@ -188,6 +207,7 @@ object SketchbookRenderer {
       drawPencilLine(
         points = activeStrokePoints,
         tool = selectedTool,
+        equippedTrail = equippedTrail,
         alpha = 1f,
         isCompleted = false,
         toScreenX = ::toScreenX,
@@ -196,11 +216,21 @@ object SketchbookRenderer {
       )
     }
 
-    // 10. Red Scribbler Enemies
+    // 10. Red Scribbler Enemies & Colossal Lava Dragon Boss (Ignis Titan)
     for (enemy in scribblers) {
       if (enemy.isAlive) {
         drawScribblerEnemy(enemy, ::toScreenX, ::toScreenY, worldScale)
       }
+    }
+    if (!ignisBoss.isDefeated) {
+      drawIgnisTitanBoss(
+        boss = ignisBoss,
+        stickman = stickman,
+        animTime = lavaAnimTime,
+        toScreenX = ::toScreenX,
+        toScreenY = ::toScreenY,
+        worldScale = worldScale
+      )
     }
 
     // 11. Hand-drawn Chalk Dust & Pencil Spark Particles
@@ -213,7 +243,7 @@ object SketchbookRenderer {
       )
     }
 
-    // 12. Animated White Stickman + Flowing Scarf + Active Aura
+    // 12. Animated White Stickman + Flowing Scarf + Active Aura / Titan Shield
     drawAnimatedStickman(
       stickman = stickman,
       animTime = lavaAnimTime,
@@ -221,6 +251,16 @@ object SketchbookRenderer {
       toScreenY = ::toScreenY,
       worldScale = worldScale
     )
+    if (stickman.hasTitanShield || stickman.superAuraTimer > 0f || equippedSkin != "DEFAULT") {
+      drawHeroCosmeticsAndShield(
+        stickman = stickman,
+        equippedSkin = equippedSkin,
+        animTime = lavaAnimTime,
+        toScreenX = ::toScreenX,
+        toScreenY = ::toScreenY,
+        worldScale = worldScale
+      )
+    }
 
     // 13. Callout Move Speech Bubble & Landing X Telegraph
     if (activeCallout != null) {
@@ -230,6 +270,16 @@ object SketchbookRenderer {
         toScreenX = ::toScreenX,
         toScreenY = ::toScreenY,
         worldScale = worldScale
+      )
+    }
+
+    // 14. Thick Fog Daily Modifier Overlay
+    if (level.dailyModifier == "Thick Fog") {
+      drawRect(
+        brush = Brush.horizontalGradient(
+          colors = listOf(Color.Transparent, Color(0xCC0D1117), Color(0xEE0D1117))
+        ),
+        size = size
       )
     }
   }
@@ -519,6 +569,7 @@ object SketchbookRenderer {
   private fun DrawScope.drawPencilLine(
     points: List<Vec2>,
     tool: ChalkTool = ChalkTool.WHITE,
+    equippedTrail: String = "STANDARD_INK",
     alpha: Float = 1f,
     isCompleted: Boolean,
     toScreenX: (Float) -> Float,
@@ -526,14 +577,20 @@ object SketchbookRenderer {
     worldScale: Float
   ) {
     if (points.isEmpty()) return
+    val trailBaseColor = when (equippedTrail) {
+      "RAINBOW_PRISM" -> Color(0xFFE040FB)
+      "SAKURA_BLOSSOM" -> Color(0xFFFF80AB)
+      "LIGHTNING_SPARK" -> Color(0xFF00E5FF)
+      else -> ChalkWhite
+    }
     val coreColor = when (tool) {
-      ChalkTool.WHITE -> ChalkWhite.copy(alpha = alpha)
+      ChalkTool.WHITE -> trailBaseColor.copy(alpha = alpha)
       ChalkTool.SPRING -> InkCyanAccent.copy(alpha = alpha)
       ChalkTool.BOOST -> LavaFlameYellow.copy(alpha = alpha)
       ChalkTool.CUTTER -> LavaOrange.copy(alpha = alpha)
     }
     val haloColor = when (tool) {
-      ChalkTool.WHITE -> PencilGraphite.copy(alpha = 0.55f * alpha)
+      ChalkTool.WHITE -> if (equippedTrail == "STANDARD_INK") PencilGraphite.copy(alpha = 0.55f * alpha) else trailBaseColor.copy(alpha = 0.42f * alpha)
       ChalkTool.SPRING -> InkCyanAccent.copy(alpha = 0.42f * alpha)
       ChalkTool.BOOST -> LavaOrange.copy(alpha = 0.48f * alpha)
       ChalkTool.CUTTER -> LavaDeepRed.copy(alpha = 0.4f * alpha)
@@ -2456,6 +2513,223 @@ object SketchbookRenderer {
           )
         }
       }
+    }
+  }
+
+  private fun DrawScope.drawBreakableRockWall(
+    wall: BreakableRockWall,
+    isSuperAuraActive: Boolean,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(wall.x)
+    if (cx < -60f || cx > size.width + 60f) return
+    val top = toScreenY(wall.topY)
+    val bot = toScreenY(wall.bottomY)
+    val w = wall.width * worldScale
+    val h = (bot - top).coerceAtLeast(8f)
+
+    drawRect(
+      color = Color(0xFF3E2723),
+      topLeft = Offset(cx - w * 0.5f, top),
+      size = Size(w, h)
+    )
+    drawRect(
+      color = if (isSuperAuraActive) LavaFlameYellow else LavaOrange,
+      topLeft = Offset(cx - w * 0.5f, top),
+      size = Size(w, h),
+      style = Stroke(width = 2.6f * worldScale)
+    )
+    // Glowing magma fissure cracks inside the stone pillar
+    drawLine(
+      color = LavaFlameYellow,
+      start = Offset(cx - w * 0.25f, top + h * 0.2f),
+      end = Offset(cx + w * 0.2f, top + h * 0.55f),
+      strokeWidth = 2.2f * worldScale,
+      cap = StrokeCap.Round
+    )
+    drawLine(
+      color = LavaOrange,
+      start = Offset(cx + w * 0.2f, top + h * 0.55f),
+      end = Offset(cx - w * 0.18f, top + h * 0.85f),
+      strokeWidth = 2.2f * worldScale,
+      cap = StrokeCap.Round
+    )
+  }
+
+  private fun DrawScope.drawLeapingLavaMonster(
+    monster: LeapingLavaMonster,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(monster.x)
+    if (cx < -60f || cx > size.width + 60f) return
+    val wy = monster.currentYAt(animTime)
+    if (wy >= WorldConstants.LAVA_SURFACE_Y) return
+    val cy = toScreenY(wy)
+    val r = monster.radius * worldScale
+
+    drawCircle(
+      color = LavaOrange.copy(alpha = 0.34f),
+      radius = r * 1.45f,
+      center = Offset(cx, cy)
+    )
+    val spikes = 8
+    for (i in 0 until spikes) {
+      val a = animTime * 5f + i * (2f * PI.toFloat() / spikes)
+      drawLine(
+        color = LavaFlameYellow,
+        start = Offset(cx + cos(a) * r * 0.7f, cy + sin(a) * r * 0.7f),
+        end = Offset(cx + cos(a) * r * 1.35f, cy + sin(a) * r * 1.35f),
+        strokeWidth = 3.0f * worldScale,
+        cap = StrokeCap.Round
+      )
+    }
+    drawCircle(color = LavaDeepRed, radius = r, center = Offset(cx, cy))
+    drawCircle(color = ChalkWhite, radius = r, center = Offset(cx, cy), style = Stroke(width = 2.2f * worldScale))
+    // Glowing imp eyes
+    drawCircle(color = LavaFlameYellow, radius = 3.2f * worldScale, center = Offset(cx - 5f * worldScale, cy - 2f * worldScale))
+    drawCircle(color = LavaFlameYellow, radius = 3.2f * worldScale, center = Offset(cx + 5f * worldScale, cy - 2f * worldScale))
+  }
+
+  private fun DrawScope.drawIgnisTitanBoss(
+    boss: IgnisTitanBoss,
+    stickman: StickmanState,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val distToPlayer = stickman.footX - boss.x
+    // Red screen-edge danger vignette when Ignis Titan is within 400px
+    if (distToPlayer < 400f) {
+      val dangerAlpha = ((400f - distToPlayer) / 400f).coerceIn(0f, 1f) * 0.42f
+      drawRect(
+        brush = Brush.horizontalGradient(
+          colors = listOf(LavaDeepRed.copy(alpha = dangerAlpha), Color.Transparent),
+          startX = 0f,
+          endX = size.width * 0.35f
+        ),
+        size = size
+      )
+    }
+
+    val headX = toScreenX(boss.x)
+    val headY = toScreenY(boss.y)
+    if (headX < -220f || headX > size.width + 120f) return
+
+    val isFlashingHurt = boss.hurtCooldown > 0f && ((animTime * 20f).toInt() % 2 == 0)
+    val bodyColor = if (isFlashingHurt) ChalkWhite else LavaDeepRed
+    val coreColor = if (isFlashingHurt) InkCyanAccent else LavaOrange
+
+    // 5 Serpentine Trailing Dragon Body Segments
+    for (seg in 5 downTo 1) {
+      val segX = headX - seg * 26f * worldScale
+      val waveY = sin(animTime * 6.5f - seg * 0.85f) * 14f * worldScale
+      val segY = headY + waveY + seg * 4f * worldScale
+      val segR = (26f - seg * 2.6f) * worldScale
+      drawCircle(color = coreColor.copy(alpha = 0.28f), radius = segR * 1.35f, center = Offset(segX, segY))
+      drawCircle(color = bodyColor, radius = segR, center = Offset(segX, segY))
+      drawCircle(color = LavaFlameYellow, radius = segR * 0.45f, center = Offset(segX, segY))
+      drawCircle(color = ChalkWhite, radius = segR, center = Offset(segX, segY), style = Stroke(width = 2.2f * worldScale))
+    }
+
+    // Colossal Dragon Head + Snapping Jaw
+    val headR = 30f * worldScale
+    drawCircle(color = LavaOrange.copy(alpha = 0.38f), radius = headR * 1.5f, center = Offset(headX, headY))
+    drawCircle(color = bodyColor, radius = headR, center = Offset(headX, headY))
+    drawCircle(color = ChalkWhite, radius = headR, center = Offset(headX, headY), style = Stroke(width = 3.0f * worldScale))
+
+    // Dragon Horns
+    drawLine(
+      color = LavaFlameYellow,
+      start = Offset(headX - 8f * worldScale, headY - headR * 0.7f),
+      end = Offset(headX - 28f * worldScale, headY - headR * 1.45f),
+      strokeWidth = 5.5f * worldScale,
+      cap = StrokeCap.Round
+    )
+    // Snapping Jaw
+    val jawOpen = (0.35f + 0.35f * sin(animTime * 8.5f)) * 18f * worldScale
+    drawLine(
+      color = LavaFlameYellow,
+      start = Offset(headX + 6f * worldScale, headY - 4f * worldScale),
+      end = Offset(headX + headR * 1.25f, headY - jawOpen),
+      strokeWidth = 6.0f * worldScale,
+      cap = StrokeCap.Round
+    )
+    drawLine(
+      color = LavaFlameYellow,
+      start = Offset(headX + 6f * worldScale, headY + 6f * worldScale),
+      end = Offset(headX + headR * 1.25f, headY + jawOpen),
+      strokeWidth = 6.0f * worldScale,
+      cap = StrokeCap.Round
+    )
+    // Glowing Dragon Eye
+    drawCircle(
+      color = LavaFlameYellow,
+      radius = 5.5f * worldScale,
+      center = Offset(headX + 8f * worldScale, headY - 8f * worldScale)
+    )
+  }
+
+  private fun DrawScope.drawHeroCosmeticsAndShield(
+    stickman: StickmanState,
+    equippedSkin: String,
+    animTime: Float,
+    toScreenX: (Float) -> Float,
+    toScreenY: (Float) -> Float,
+    worldScale: Float
+  ) {
+    val cx = toScreenX(stickman.footX)
+    val cy = toScreenY(stickman.footY - WorldConstants.STICKMAN_HEIGHT * 0.5f)
+
+    // Golden Super Aura Sonic Dash halo (#FFD700)
+    if (stickman.superAuraTimer > 0f || equippedSkin == "GOLDEN_TITAN") {
+      val pulse = 0.88f + 0.12f * sin(animTime * 14f)
+      drawCircle(
+        color = Color(0xFFFFD700).copy(alpha = 0.28f * pulse),
+        radius = 42f * worldScale * pulse,
+        center = Offset(cx, cy)
+      )
+      drawCircle(
+        color = Color(0xFFFFD700),
+        radius = 36f * worldScale * pulse,
+        center = Offset(cx, cy),
+        style = Stroke(width = 2.8f * worldScale)
+      )
+    }
+
+    // Cyber-Ninja Skin Visor & Scarf
+    if (equippedSkin == "CYBER_NINJA") {
+      val headY = toScreenY(stickman.footY - WorldConstants.STICKMAN_HEIGHT + 10f)
+      drawLine(
+        color = InkCyanAccent,
+        start = Offset(cx - 6f * worldScale, headY),
+        end = Offset(cx + 9f * worldScale, headY),
+        strokeWidth = 4.2f * worldScale,
+        cap = StrokeCap.Round
+      )
+    }
+
+    // Titan's Shield Protective Energy Sphere
+    if (stickman.hasTitanShield) {
+      drawCircle(
+        color = InkCyanAccent.copy(alpha = 0.18f),
+        radius = 38f * worldScale,
+        center = Offset(cx, cy)
+      )
+      drawCircle(
+        color = InkCyanAccent.copy(alpha = 0.85f),
+        radius = 38f * worldScale,
+        center = Offset(cx, cy),
+        style = Stroke(
+          width = 2.4f * worldScale,
+          pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f * worldScale, 6f * worldScale), animTime * 30f * worldScale)
+        )
+      )
     }
   }
 }

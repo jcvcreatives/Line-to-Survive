@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.audio.SoundEffectManager
 import com.example.data.ProgressRepository
+import com.example.data.local.AppDatabase
+import com.example.data.local.GameRepository
 import com.example.game.GameViewModel
 import com.example.ui.DrawToSurviveScreen
 import com.example.ui.theme.DrawToSurviveTheme
@@ -19,6 +21,8 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
 
     val progressRepository = ProgressRepository(applicationContext)
+    val appDatabase = AppDatabase.getDatabase(applicationContext)
+    val gameRepository = GameRepository(appDatabase.gameDao())
     val manager = SoundEffectManager(
       context = applicationContext,
       initialEnabled = progressRepository.isSoundEnabled()
@@ -30,7 +34,8 @@ class MainActivity : ComponentActivity() {
         val gameViewModel: GameViewModel = viewModel(
           factory = GameViewModel.Factory(
             progressRepository = progressRepository,
-            soundManager = manager
+            soundManager = manager,
+            gameRepository = gameRepository
           )
         )
         DrawToSurviveScreen(viewModel = gameViewModel)

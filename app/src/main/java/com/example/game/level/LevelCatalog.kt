@@ -1,11 +1,13 @@
 package com.example.game.level
 
+import com.example.game.model.BreakableRockWall
 import com.example.game.model.CalloutMoveType
 import com.example.game.model.ChalkBit
 import com.example.game.model.DifficultyMode
 import com.example.game.model.DynamicHazard
 import com.example.game.model.GuideStroke
 import com.example.game.model.HazardType
+import com.example.game.model.LeapingLavaMonster
 import com.example.game.model.LedgeStyle
 import com.example.game.model.LevelBlueprint
 import com.example.game.model.LevelConfig
@@ -950,6 +952,62 @@ object LevelCatalog {
     return hazards
   }
 
+  /**
+   * Generates Breakable Rock Walls and Leaping Lava Monsters for Ignis Titan Edition combat.
+   */
+  fun getCombatHazards(
+    level: Int,
+    config: LevelConfig = getLevelConfig(level),
+    difficulty: DifficultyMode = config.difficultyMode
+  ): Pair<List<BreakableRockWall>, List<LeapingLavaMonster>> {
+    val clampedLevel = level.coerceIn(1, TOTAL_LEVELS)
+    if (clampedLevel <= 1) return emptyList<BreakableRockWall>() to emptyList<LeapingLavaMonster>()
+
+    val blueprint = getBlueprint(clampedLevel)
+    val startPlatformEnd = 520f
+    val effectiveLength = config.levelLength * blueprint.lengthMultiplier
+    val finishX = startPlatformEnd + effectiveLength
+
+    val walls = mutableListOf<BreakableRockWall>()
+    val monsters = mutableListOf<LeapingLavaMonster>()
+
+    val spacing = (820f - clampedLevel * 6.5f).coerceIn(420f, 820f)
+    var cursorX = startPlatformEnd + 460f
+    var idx = 0
+
+    while (cursorX < finishX - 240f) {
+      if (idx % 2 == 0 && clampedLevel >= 4) {
+        val wallBottomY = (WorldConstants.DEFAULT_GROUND_Y - 6f).coerceIn(240f, 380f)
+        val wallTopY = wallBottomY - 68f
+        walls.add(
+          BreakableRockWall(
+            id = clampedLevel * 100 + idx,
+            x = cursorX,
+            topY = wallTopY,
+            bottomY = wallBottomY,
+            width = 30f
+          )
+        )
+      } else {
+        val peakY = (WorldConstants.DEFAULT_GROUND_Y - 48f).coerceIn(210f, 340f)
+        monsters.add(
+          LeapingLavaMonster(
+            id = clampedLevel * 100 + idx,
+            x = cursorX,
+            baseY = WorldConstants.LAVA_SURFACE_Y,
+            peakY = peakY,
+            cycleSeconds = (2.6f / difficulty.hazardSpeedMult).coerceIn(1.4f, 3.2f),
+            phaseOffset = (idx * 1.3f + clampedLevel * 0.5f) % 6.28f,
+            radius = 18f
+          )
+        )
+      }
+      cursorX += spacing
+      idx++
+    }
+    return walls to monsters
+  }
+
   fun getLevel(
     levelNumber: Int,
     difficulty: DifficultyMode = DifficultyMode.NORMAL,
@@ -1165,6 +1223,20 @@ object LevelCatalog {
       )
     )
 
+    val (rockWalls, lavaMonsters) = getCombatHazards(levelNumber, cfg, difficulty)
+    val bossHp = when {
+      levelNumber == 50 -> 8
+      levelNumber % 10 == 0 -> 6
+      else -> 5
+    }
+    val scoreMult = when {
+      levelNumber >= 50 -> 5.0f
+      levelNumber >= 40 -> 3.5f
+      levelNumber >= 25 -> 2.2f
+      levelNumber >= 10 -> 1.5f
+      else -> 1.0f + (levelNumber - 1) * 0.04f
+    }
+
     return LevelDefinition(
       levelNumber = levelNumber,
       title = cfg.levelTitle,
@@ -1193,6 +1265,10 @@ object LevelCatalog {
       thumbtacks = emptyList(),
       scribblers = emptyList(),
       hazards = getHazards(levelNumber, cfg, difficulty, mapBiome),
+      rockWalls = rockWalls,
+      lavaMonsters = lavaMonsters,
+      bossMaxHp = bossHp,
+      scoreMultiplier = scoreMult,
       calloutScript = callouts
     )
   }

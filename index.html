@@ -793,19 +793,29 @@
 
         <div class="hud-meters-column">
           <div class="hud-meters-labels">
-            <span class="progress-label-text" id="hudProgressText">PROGRESS: 0%</span>
             <div class="ink-label-group">
               <span id="hudInkText" style="color: var(--ink-cyan-accent);">INK: 100%</span>
               <span class="ink-recharge-tag" id="hudRechargeTag" hidden>(+⚡)</span>
             </div>
+            <span class="progress-label-text" id="hudBossHpText" style="color: var(--lava-orange);">🐉 BOSS HP: 5/5</span>
+          </div>
+
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <div class="linear-progress-track ink-track" style="flex: 1;">
+              <div class="linear-progress-fill" id="hudInkFill" style="width: 100%; background: var(--ink-cyan-accent);"></div>
+            </div>
+            <div class="linear-progress-track ink-track" style="flex: 1;">
+              <div class="linear-progress-fill" id="hudBossHpFill" style="width: 100%; background: var(--lava-deep-red);"></div>
+            </div>
+          </div>
+
+          <div class="hud-meters-labels" style="margin-top: 2px;">
+            <span id="hudRuneBadge" style="font-family: var(--font-mono); font-size: 11px; font-weight: 900; color: var(--chalk-white); background: rgba(24,25,31,0.85); padding: 1px 6px; border-radius: 5px; border: 1px solid rgba(247,248,242,0.35);">━ BRIDGE RUNE</span>
+            <span class="progress-label-text" id="hudProgressText">PROGRESS: 0% • PTS 0</span>
           </div>
 
           <div class="linear-progress-track progress-track">
             <div class="linear-progress-fill" id="hudProgressFill" style="width: 0%; background: var(--finish-banner-green);"></div>
-          </div>
-
-          <div class="linear-progress-track ink-track">
-            <div class="linear-progress-fill" id="hudInkFill" style="width: 100%; background: var(--ink-cyan-accent);"></div>
           </div>
         </div>
 
@@ -1902,6 +1912,8 @@
         boostTimer: 0,
         lowGravityTimer: 0,
         blitzTimer: 0,
+        superAuraTimer: 0,
+        invulnerableTimer: 0,
         landingSquashTimer: 0,
         deathTimer: 0
       };
@@ -1910,6 +1922,54 @@
       state.activeStrokePoints = [];
       state.currentInk = lvl.maxInkPerLevel;
       state.totalInkDrawn = 0;
+      state.score = 0;
+      state.lastRuneBadge = '━ BRIDGE RUNE';
+      state.lastRuneColor = COLORS.ChalkWhite;
+      const bossMaxHp = levelNum === 50 ? 8 : (lvl.isMiniBoss ? 6 : 5);
+      state.ignisBoss = {
+        x: lvl.spawnPosition.x - 320,
+        y: lvl.spawnPosition.y - 36,
+        hp: bossMaxHp,
+        maxHp: bossMaxHp,
+        hurtCooldown: 0,
+        biteCooldown: 0,
+        knockbackVx: 0,
+        isDefeated: false
+      };
+      state.rockWalls = [];
+      state.lavaMonsters = [];
+      if (levelNum >= 3) {
+        const wallCount = Math.min(4, Math.max(1, Math.floor(levelNum / 10) + 1));
+        const span = Math.max(320, lvl.finishLineX - lvl.spawnPosition.x - 460);
+        for (let i = 0; i < wallCount; i++) {
+          const wx = lvl.spawnPosition.x + 340 + span * ((i + 0.55) / (wallCount + 0.3));
+          state.rockWalls.push({
+            id: i + 1,
+            x: wx,
+            topY: DEFAULT_GROUND_Y - 76,
+            bottomY: DEFAULT_GROUND_Y + 4,
+            width: 30,
+            isSmashed: false
+          });
+        }
+      }
+      if (levelNum >= 2) {
+        const monsterCount = Math.min(5, Math.max(1, Math.floor(levelNum / 8) + 1));
+        const span = Math.max(320, lvl.finishLineX - lvl.spawnPosition.x - 420);
+        for (let i = 0; i < monsterCount; i++) {
+          const mx = lvl.spawnPosition.x + 280 + span * ((i + 0.35) / (monsterCount + 0.2));
+          state.lavaMonsters.push({
+            id: i + 101,
+            x: mx,
+            baseY: LAVA_SURFACE_Y - 12,
+            apexY: DEFAULT_GROUND_Y - 68,
+            cyclePeriod: Math.max(1.55, 2.5 - levelNum * 0.015),
+            phaseOffset: i * 1.15,
+            radius: 20,
+            isDefeated: false
+          });
+        }
+      }
       state.chalkBits = lvl.chalkBits.map(b => ({ ...b, collected: false }));
       state.scribblers = lvl.scribblers.map(s => ({
         ...s,
@@ -2222,130 +2282,103 @@
         }
       }
 
-      const isTurboImmune = updatedBoost > 0 || nextBlitzTimer > 0;
-      if (!isTurboImmune) {
-        for (const cluster of level.thumbtacks) {
-          for (let i = 0; i < cluster.count; i++) {
-            const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
-            const tx = cluster.x + offset;
-            const ty = cluster.y;
-            if (Math.abs(resolvedX - tx) < 13 && resolvedY >= ty - 6 && resolvedY - STICKMAN_HEIGHT <= ty + 8) {
-              state.gameOverReason = "Impaled on thumbtacks! Draw a bridge over the spikes.";
-              return {
-                ...st,
-                footX: resolvedX,
-                footY: resolvedY,
-                velocityX: 0,
-                velocityY: 0,
-                isGrounded: false,
-                isAlive: false,
-                landingSquashTimer: 0,
-                deathTimer: 0.01
-              };
-            }
+      const nextSuperAuraTimer = Math.max(0, (st.superAuraTimer || 0) - dt);
+      const nextInvulnTimer = Math.max(0, (st.invulnerableTimer || 0) - dt);
+
+      // Swept capsule & AABB bounds for continuous obstacle collision (active even during Boost/Blitz)
+      const sweptMinX = Math.min(prevX, resolvedX) - 13;
+      const sweptMaxX = Math.max(prevX, resolvedX) + 13;
+      const stickmanTopY = resolvedY - STICKMAN_HEIGHT + 4;
+      const bodySegTop = { x: resolvedX, y: stickmanTopY };
+      const bodySegBot = { x: resolvedX, y: resolvedY };
+      const midX = (prevX + resolvedX) * 0.5;
+      const midY = (prevY + resolvedY) * 0.5;
+      const midSegTop = { x: midX, y: midY - STICKMAN_HEIGHT + 4 };
+      const midSegBot = { x: midX, y: midY };
+
+      const killWithReason = (reasonText) => {
+        state.gameOverReason = reasonText;
+        return {
+          ...st,
+          footX: resolvedX,
+          footY: resolvedY,
+          velocityX: 0,
+          velocityY: 0,
+          isGrounded: false,
+          isAlive: false,
+          landingSquashTimer: 0,
+          deathTimer: 0.01
+        };
+      };
+
+      for (const cluster of level.thumbtacks) {
+        for (let i = 0; i < cluster.count; i++) {
+          const offset = (i - (cluster.count - 1) / 2) * cluster.spacing;
+          const tx = cluster.x + offset;
+          const ty = cluster.y;
+          const hitX = sweptMaxX >= tx - 9 && sweptMinX <= tx + 9;
+          const hitY = resolvedY >= ty - 10 && stickmanTopY <= ty + 8;
+          if (hitX && hitY) {
+            return killWithReason("Impaled on thumbtacks! Draw a bridge over the spikes.");
           }
         }
+      }
 
-        for (const hazard of (level.hazards || [])) {
-          if (hazard.type === 'PENDULUM' || hazard.type === 'SWINGING_PENDULUM') {
-            const bobPos = getPendulumBobPos(hazard, state.lavaAnimTime);
-            const hitR = hazard.bobRadius + 10;
-            const dFoot = Math.hypot(resolvedX - bobPos.x, (resolvedY - 12) - bobPos.y);
-            const dTorso = Math.hypot(resolvedX - bobPos.x, (resolvedY - STICKMAN_HEIGHT * 0.5) - bobPos.y);
-            const dHead = Math.hypot(resolvedX - bobPos.x, (resolvedY - STICKMAN_HEIGHT + 10) - bobPos.y);
-            if (dFoot <= hitR || dTorso <= hitR || dHead <= hitR) {
-              state.gameOverReason = "Struck by a swinging pendulum! Curve your chalk line around the arc.";
-              return {
-                ...st,
-                footX: resolvedX,
-                footY: resolvedY,
-                velocityX: 0,
-                velocityY: 0,
-                isGrounded: false,
-                isAlive: false,
-                landingSquashTimer: 0,
-                deathTimer: 0.01
-              };
+      for (const hazard of (level.hazards || [])) {
+        if (hazard.type === 'PENDULUM' || hazard.type === 'SWINGING_PENDULUM') {
+          const bobPositions = [getPendulumBobPos(hazard, state.lavaAnimTime)];
+          if (hazard.pendulumStyle === 'DOUBLE_SYNC') {
+            const p2 = getPendulumBobPos(hazard, state.lavaAnimTime + Math.PI / Math.max(0.5, hazard.swingSpeed || 2.5));
+            bobPositions.push(p2);
+          }
+          const hitR = (hazard.bobRadius || 22) + 13;
+          for (const bobPos of bobPositions) {
+            const dNow = distancePointToSegment(bobPos, bodySegTop, bodySegBot);
+            const dMid = distancePointToSegment(bobPos, midSegTop, midSegBot);
+            if (dNow <= hitR || dMid <= hitR) {
+              return killWithReason("Struck by a swinging pendulum! Curve your chalk line around the arc.");
             }
-          } else if (hazard.type === 'LAVA_GEYSER') {
-            const plumeTopY = getGeyserPlumeTopY(hazard, state.lavaAnimTime);
-            if (plumeTopY < LAVA_SURFACE_Y - 14) {
-              const halfW = (hazard.width || 38) * 0.5 + 8;
-              if (Math.abs(resolvedX - hazard.x) <= halfW && resolvedY >= plumeTopY + 6) {
-                state.gameOverReason = "Roasted by a Lava Geyser! Draw a high arched bridge over the bubble.";
-                return {
-                  ...st,
-                  footX: resolvedX,
-                  footY: resolvedY,
-                  velocityX: 0,
-                  velocityY: 0,
-                  isGrounded: false,
-                  isAlive: false,
-                  landingSquashTimer: 0,
-                  deathTimer: 0.01
-                };
+          }
+        } else if (hazard.type === 'LAVA_GEYSER') {
+          const plumeTopY = getGeyserPlumeTopY(hazard, state.lavaAnimTime);
+          if (plumeTopY < LAVA_SURFACE_Y - 12) {
+            const halfW = (hazard.width || 38) * 0.5 + 10;
+            const overlapsX = sweptMaxX >= hazard.x - halfW && sweptMinX <= hazard.x + halfW;
+            const overlapsY = resolvedY >= plumeTopY + 4 && stickmanTopY <= LAVA_SURFACE_Y;
+            if (overlapsX && overlapsY) {
+              const safeOnBridge = grounded && resolvedY <= plumeTopY + 10;
+              if (!safeOnBridge) {
+                return killWithReason("Roasted by a Lava Geyser! Draw a high arched bridge over the bubble.");
               }
             }
-          } else if (hazard.type === 'FALLING_SPIKE') {
+          }
+        } else if (hazard.type === 'FALLING_SPIKE') {
+          const hitHalfW = (hazard.bobRadius || 16) + 8;
+          if (sweptMaxX >= hazard.x - hitHalfW && sweptMinX <= hazard.x + hitHalfW) {
             const tipY = getFallingSpikeTipY(hazard, resolvedX, completedLines);
-            const spikeTopY = tipY - (hazard.height || 44);
+            const spikeTopY = Math.max(hazard.topY || 40, tipY - (hazard.height || 44));
             const shieldY = findCeilingShieldY(hazard.x, hazard.topY, resolvedY - STICKMAN_HEIGHT, completedLines);
             const blocked = shieldY !== null && tipY <= shieldY + 6;
-            if (!blocked && Math.abs(resolvedX - hazard.x) <= (hazard.bobRadius || 18) + 8) {
-              const headY = resolvedY - STICKMAN_HEIGHT + 8;
-              if (tipY >= headY && spikeTopY <= resolvedY) {
-                state.gameOverReason = "Crushed by a Falling Stalactite! Draw an overhead Chalk roof shield.";
-                return {
-                  ...st,
-                  footX: resolvedX,
-                  footY: resolvedY,
-                  velocityX: 0,
-                  velocityY: 0,
-                  isGrounded: false,
-                  isAlive: false,
-                  landingSquashTimer: 0,
-                  deathTimer: 0.01
-                };
-              }
+            if (!blocked && tipY >= stickmanTopY + 2 && spikeTopY <= resolvedY) {
+              return killWithReason("Crushed by a Falling Stalactite! Draw an overhead Chalk roof shield.");
             }
-          } else if (hazard.type === 'LASER_GATE') {
-            if (isLaserActive(hazard, state.lavaAnimTime)) {
-              const beamBottomY = hazard.topY + (hazard.height || 215);
-              if (Math.abs(resolvedX - hazard.x) <= 13 && resolvedY >= hazard.topY + 6 && (resolvedY - STICKMAN_HEIGHT) <= beamBottomY - 6) {
-                state.gameOverReason = "Zapped by a Laser Gate! Time your crossing or dash through with Turbo.";
-                return {
-                  ...st,
-                  footX: resolvedX,
-                  footY: resolvedY,
-                  velocityX: 0,
-                  velocityY: 0,
-                  isGrounded: false,
-                  isAlive: false,
-                  landingSquashTimer: 0,
-                  deathTimer: 0.01
-                };
-              }
+          }
+        } else if (hazard.type === 'LASER_GATE') {
+          if (isLaserActive(hazard, state.lavaAnimTime)) {
+            const beamBottomY = hazard.topY + (hazard.height || 215);
+            const overlapsX = sweptMaxX >= hazard.x - 10 && sweptMinX <= hazard.x + 10;
+            const overlapsY = resolvedY >= hazard.topY + 4 && stickmanTopY <= beamBottomY - 4;
+            if (overlapsX && overlapsY) {
+              return killWithReason("Zapped by a Laser Gate! Time your crossing when the beam cycles off.");
             }
-          } else if (hazard.type === 'SAW_TRACK') {
-            const sawPos = getSawPos(hazard, state.lavaAnimTime);
-            const hitR = (hazard.bobRadius || 22) + 9;
-            const dFoot = Math.hypot(resolvedX - sawPos.x, (resolvedY - 12) - sawPos.y);
-            const dTorso = Math.hypot(resolvedX - sawPos.x, (resolvedY - STICKMAN_HEIGHT * 0.5) - sawPos.y);
-            const dHead = Math.hypot(resolvedX - sawPos.x, (resolvedY - STICKMAN_HEIGHT + 10) - sawPos.y);
-            if (dFoot <= hitR || dTorso <= hitR || dHead <= hitR) {
-              state.gameOverReason = "Sliced by a Track Buzzsaw! Ramp over or duck underneath the track.";
-              return {
-                ...st,
-                footX: resolvedX,
-                footY: resolvedY,
-                velocityX: 0,
-                velocityY: 0,
-                isGrounded: false,
-                isAlive: false,
-                landingSquashTimer: 0,
-                deathTimer: 0.01
-              };
-            }
+          }
+        } else if (hazard.type === 'SAW_TRACK') {
+          const sawPos = getSawPos(hazard, state.lavaAnimTime);
+          const hitR = (hazard.bobRadius || 22) + 13;
+          const dNow = distancePointToSegment(sawPos, bodySegTop, bodySegBot);
+          const dMid = distancePointToSegment(sawPos, midSegTop, midSegBot);
+          if (dNow <= hitR || dMid <= hitR) {
+            return killWithReason("Sliced by a Track Buzzsaw! Ramp over or duck underneath the track.");
           }
         }
       }
@@ -2379,6 +2412,8 @@
           boostTimer: updatedBoost,
           lowGravityTimer: nextLowGravTimer,
           blitzTimer: nextBlitzTimer,
+          superAuraTimer: nextSuperAuraTimer,
+          invulnerableTimer: nextInvulnTimer,
           landingSquashTimer: nextLandingSquash
         };
       }
@@ -2396,6 +2431,8 @@
         boostTimer: updatedBoost,
         lowGravityTimer: nextLowGravTimer,
         blitzTimer: nextBlitzTimer,
+        superAuraTimer: nextSuperAuraTimer,
+        invulnerableTimer: nextInvulnTimer,
         landingSquashTimer: nextLandingSquash
       };
     }
@@ -2570,6 +2607,91 @@
         }
       }
       state.scribblers = nextScribblers;
+
+      // 4b. Step Breakable Rock Walls, Leaping Lava Monsters & Ignis Titan Dragon Boss
+      const isSuper = (state.stickman.superAuraTimer || 0) > 0 || (state.stickman.boostTimer || 0) > 0 || (state.stickman.blitzTimer || 0) > 0;
+      const rLeft = state.stickman.footX - 15;
+      const rRight = state.stickman.footX + 15;
+      const rTop = state.stickman.footY - STICKMAN_HEIGHT + 4;
+      const rBot = state.stickman.footY;
+
+      for (const wall of (state.rockWalls || [])) {
+        if (wall.isSmashed || !state.stickman.isAlive) continue;
+        if (rRight >= wall.x - wall.width * 0.5 && rLeft <= wall.x + wall.width * 0.5 && rBot >= wall.topY + 4 && rTop <= wall.bottomY - 4) {
+          if (isSuper) {
+            wall.isSmashed = true;
+            state.score = (state.score || 0) + 25;
+            spawnLineSparks([{ x: wall.x, y: (wall.topY + wall.bottomY) * 0.5 }]);
+            sound.playCut();
+          } else if ((state.stickman.invulnerableTimer || 0) <= 0) {
+            state.gameOverReason = "Blocked by a Cracked Basalt Wall! Activate Super Aura (draw a circle) or Turbo to smash through.";
+            state.stickman.isAlive = false;
+            state.stickman.velocityX = 0;
+            state.stickman.velocityY = 0;
+          }
+        }
+      }
+
+      for (const monster of (state.lavaMonsters || [])) {
+        if (monster.isDefeated || !state.stickman.isAlive) continue;
+        const phase = ((state.lavaAnimTime + monster.phaseOffset) % monster.cyclePeriod) / monster.cyclePeriod;
+        const my = phase < 0.72
+          ? monster.baseY - Math.sin((phase / 0.72) * Math.PI) * (monster.baseY - monster.apexY)
+          : monster.baseY;
+        if (my < LAVA_SURFACE_Y - 6) {
+          const d = distancePointToSegment({ x: monster.x, y: my }, { x: state.stickman.footX, y: rTop }, { x: state.stickman.footX, y: rBot });
+          if (d <= monster.radius + 13) {
+            if (isSuper) {
+              monster.isDefeated = true;
+              state.score = (state.score || 0) + 35;
+              state.currentInk = Math.min(state.level.maxInkPerLevel * 1.5, state.currentInk + state.level.maxInkPerLevel * 0.15);
+              spawnLineSparks([{ x: monster.x, y: my }]);
+              sound.playSpring();
+            } else if ((state.stickman.invulnerableTimer || 0) <= 0) {
+              state.gameOverReason = "Ambushed by a Leaping Magma Imp! Blast it with Super Aura or bridge high above.";
+              state.stickman.isAlive = false;
+              state.stickman.velocityX = 0;
+              state.stickman.velocityY = 0;
+            }
+          }
+        }
+      }
+
+      if (state.ignisBoss && !state.ignisBoss.isDefeated && state.stickman.isAlive) {
+        const boss = state.ignisBoss;
+        boss.hurtCooldown = Math.max(0, boss.hurtCooldown - clampedDt);
+        boss.biteCooldown = Math.max(0, boss.biteCooldown - clampedDt);
+        const refSpeed = Math.max(state.level.runSpeed, state.stickman.velocityX);
+        const gap = state.stickman.footX - boss.x;
+        const chaseSpeed = gap > 480 ? refSpeed * 1.38 : (gap > 38 ? refSpeed * (state.currentLevel === 1 ? 1.04 : 1.09) : refSpeed * 0.96);
+        boss.knockbackVx *= Math.max(0, 1 - 3.2 * clampedDt);
+        boss.x = Math.min(state.stickman.footX - 18, boss.x + (chaseSpeed + boss.knockbackVx) * clampedDt);
+        const targetY = Math.max(130, Math.min(LAVA_SURFACE_Y - 56, state.stickman.footY - 34 + Math.sin(state.lavaAnimTime * 3.4) * 18));
+        boss.y += (targetY - boss.y) * Math.min(1, 4.5 * clampedDt);
+
+        const distX = Math.abs(state.stickman.footX - boss.x);
+        const distY = Math.abs((state.stickman.footY - 28) - boss.y);
+        if (distX < (isSuper ? 115 : 64) && distY < 76) {
+          if (isSuper && boss.hurtCooldown <= 0) {
+            boss.hurtCooldown = 0.9;
+            boss.knockbackVx = -360;
+            boss.hp = Math.max(0, boss.hp - 1);
+            state.score = (state.score || 0) + (boss.hp === 0 ? 300 : 100);
+            if (boss.hp === 0) {
+              boss.isDefeated = true;
+              boss.x -= 240;
+            }
+            spawnLineSparks([{ x: boss.x + 24, y: boss.y }]);
+            sound.playSpring();
+          } else if (!isSuper && boss.biteCooldown <= 0 && (state.stickman.invulnerableTimer || 0) <= 0) {
+            boss.biteCooldown = 2.0;
+            boss.knockbackVx = -240;
+            state.currentInk = Math.max(0, state.currentInk - state.level.maxInkPerLevel * 0.35);
+            state.stickman.invulnerableTimer = 1.0;
+            sound.playCut();
+          }
+        }
+      }
 
       // 5. Update Chalk Bits & Magnet Combo collection (by stickman OR by player-drawn lines)
       const magnetRadius = (state.comboCount >= 2 || state.stickman.blitzTimer > 0) ? 135 : 56;
@@ -2955,6 +3077,56 @@
       }
     });
 
+    function classifyRuneStroke(points, stickman) {
+      if (!points || points.length < 2) {
+        return { runeType: 'STANDARD_INK', badge: '━ BRIDGE RUNE', color: COLORS.ChalkWhite, toolOverride: null, inkRefundRatio: 0, activatesSuperAura: false };
+      }
+      const totalLen = calculatePolylineLength(points);
+      const first = points[0];
+      const last = points[points.length - 1];
+      const directDist = distance(first, last);
+      const straightnessRatio = totalLen > 1 ? directDist / totalLen : 1;
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      const width = Math.max(1, maxX - minX);
+      const height = Math.max(1, maxY - minY);
+      const cx = (minX + maxX) * 0.5;
+      const cy = (minY + maxY) * 0.5;
+
+      let dirFlips = 0;
+      let prevSignY = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const dy = points[i + 1].y - points[i].y;
+        if (Math.abs(dy) >= 6) {
+          const s = dy > 0 ? 1 : -1;
+          if (prevSignY !== 0 && s !== prevSignY) dirFlips++;
+          prevSignY = s;
+        }
+      }
+
+      const runnerCenterY = stickman.footY - STICKMAN_HEIGHT * 0.5;
+      const distToRunner = Math.hypot(cx - stickman.footX, cy - runnerCenterY);
+      const isClosedLoop = points.length >= 6 && totalLen >= 90 && directDist < totalLen * 0.36 && width >= 24 && height >= 24;
+
+      if (isClosedLoop && distToRunner < 195) {
+        return { runeType: 'STAR_SPARK', badge: '★ STAR SPARK (+25% INK)', color: COLORS.LavaFlameYellow, toolOverride: 'BOOST', inkRefundRatio: 0.25, activatesSuperAura: true };
+      }
+      if (dirFlips >= 2 && straightnessRatio < 0.84 && totalLen >= 75) {
+        return { runeType: 'ZIGZAG_COIL', badge: '⚡ ZIG-ZAG COIL (+15% INK)', color: COLORS.InkCyanAccent, toolOverride: 'SPRING', inkRefundRatio: 0.15, activatesSuperAura: false };
+      }
+      const netRise = first.y - last.y;
+      if (last.x - first.x >= 55 && netRise >= 28 && Math.abs(netRise) / Math.max(1, last.x - first.x) >= 0.22 && dirFlips <= 2 && cx >= stickman.footX - 60) {
+        return { runeType: 'RAMP_SLOPE', badge: '🚀 TURBO RAMP (+12% INK)', color: COLORS.FinishBannerGreen, toolOverride: 'BOOST', inkRefundRatio: 0.12, activatesSuperAura: false };
+      }
+      return { runeType: 'STANDARD_INK', badge: '━ BRIDGE RUNE', color: COLORS.ChalkWhite, toolOverride: null, inkRefundRatio: 0, activatesSuperAura: false };
+    }
+
     function finishActiveStroke() {
       if (!isDrawing) return;
       isDrawing = false;
@@ -2966,13 +3138,29 @@
       }
       if (state.activeStrokePoints.length >= 2) {
         const smoothed = smoothStrokePoints(state.activeStrokePoints);
+        const rune = classifyRuneStroke(smoothed, state.stickman);
+        state.lastRuneBadge = rune.badge;
+        state.lastRuneColor = rune.color;
+        if (rune.inkRefundRatio > 0) {
+          state.currentInk = Math.min(state.level.maxInkPerLevel * 1.5, state.currentInk + state.level.maxInkPerLevel * rune.inkRefundRatio);
+        }
+        if (rune.activatesSuperAura) {
+          state.stickman.superAuraTimer = 5.0;
+          state.stickman.boostTimer = Math.max(state.stickman.boostTimer, 5.0);
+          spawnLineSparks(smoothed);
+          sound.playPickup(true);
+          state.activeStrokePoints = [];
+          updateHudDOM();
+          return;
+        }
+        const finalTool = (state.selectedTool === 'WHITE' && rune.toolOverride) ? rune.toolOverride : state.selectedTool;
         const newLine = {
           id: Date.now() + Math.random(),
           points: smoothed,
           segments: makeSegments(smoothed),
-          tool: state.selectedTool,
+          tool: finalTool,
           ageSeconds: 0,
-          maxLifetime: state.selectedTool === 'BOOST' ? 9999 : (state.level.lineLifespan || DEFAULT_LINE_LIFETIME)
+          maxLifetime: finalTool === 'BOOST' ? 9999 : (state.level.lineLifespan || DEFAULT_LINE_LIFETIME)
         };
         state.completedLines.push(newLine);
         matterBridge.addDrawnLineBodies(newLine);
@@ -3094,11 +3282,71 @@
         drawPencilLine(state.activeStrokePoints, state.selectedTool, 1, false, toScreenX, toScreenY, worldScale);
       }
 
-      // 10. Red Scribbler Enemies
+      // 10. Red Scribbler Enemies, Breakable Rock Walls, Leaping Lava Monsters & Ignis Titan Dragon Boss
       for (const enemy of state.scribblers) {
         if (enemy.isAlive) {
           drawScribblerEnemy(enemy, toScreenX, toScreenY, worldScale, w);
         }
+      }
+      for (const wall of (state.rockWalls || [])) {
+        if (!wall.isSmashed) {
+          const sx = toScreenX(wall.x - wall.width * 0.5);
+          const sy = toScreenY(wall.topY);
+          const sw = wall.width * worldScale;
+          const sh = (wall.bottomY - wall.topY) * worldScale;
+          ctx.fillStyle = '#2C2F3B';
+          ctx.strokeStyle = COLORS.LavaOrange;
+          ctx.lineWidth = 2.5 * worldScale;
+          ctx.fillRect(sx, sy, sw, sh);
+          ctx.strokeRect(sx, sy, sw, sh);
+        }
+      }
+      for (const monster of (state.lavaMonsters || [])) {
+        if (!monster.isDefeated) {
+          const phase = ((state.lavaAnimTime + monster.phaseOffset) % monster.cyclePeriod) / monster.cyclePeriod;
+          const my = phase < 0.72
+            ? monster.baseY - Math.sin((phase / 0.72) * Math.PI) * (monster.baseY - monster.apexY)
+            : monster.baseY;
+          if (my < LAVA_SURFACE_Y - 4) {
+            const sx = toScreenX(monster.x);
+            const sy = toScreenY(my);
+            const r = monster.radius * worldScale;
+            ctx.fillStyle = COLORS.LavaDeepRed;
+            ctx.strokeStyle = COLORS.LavaFlameYellow;
+            ctx.lineWidth = 2 * worldScale;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      }
+      if (state.ignisBoss && !state.ignisBoss.isDefeated && state.stickman) {
+        const boss = state.ignisBoss;
+        const distToPlayer = Math.max(0, state.stickman.footX - boss.x);
+        if (distToPlayer < 400) {
+          const vigAlpha = ((1 - distToPlayer / 400) * 0.34);
+          ctx.fillStyle = `rgba(213, 0, 0, ${vigAlpha})`;
+          ctx.fillRect(0, 0, 36 * worldScale, h);
+        }
+        const hx = toScreenX(boss.x);
+        const hy = toScreenY(boss.y);
+        for (let seg = 4; seg >= 1; seg--) {
+          const bx = hx - seg * 26 * worldScale;
+          const by = hy + Math.sin(state.lavaAnimTime * 5.2 - seg * 0.9) * 12 * worldScale;
+          const br = (28 - seg * 3.5) * worldScale;
+          ctx.fillStyle = boss.hurtCooldown > 0 ? COLORS.ChalkWhite : COLORS.LavaDeepRed;
+          ctx.strokeStyle = COLORS.LavaOrange;
+          ctx.lineWidth = 2 * worldScale;
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.fillStyle = boss.hurtCooldown > 0 ? COLORS.ChalkWhite : COLORS.LavaOrange;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 30 * worldScale, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       // 11. Hand-drawn Chalk Dust & Pencil Spark Particles
@@ -4509,8 +4757,28 @@
         Math.max(1, state.level.finishLineX - state.level.spawnPosition.x)
       ));
       const progPct = Math.round(prog * 100);
-      document.getElementById('hudProgressText').textContent = `PROGRESS: ${progPct}%`;
+      document.getElementById('hudProgressText').textContent = `DIST: ${progPct}% • PTS ${state.score || 0}`;
       document.getElementById('hudProgressFill').style.width = `${progPct}%`;
+
+      if (state.ignisBoss) {
+        const bossHpEl = document.getElementById('hudBossHpText');
+        const bossFillEl = document.getElementById('hudBossHpFill');
+        if (bossHpEl && bossFillEl) {
+          bossHpEl.textContent = state.ignisBoss.isDefeated
+            ? '🐉 IGNIS SLAIN!'
+            : `🐉 BOSS HP: ${state.ignisBoss.hp}/${state.ignisBoss.maxHp}`;
+          bossHpEl.style.color = state.ignisBoss.isDefeated ? COLORS.FinishBannerGreen : COLORS.LavaOrange;
+          const bossPct = Math.round((state.ignisBoss.hp / Math.max(1, state.ignisBoss.maxHp)) * 100);
+          bossFillEl.style.width = `${bossPct}%`;
+        }
+      }
+
+      const runeBadgeEl = document.getElementById('hudRuneBadge');
+      if (runeBadgeEl) {
+        const superActive = (state.stickman.superAuraTimer || 0) > 0;
+        runeBadgeEl.textContent = superActive ? '✨ SUPER AURA!' : (state.lastRuneBadge || '━ BRIDGE RUNE');
+        runeBadgeEl.style.color = superActive ? COLORS.LavaFlameYellow : (state.lastRuneColor || COLORS.ChalkWhite);
+      }
 
       const inkRatio = Math.max(0, Math.min(1, state.currentInk / state.level.maxInkPerLevel));
       const inkPct = Math.round(inkRatio * 100);

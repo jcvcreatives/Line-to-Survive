@@ -318,6 +318,174 @@ class ExampleUnitTest {
     val insidePt = Vec2((noDraw.startX + noDraw.endX) * 0.5f, (noDraw.topY + noDraw.bottomY) * 0.5f)
     assertTrue("Point inside NO_DRAW_ZONE should be detected", noDraw.containsNoDrawPoint(insidePt))
   }
+
+  @Test
+  fun `obstacle hitboxes immediately stop the game on contact even during boost or blitz`() {
+    val baseLevel = LevelCatalog.getLevel(1)
+    val groundY = WorldConstants.DEFAULT_GROUND_Y
+
+    // 1. Swinging Pendulum directly on the runner's torso stops the game even with boostTimer > 0
+    val pendulum = com.example.game.model.DynamicHazard(
+      id = 900,
+      type = com.example.game.model.HazardType.SWINGING_PENDULUM,
+      x = 240f,
+      y = groundY - 120f,
+      armLength = 95f,
+      bobRadius = 22f,
+      maxAngleRadians = 0f,
+      angularSpeed = 0f,
+      phaseOffset = 0f
+    )
+    val levelWithPendulum = baseLevel.copy(hazards = listOf(pendulum), thumbtacks = emptyList())
+    val boostedRunner = StickmanState(
+      footX = 235f,
+      footY = groundY,
+      velocityX = baseLevel.runSpeed,
+      isGrounded = true,
+      boostTimer = 1.5f,
+      blitzTimer = 1.0f
+    )
+    val pendulumStep = PhysicsEngine.stepPhysics(
+      stickman = boostedRunner,
+      level = levelWithPendulum,
+      completedLines = emptyList(),
+      deltaSeconds = 1f / 60f,
+      animTime = 0f
+    )
+    assertFalse("Runner hitting a swinging pendulum must immediately stop (isAlive = false) even during boost/blitz", pendulumStep.stickman.isAlive)
+    assertTrue("Obstacle hit should trigger game over flag", pendulumStep.hitLava)
+
+    // 2. Active Laser Gate stops the game on contact
+    val laserGate = com.example.game.model.DynamicHazard(
+      id = 901,
+      type = com.example.game.model.HazardType.LASER_GATE,
+      x = 240f,
+      y = groundY - 60f,
+      topY = groundY - 140f,
+      bottomY = groundY + 20f,
+      laserHalfPeriodSeconds = 1.8f,
+      phaseOffset = 0f
+    )
+    val levelWithLaser = baseLevel.copy(hazards = listOf(laserGate), thumbtacks = emptyList())
+    val laserStep = PhysicsEngine.stepPhysics(
+      stickman = boostedRunner,
+      level = levelWithLaser,
+      completedLines = emptyList(),
+      deltaSeconds = 1f / 60f,
+      animTime = 0.2f
+    )
+    assertFalse("Runner hitting an active Laser Gate must immediately stop (isAlive = false)", laserStep.stickman.isAlive)
+    assertTrue(laserStep.hitLava)
+
+    // 3. Track Buzzsaw stops the game on contact
+    val sawTrack = com.example.game.model.DynamicHazard(
+      id = 902,
+      type = com.example.game.model.HazardType.SAW_TRACK,
+      x = 240f,
+      y = groundY - 25f,
+      trackStartX = 240f,
+      trackStartY = groundY - 25f,
+      trackEndX = 240f,
+      trackEndY = groundY - 25f,
+      bobRadius = 22f,
+      trackSpeed = 1f
+    )
+    val levelWithSaw = baseLevel.copy(hazards = listOf(sawTrack), thumbtacks = emptyList())
+    val sawStep = PhysicsEngine.stepPhysics(
+      stickman = boostedRunner,
+      level = levelWithSaw,
+      completedLines = emptyList(),
+      deltaSeconds = 1f / 60f,
+      animTime = 0f
+    )
+    assertFalse("Runner hitting a Saw Track must immediately stop (isAlive = false)", sawStep.stickman.isAlive)
+    assertTrue(sawStep.hitLava)
+  }
+
+  @Test
+  fun `rune classification engine identifies bridge, star spark super aura, zigzag coil, and turbo ramp`() {
+    val runner = StickmanState(
+      footX = 300f,
+      footY = 325f,
+      velocityX = 180f,
+      isGrounded = true
+    )
+
+    // 1. Straight Bridge -> STANDARD_INK
+    val straightBridge = listOf(Vec2(320f, 325f), Vec2(420f, 325f), Vec2(520f, 325f))
+    val bridgeRune = PhysicsEngine.classifyRuneStroke(straightBridge, runner)
+    assertEquals(com.example.game.model.RuneType.STANDARD_INK, bridgeRune.runeType)
+
+    // 2. Closed Circle around the runner -> STAR_SPARK (+25% Ink & Golden Super Aura)
+    val circlePoints = (0..12).map { idx ->
+      val angle = (idx.toFloat() / 12f) * (Math.PI.toFloat() * 2f)
+      Vec2(
+        x = runner.footX + kotlin.math.cos(angle) * 45f,
+        y = (runner.footY - 28f) + kotlin.math.sin(angle) * 45f
+      )
+    }
+    val starRune = PhysicsEngine.classifyRuneStroke(circlePoints, runner)
+    assertEquals(com.example.game.model.RuneType.STAR_SPARK, starRune.runeType)
+    assertTrue(starRune.triggersSuperAura)
+    assertEquals(0.25f, starRune.inkRefundRatio, 0.01f)
+
+    // 3. Zig-Zag / W-shape -> ZIGZAG_COIL (+15% Ink & Spring Bounce)
+    val zigZagPoints = listOf(
+      Vec2(360f, 330f),
+      Vec2(390f, 280f),
+      Vec2(420f, 330f),
+      Vec2(450f, 280f),
+      Vec2(480f, 330f)
+    )
+    val zigZagRune = PhysicsEngine.classifyRuneStroke(zigZagPoints, runner)
+    assertEquals(com.example.game.model.RuneType.ZIGZAG_COIL, zigZagRune.runeType)
+    assertEquals(com.example.game.model.ChalkTool.SPRING, zigZagRune.effectiveTool)
+
+    // 4. Upward Ramp ahead of runner -> RAMP_SLOPE (+12% Ink & Turbo Boost)
+    val rampPoints = listOf(
+      Vec2(330f, 330f),
+      Vec2(390f, 305f),
+      Vec2(450f, 275f)
+    )
+    val rampRune = PhysicsEngine.classifyRuneStroke(rampPoints, runner)
+    assertEquals(com.example.game.model.RuneType.RAMP_SLOPE, rampRune.runeType)
+    assertEquals(com.example.game.model.ChalkTool.BOOST, rampRune.effectiveTool)
+  }
+
+  @Test
+  fun `ignis titan boss takes damage and recoils with i-frames when struck by super aura runner`() {
+    val level = LevelCatalog.getLevel(5)
+    val superRunner = StickmanState(
+      footX = 400f,
+      footY = 325f,
+      velocityX = level.runSpeed * 1.65f,
+      isGrounded = true,
+      superAuraTimer = 4.5f
+    )
+    val boss = com.example.game.model.IgnisTitanBoss(
+      x = 345f,
+      y = 295f,
+      hp = 5,
+      maxHp = 5,
+      hurtCooldown = 0f
+    )
+
+    val step1 = PhysicsEngine.stepCombatEntities(
+      stickman = superRunner,
+      level = level,
+      rockWalls = emptyList(),
+      lavaMonsters = emptyList(),
+      ignisBoss = boss,
+      animTime = 1.0f,
+      dt = 1f / 60f
+    )
+    assertTrue("Boss should take damage on Super Aura contact", step1.bossTookDamage)
+    assertEquals(4, step1.ignisBoss.hp)
+    assertTrue("Boss should have i-frame hurtCooldown set (~0.9s)", step1.ignisBoss.hurtCooldown > 0.8f)
+    assertEquals(-360f, step1.ignisBoss.knockbackVx, 0.1f)
+    assertTrue("Striking Ignis Titan should award bonus score", step1.scoreDelta >= 100)
+  }
 }
+
 
 

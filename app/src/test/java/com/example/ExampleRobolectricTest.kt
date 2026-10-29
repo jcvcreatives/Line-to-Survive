@@ -47,17 +47,27 @@ class ExampleRobolectricTest {
 
     composeTestRule.waitForIdle()
 
-    // 1. Verify Start Screen with DRAW TO SURVIVE title and Play button
+    // 1. Verify Start Screen with DRAW TO SURVIVE title, Daily Challenge, Bazaar Shop, and Play button
     composeTestRule.onNodeWithTag("start_title_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("daily_challenge_button").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("shop_button").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithTag("alchemists_bazaar_modal").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("close_shop_button").assertIsDisplayed().performClick()
+    composeTestRule.waitForIdle()
+
     composeTestRule.onNodeWithTag("play_button").assertIsDisplayed().performClick()
     composeTestRule.waitForIdle()
 
     assertEquals(ScreenState.PLAYING, viewModel.uiState.value.screenState)
     assertTrue("Background music should start playing during gameplay", soundManager.isBackgroundMusicPlaying)
 
-    // 2. Verify Gameplay HUD elements and "DRAW A PATH TO SURVIVE!" instruction banner
+    // 2. Verify Gameplay 2x2 Grid HUD elements and "DRAW A PATH TO SURVIVE!" instruction banner
     composeTestRule.onNodeWithTag("level_indicator").assertIsDisplayed()
     composeTestRule.onNodeWithTag("progress_indicator_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("boss_hp_text").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("rune_inspector_badge").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("score_indicator_text").assertIsDisplayed()
     composeTestRule.onNodeWithTag("instruction_banner").assertIsDisplayed()
     composeTestRule.onNodeWithTag("pause_button").assertIsDisplayed()
 

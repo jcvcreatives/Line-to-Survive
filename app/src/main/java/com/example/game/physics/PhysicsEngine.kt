@@ -1,15 +1,20 @@
 package com.example.game.physics
 
+import com.example.game.model.BreakableRockWall
 import com.example.game.model.ChalkBit
 import com.example.game.model.ChalkTool
 import com.example.game.model.DrawnLine
 import com.example.game.model.DynamicHazard
 import com.example.game.model.EmberParticle
 import com.example.game.model.HazardType
+import com.example.game.model.IgnisTitanBoss
+import com.example.game.model.LeapingLavaMonster
 import com.example.game.model.LedgeStyle
 import com.example.game.model.LevelDefinition
 import com.example.game.model.MapBiome
 import com.example.game.model.Platform
+import com.example.game.model.RuneClassification
+import com.example.game.model.RuneType
 import com.example.game.model.ScribblerEnemy
 import com.example.game.model.SketchParticle
 import com.example.game.model.SketchParticleType
@@ -26,14 +31,18 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Pure 2D physics, path-smoothing, and collision engine for Draw to Survive.
+ * Pure 2D physics, path-smoothing, Rune Classification, and swept collision engine for
+ * Draw to Survive / Ink Bridge Runner: Ignis Titan Edition.
  *
  * Supports:
- * - Multi-substep collision resolution so the stickman never tunnels through thin drawn lines
- * - Overhead ceiling collision so drawn roofs protect against FALLING_SPIKE and WIND_UPDRAFT
- * - All 8 modular obstacles: PENDULUM, LEDGE, LAVA_GEYSER, FALLING_SPIKE, LASER_GATE,
- *   SAW_TRACK, NO_DRAW_ZONE, and WIND_UPDRAFT
- * - Multi-Map environmental physics (MAP_1_VOLCANO, MAP_2_CRYO_LAB low gravity, MAP_3_CYBER_GRID moving platforms)
+ * - Multi-substep swept collision resolution so the stickman never tunnels through thin drawn lines
+ *   or fast-moving obstacles
+ * - One-way non-blocking ink lines (never blocks horizontal velocity, ignores steep vertical segments
+ *   unless bouncy trampoline)
+ * - Pure Line-Drawing & Rune Classification Engine (Straight Bridge, Closed Circle Super Aura,
+ *   Zig-Zag Bouncy Coil, Curved Turbo Ramp)
+ * - Continuous swept capsule hitboxes for all 8 modular obstacles + Breakable Rock Walls,
+ *   Leaping Lava Monsters, and the Colossal Lava Dragon Boss (Ignis Titan)
  */
 object PhysicsEngine {
 
@@ -51,8 +60,24 @@ object PhysicsEngine {
     val justJumped: Boolean = false,
     val justLanded: Boolean = false,
     val justBouncedSpring: Boolean = false,
+    val shieldJustBroken: Boolean = false,
     val hitLava: Boolean = false,
     val reachedFinish: Boolean = false
+  )
+
+  data class CombatStepResult(
+    val stickman: StickmanState,
+    val rockWalls: List<BreakableRockWall>,
+    val lavaMonsters: List<LeapingLavaMonster>,
+    val ignisBoss: IgnisTitanBoss,
+    val scoreDelta: Int = 0,
+    val inkDelta: Float = 0f,
+    val bossTookDamage: Boolean = false,
+    val playerTookBossBite: Boolean = false,
+    val wallSmashed: Boolean = false,
+    val monsterBlasted: Boolean = false,
+    val shieldBroken: Boolean = false,
+    val extraParticles: List<SketchParticle> = emptyList()
   )
 
   data class MatterBody2D(
@@ -84,12 +109,132 @@ object PhysicsEngine {
           height = thickness,
           angleRadians = atan2(dy, dx),
           isStatic = true,
-          restitution = if (line.tool == ChalkTool.SPRING) 1.15f else 0f,
+          restitution = if (line.tool == ChalkTool.SPRING) 1.8f else 0f,
           friction = 0f,
           tool = line.tool
         )
       }
     }
+  }
+
+  /**
+   * Pure Line-Drawing & Rune Classification Engine:
+   * Evaluates stroke geometry upon finger release:
+   * 1. CLOSED CIRCLE ON RUNNER (`STAR_SPARK`): start-to-end distance < 110px, low straightness,
+   *    and center within 130px of runner -> +25% Ink & 5.0s Golden Super Aura Sonic Dash.
+   * 2. ZIG-ZAG / W-SHAPE (`ZIGZAG_COIL`): `directionFlips >= 2` -> Neon Cyan 1.8x trampoline & +15% Ink.
+   * 3. CURVED RAMP / LOOP AHEAD (`RAMP_SLOPE`): arched ramp -> Neon Green 1.9x turbo conveyor & +12% Ink.
+   * 4. STRAIGHT BRIDGE (`STANDARD_INK`): `straightnessRatio > 0.88` and `directionFlips < 2` -> Standard Ink.
+   */
+  fun classifyRuneStroke(
+    points: List<Vec2>,
+    stickman: StickmanState,
+    selectedTool: ChalkTool = ChalkTool.WHITE
+  ): RuneClassification {
+    if (selectedTool == ChalkTool.SPRING) {
+      return RuneClassification(
+        runeType = RuneType.ZIGZAG_COIL,
+        effectiveTool = ChalkTool.SPRING,
+        inkRefundRatio = 0f
+      )
+    }
+    if (selectedTool == ChalkTool.BOOST) {
+      return RuneClassification(
+        runeType = RuneType.RAMP_SLOPE,
+        effectiveTool = ChalkTool.BOOST,
+        inkRefundRatio = 0f
+      )
+    }
+    if (points.size < 3) {
+      return RuneClassification(
+        runeType = RuneType.STANDARD_INK,
+        effectiveTool = ChalkTool.WHITE
+      )
+    }
+
+    val totalLength = calculatePolylineLength(points)
+    if (totalLength < 70f) {
+      return RuneClassification(
+        runeType = RuneType.STANDARD_INK,
+        effectiveTool = ChalkTool.WHITE
+      )
+    }
+
+    val first = points.first()
+    val last = points.last()
+    val directDist = first.distanceTo(last)
+    val straightnessRatio = directDist / totalLength.coerceAtLeast(1f)
+
+    var sumX = 0f
+    var sumY = 0f
+    for (pt in points) {
+      sumX += pt.x
+      sumY += pt.y
+    }
+    val center = Vec2(sumX / points.size, sumY / points.size)
+    val runnerCenter = Vec2(stickman.footX, stickman.footY - WorldConstants.STICKMAN_HEIGHT * 0.5f)
+    val distToRunner = center.distanceTo(runnerCenter)
+
+    // Count significant vertical direction flips for Zig-Zag / W-Shape detection
+    var directionFlips = 0
+    var prevSignY = 0
+    val stepStride = max(1, points.size / 8)
+    var i = 0
+    while (i + stepStride < points.size) {
+      val dy = points[i + stepStride].y - points[i].y
+      if (abs(dy) >= 14f) {
+        val signY = if (dy > 0f) 1 else -1
+        if (prevSignY != 0 && signY != prevSignY) {
+          directionFlips++
+        }
+        prevSignY = signY
+      }
+      i += stepStride
+    }
+
+    // 1. CLOSED CIRCLE ON RUNNER -> STAR_SPARK (Golden Super Aura Sonic Dash)
+    val isClosedLoop = directDist < 110f && straightnessRatio < 0.44f && totalLength >= 90f
+    if (isClosedLoop && distToRunner <= 135f) {
+      return RuneClassification(
+        runeType = RuneType.STAR_SPARK,
+        effectiveTool = ChalkTool.BOOST,
+        inkRefundRatio = 0.25f,
+        triggersSuperAura = true,
+        triggersImmediateBounce = false
+      )
+    }
+
+    // 2. ZIG-ZAG / W-SHAPE -> ZIGZAG_COIL (Neon Cyan Bouncy Trampoline)
+    if (directionFlips >= 2 && straightnessRatio in 0.25f..0.78f) {
+      return RuneClassification(
+        runeType = RuneType.ZIGZAG_COIL,
+        effectiveTool = ChalkTool.SPRING,
+        inkRefundRatio = 0.15f,
+        triggersSuperAura = false,
+        triggersImmediateBounce = distToRunner <= 115f
+      )
+    }
+
+    // 3. CURVED RAMP / UPWARD RAMP AHEAD -> RAMP_SLOPE (Neon Green Turbo Conveyor)
+    val netClimb = first.y - last.y
+    val isUpwardRamp = (netClimb >= 36f && last.x > first.x + 40f) ||
+      (straightnessRatio in 0.65f..0.88f && netClimb >= 20f)
+    if (directionFlips < 2 && totalLength >= 95f && isUpwardRamp) {
+      return RuneClassification(
+        runeType = RuneType.RAMP_SLOPE,
+        effectiveTool = ChalkTool.BOOST,
+        inkRefundRatio = 0.12f,
+        triggersSuperAura = false,
+        triggersImmediateBounce = false
+      )
+    }
+
+    // 4. STRAIGHT BRIDGE -> STANDARD_INK
+    return RuneClassification(
+      runeType = RuneType.STANDARD_INK,
+      effectiveTool = ChalkTool.WHITE,
+      inkRefundRatio = 0f
+    )
   }
 
   /**
@@ -101,7 +246,6 @@ object PhysicsEngine {
     hazards: List<DynamicHazard>
   ): Boolean {
     if (tool == ChalkTool.CUTTER) return false
-    // Standard Chalk (WHITE) is blocked inside NO_DRAW_ZONE; players must place Bounce before the zone
     if (tool != ChalkTool.WHITE) return false
     return hazards.any { it.type == HazardType.NO_DRAW_ZONE && it.containsNoDrawPoint(candidatePoint) }
   }
@@ -239,11 +383,13 @@ object PhysicsEngine {
     var jumpedInFrame = false
     var landedInFrame = false
     var bouncedSpringInFrame = false
+    var shieldBrokenInFrame = false
 
     for (step in 0 until steps) {
       val prevGrounded = current.isGrounded
       val prevFootY = current.footY
       val prevVy = current.velocityY
+      val prevHadShield = current.hasTitanShield
 
       current = stepSingleSubstep(
         state = current,
@@ -253,6 +399,10 @@ object PhysicsEngine {
         dt = subDt,
         animTime = animTime + step * subDt
       )
+
+      if (prevHadShield && !current.hasTitanShield) {
+        shieldBrokenInFrame = true
+      }
 
       if (current.velocityY < -440f && prevVy >= -200f) {
         bouncedSpringInFrame = true
@@ -277,6 +427,7 @@ object PhysicsEngine {
       justJumped = jumpedInFrame,
       justLanded = landedInFrame,
       justBouncedSpring = bouncedSpringInFrame,
+      shieldJustBroken = shieldBrokenInFrame,
       hitLava = !current.isAlive,
       reachedFinish = current.hasReachedFinish
     )
@@ -299,6 +450,8 @@ object PhysicsEngine {
     val nextBoostTimer = (state.boostTimer - dt).coerceAtLeast(0f)
     val nextLowGravTimer = (state.lowGravityTimer - dt).coerceAtLeast(0f)
     val nextBlitzTimer = (state.blitzTimer - dt).coerceAtLeast(0f)
+    val nextSuperAuraTimer = (state.superAuraTimer - dt).coerceAtLeast(0f)
+    val nextInvulnTimer = (state.invulnerableTimer - dt).coerceAtLeast(0f)
 
     val slopeFactor = if (state.isGrounded && state.slopeRadians < 0f) {
       cos(state.slopeRadians.coerceIn(-1.05f, 0f)).coerceIn(0.62f, 1f)
@@ -308,6 +461,7 @@ object PhysicsEngine {
 
     val boostMult = when {
       nextBlitzTimer > 0f -> 1.85f
+      nextSuperAuraTimer > 0f -> 1.65f
       nextBoostTimer > 0f -> 1.5f
       else -> 1f
     }
@@ -327,28 +481,25 @@ object PhysicsEngine {
       state.velocityY
     }
 
+    // Auto-vaulting over top 30px..115px of slightly higher cliff ledges (Swept platform collision)
     if (state.isGrounded) {
-      val vaultHeight = findVaultWallHeight(prevX, resolvedX + 8f, prevY, completedLines)
-      if (vaultHeight != null) {
-        vy = -sqrt(2f * WorldConstants.GRAVITY * (vaultHeight + 24f)).coerceIn(280f, 520f)
-      } else {
-        for (platform in platforms) {
-          if (
-            prevX <= platform.startX + 4f &&
-              resolvedX + 18f >= platform.startX &&
-              prevY > platform.topY + STEP_UP_TOLERANCE &&
-              prevY <= platform.topY + PLATFORM_MANTLE_TOLERANCE
-          ) {
-            val climbHeight = (prevY - platform.topY).coerceIn(24f, PLATFORM_MANTLE_TOLERANCE)
-            vy = -sqrt(2f * WorldConstants.GRAVITY * (climbHeight + 26f)).coerceIn(260f, 520f)
-            break
-          }
+      for (platform in platforms) {
+        if (
+          prevX <= platform.startX + 4f &&
+            resolvedX + 18f >= platform.startX &&
+            prevY > platform.topY + STEP_UP_TOLERANCE &&
+            prevY <= platform.topY + PLATFORM_MANTLE_TOLERANCE
+        ) {
+          val climbHeight = (prevY - platform.topY).coerceIn(24f, PLATFORM_MANTLE_TOLERANCE)
+          vy = -sqrt(2f * WorldConstants.GRAVITY * (climbHeight + 26f)).coerceIn(260f, 520f)
+          break
         }
       }
     }
 
-    // Apply MapBiome gravity multiplier (e.g. MAP_2_CRYO_LAB low gravity) + LOW GRAV callout modifier
-    val gravityScale = (if (nextLowGravTimer > 0f) 0.48f else 1f) * level.mapBiome.gravityMult
+    // Apply MapBiome gravity multiplier + Milestone 25 micro-gravity + LOW GRAV callout modifier
+    val milestoneGravMult = if (level.levelNumber == 25 && nextLowGravTimer > 0f) 0.26f else 1f
+    val gravityScale = (if (nextLowGravTimer > 0f) 0.48f else 1f) * level.mapBiome.gravityMult * milestoneGravMult
     vy = (vy + WorldConstants.GRAVITY * gravityScale * dt).coerceAtMost(WorldConstants.MAX_FALL_SPEED)
 
     // Apply WIND_UPDRAFT upward lift if stickman is inside an active Wind Updraft column
@@ -362,8 +513,16 @@ object PhysicsEngine {
       }
     }
 
+    // Low-Altitude Super Aura Combat Hover: keeps Super Aura runner safely at combat height
+    if (nextSuperAuraTimer > 0f && !state.isGrounded) {
+      val hoverTargetY = WorldConstants.DEFAULT_GROUND_Y - 12f
+      if (prevY >= hoverTargetY && vy > 0f) {
+        vy = (hoverTargetY - prevY) * 8f
+      }
+    }
+
     var freeFallY = prevY + vy * dt
-    var grounded = if (inUpdraft && vy < -40f) false else state.isGrounded
+    val grounded = if (inUpdraft && vy < -40f) false else state.isGrounded
 
     // Check overhead player-drawn ceiling lines when rising (protects stickman in WIND_UPDRAFT from hitting overhead hazards!)
     if (vy < 0f) {
@@ -407,7 +566,8 @@ object PhysicsEngine {
       }
     }
 
-    if (!isGroundedNow && vy >= 0f) {
+    // One-way top surface landing when descending (vy >= -2f)
+    if (!isGroundedNow && vy >= -2f) {
       val landingHit = candidateHits
         .filter { hit ->
           prevY <= hit.y + FALL_CROSSING_TOLERANCE &&
@@ -424,11 +584,13 @@ object PhysicsEngine {
       }
     }
 
+    // Swept Anti-Sink Platform Collision
     for (platform in platforms) {
       if (resolvedX + FOOT_SUPPORT_HALF_WIDTH >= platform.startX && resolvedX - FOOT_SUPPORT_HALF_WIDTH <= platform.endX) {
         if (
-          resolvedY > platform.topY &&
-            (prevY <= platform.topY + PLATFORM_MANTLE_TOLERANCE || resolvedY <= platform.topY + PLATFORM_MANTLE_TOLERANCE)
+          resolvedY >= platform.topY &&
+            (prevY <= platform.topY + 95f || resolvedY <= platform.topY + 95f) &&
+            vy >= 0f
         ) {
           resolvedY = platform.topY
           resolvedVy = 0f
@@ -436,11 +598,16 @@ object PhysicsEngine {
           resolvedSlope = 0f
           activeSurfaceTool = ChalkTool.WHITE
         } else if (
-          resolvedY > platform.topY + PLATFORM_MANTLE_TOLERANCE &&
-            prevX + 6f <= platform.startX &&
-            resolvedX + 6f > platform.startX
+          resolvedY > platform.topY &&
+            prevY > platform.topY &&
+            resolvedY <= platform.topY + 30f
         ) {
-          resolvedX = platform.startX - 6f
+          // Auto-vault top 30px of slightly higher cliff ledge
+          resolvedY = platform.topY
+          resolvedVy = -180f
+          isGroundedNow = true
+          resolvedSlope = 0f
+          activeSurfaceTool = ChalkTool.WHITE
         }
       }
     }
@@ -452,7 +619,7 @@ object PhysicsEngine {
         nextLandingSquash = 0.26f
       }
       if (activeSurfaceTool == ChalkTool.SPRING) {
-        resolvedVy = -530f
+        resolvedVy = -540f
         isGroundedNow = false
         nextLandingSquash = 0f
       } else if (activeSurfaceTool == ChalkTool.BOOST) {
@@ -460,99 +627,131 @@ object PhysicsEngine {
       }
     }
 
-    // Check modular obstacle collisions (Turbo Boost or Blitz shields the runner)
-    if (updatedBoostTimer <= 0f && nextBlitzTimer <= 0f) {
-      for (cluster in level.thumbtacks) {
-        for (i in 0 until cluster.count) {
-          val offset = (i - (cluster.count - 1) / 2f) * cluster.spacing
-          val tx = cluster.x + offset
-          val ty = cluster.y
-          if (abs(resolvedX - tx) < 13f && resolvedY >= ty - 6f && resolvedY - WorldConstants.STICKMAN_HEIGHT <= ty + 8f) {
-            return killStickman(state, resolvedX, resolvedY)
-          }
+    // =========================================================================
+    // EXACT SWEPT OBSTACLE HITBOX COLLISION (ALWAYS ACTIVE - STOPS GAME ON HIT)
+    // =========================================================================
+    var currentHasShield = state.hasTitanShield
+    var currentInvuln = nextInvulnTimer
+
+    fun handleLethalObstacleHit(): StickmanState? {
+      if (currentInvuln > 0f) return null
+      if (currentHasShield) {
+        currentHasShield = false
+        currentInvuln = 1.1f
+        resolvedVy = -320f
+        isGroundedNow = false
+        return null
+      }
+      return killStickman(state, resolvedX, resolvedY)
+    }
+
+    val sweptMinX = min(prevX, resolvedX) - 13f
+    val sweptMaxX = max(prevX, resolvedX) + 13f
+    val stickmanTopY = resolvedY - WorldConstants.STICKMAN_HEIGHT + 4f
+    val stickmanBotY = resolvedY - 2f
+    val bodySegTop = Vec2(resolvedX, stickmanTopY)
+    val bodySegBot = Vec2(resolvedX, stickmanBotY)
+    val midX = (prevX + resolvedX) * 0.5f
+    val midSegTop = Vec2(midX, stickmanTopY)
+    val midSegBot = Vec2(midX, stickmanBotY)
+
+    // 1. Thumbtack clusters
+    for (cluster in level.thumbtacks) {
+      for (i in 0 until cluster.count) {
+        val offset = (i - (cluster.count - 1) / 2f) * cluster.spacing
+        val tx = cluster.x + offset
+        val ty = cluster.y
+        if (sweptMaxX >= tx - 9f && sweptMinX <= tx + 9f && resolvedY >= ty - 8f && stickmanTopY <= ty + 8f) {
+          handleLethalObstacleHit()?.let { return it }
         }
       }
+    }
 
-      val footSample = Vec2(resolvedX, resolvedY - 12f)
-      val torsoSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT * 0.5f)
-      val headSample = Vec2(resolvedX, resolvedY - WorldConstants.STICKMAN_HEIGHT + 10f)
-      val stickmanTopY = resolvedY - WorldConstants.STICKMAN_HEIGHT
-
-      for (hazard in level.hazards) {
-        when (hazard.type) {
-          HazardType.PENDULUM -> {
-            val bobPos = hazard.pendulumBobPositionAt(animTime)
-            val hitRadius = hazard.bobRadius + 10f
-            if (
-              bobPos.distanceTo(footSample) <= hitRadius ||
-                bobPos.distanceTo(torsoSample) <= hitRadius ||
-                bobPos.distanceTo(headSample) <= hitRadius
-            ) {
-              return killStickman(state, resolvedX, resolvedY)
-            }
+    // 2. All Modular Dynamic Hazards (Continuous Swept Capsule / AABB Hitboxes)
+    for (hazard in level.hazards) {
+      when (hazard.type) {
+        HazardType.PENDULUM -> {
+          val bobPos = hazard.pendulumBobPositionAt(animTime)
+          val hitRadius = hazard.bobRadius + 13f
+          val distNow = distancePointToSegment(bobPos, bodySegTop, bodySegBot)
+          val distMid = distancePointToSegment(bobPos, midSegTop, midSegBot)
+          if (distNow <= hitRadius || distMid <= hitRadius) {
+            handleLethalObstacleHit()?.let { return it }
           }
-
-          HazardType.LAVA_GEYSER -> {
-            val ratio = hazard.geyserEruptionRatioAt(animTime)
-            if (ratio > 0.14f) {
-              val geyserTop = hazard.geyserCurrentTopYAt(animTime)
-              val halfW = hazard.geyserWidth * 0.5f + 8f
-              if (abs(resolvedX - hazard.x) <= halfW && resolvedY >= geyserTop + 6f) {
-                // Allow standing safely ON TOP of a drawn bridge above the geyser top
-                if (stickmanTopY <= WorldConstants.LAVA_SURFACE_Y && resolvedY > geyserTop + 10f) {
-                  return killStickman(state, resolvedX, resolvedY)
-                }
-              }
-            }
-          }
-
-          HazardType.FALLING_SPIKE -> {
-            if (abs(resolvedX - hazard.x) <= 18f) {
-              val (spikeTipY, blockedByRoof) = hazard.fallingSpikeTipY(resolvedX, completedLines)
-              val spikeTopY = (spikeTipY - hazard.spikeHeight).coerceAtLeast(hazard.y)
-              if (!blockedByRoof && spikeTipY >= stickmanTopY + 4f && spikeTopY <= resolvedY - 4f) {
-                return killStickman(state, resolvedX, resolvedY)
-              }
-            }
-          }
-
-          HazardType.LASER_GATE -> {
-            if (hazard.isLaserActiveAt(animTime)) {
-              if (abs(resolvedX - hazard.x) <= 13f && resolvedY >= hazard.topY + 6f && stickmanTopY <= hazard.bottomY - 6f) {
-                return killStickman(state, resolvedX, resolvedY)
-              }
-            }
-          }
-
-          HazardType.SAW_TRACK -> {
-            val sawPos = hazard.sawPositionAt(animTime)
-            val hitRadius = hazard.bobRadius + 9f
-            if (
-              sawPos.distanceTo(footSample) <= hitRadius ||
-                sawPos.distanceTo(torsoSample) <= hitRadius ||
-                sawPos.distanceTo(headSample) <= hitRadius
-            ) {
-              return killStickman(state, resolvedX, resolvedY)
-            }
-          }
-
-          HazardType.LEDGE, HazardType.NO_DRAW_ZONE, HazardType.WIND_UPDRAFT -> Unit
         }
+
+        HazardType.LAVA_GEYSER -> {
+          val ratio = hazard.geyserEruptionRatioAt(animTime)
+          if (ratio > 0.06f) {
+            val geyserTop = hazard.geyserCurrentTopYAt(animTime)
+            val halfW = hazard.geyserWidth * 0.5f + 10f
+            val overlapsX = sweptMaxX >= hazard.x - halfW && sweptMinX <= hazard.x + halfW
+            val overlapsY = resolvedY >= geyserTop + 4f && stickmanTopY <= WorldConstants.LAVA_SURFACE_Y
+            if (overlapsX && overlapsY) {
+              // Only safe if standing on a drawn bridge strictly above the erupting geyser tip
+              val safeOnOverheadBridge = isGroundedNow && resolvedY <= geyserTop + 8f
+              if (!safeOnOverheadBridge) {
+                handleLethalObstacleHit()?.let { return it }
+              }
+            }
+          }
+        }
+
+        HazardType.FALLING_SPIKE -> {
+          val overlapsX = sweptMaxX >= hazard.x - 14f && sweptMinX <= hazard.x + 14f
+          if (overlapsX) {
+            val (spikeTipY, blockedByRoof) = hazard.fallingSpikeTipY(resolvedX, completedLines)
+            val spikeTopY = (spikeTipY - hazard.spikeHeight).coerceAtLeast(hazard.y)
+            if (!blockedByRoof && spikeTipY >= stickmanTopY + 2f && spikeTopY <= resolvedY) {
+              handleLethalObstacleHit()?.let { return it }
+            }
+          }
+        }
+
+        HazardType.LASER_GATE -> {
+          if (hazard.isLaserActiveAt(animTime)) {
+            val overlapsX = sweptMaxX >= hazard.x - 9f && sweptMinX <= hazard.x + 9f
+            val overlapsY = resolvedY >= hazard.topY + 4f && stickmanTopY <= hazard.bottomY - 4f
+            if (overlapsX && overlapsY) {
+              handleLethalObstacleHit()?.let { return it }
+            }
+          }
+        }
+
+        HazardType.SAW_TRACK -> {
+          val sawPos = hazard.sawPositionAt(animTime)
+          val hitRadius = hazard.bobRadius + 13f
+          val distNow = distancePointToSegment(sawPos, bodySegTop, bodySegBot)
+          val distMid = distancePointToSegment(sawPos, midSegTop, midSegBot)
+          if (distNow <= hitRadius || distMid <= hitRadius) {
+            handleLethalObstacleHit()?.let { return it }
+          }
+        }
+
+        HazardType.LEDGE, HazardType.NO_DRAW_ZONE, HazardType.WIND_UPDRAFT -> Unit
       }
     }
 
     // Check if stickman fell into the bottom hazard pit (Lava / Cryo Acid / Laser Floor)
     if (resolvedY >= WorldConstants.LAVA_SURFACE_Y) {
-      return state.copy(
-        footX = resolvedX,
-        footY = WorldConstants.LAVA_SURFACE_Y,
-        velocityX = 0f,
-        velocityY = 0f,
-        isGrounded = false,
-        isAlive = false,
-        landingSquashTimer = 0f,
-        deathTimer = 0.01f
-      )
+      if (currentHasShield) {
+        currentHasShield = false
+        currentInvuln = 1.2f
+        resolvedY = WorldConstants.LAVA_SURFACE_Y - 18f
+        resolvedVy = -520f
+        isGroundedNow = false
+      } else {
+        return state.copy(
+          footX = resolvedX,
+          footY = WorldConstants.LAVA_SURFACE_Y,
+          velocityX = 0f,
+          velocityY = 0f,
+          isGrounded = false,
+          isAlive = false,
+          landingSquashTimer = 0f,
+          deathTimer = 0.01f
+        )
+      }
     }
 
     // Check if stickman crossed the finish line above the bottom hazard pit
@@ -569,6 +768,9 @@ object PhysicsEngine {
         boostTimer = updatedBoostTimer,
         lowGravityTimer = nextLowGravTimer,
         blitzTimer = nextBlitzTimer,
+        superAuraTimer = nextSuperAuraTimer,
+        invulnerableTimer = currentInvuln,
+        hasTitanShield = currentHasShield,
         landingSquashTimer = nextLandingSquash
       )
     }
@@ -586,6 +788,9 @@ object PhysicsEngine {
       boostTimer = updatedBoostTimer,
       lowGravityTimer = nextLowGravTimer,
       blitzTimer = nextBlitzTimer,
+      superAuraTimer = nextSuperAuraTimer,
+      invulnerableTimer = currentInvuln,
+      hasTitanShield = currentHasShield,
       landingSquashTimer = nextLandingSquash
     )
   }
@@ -600,6 +805,225 @@ object PhysicsEngine {
       isAlive = false,
       landingSquashTimer = 0f,
       deathTimer = 0.01f
+    )
+  }
+
+  /**
+   * Updates Breakable Rock Walls, Leaping Lava Monsters, and the Colossal Lava Dragon Boss (Ignis Titan).
+   */
+  fun stepCombatEntities(
+    stickman: StickmanState,
+    level: LevelDefinition,
+    rockWalls: List<BreakableRockWall>,
+    lavaMonsters: List<LeapingLavaMonster>,
+    ignisBoss: IgnisTitanBoss,
+    animTime: Float,
+    dt: Float
+  ): CombatStepResult {
+    if (!stickman.isAlive || stickman.hasReachedFinish) {
+      return CombatStepResult(
+        stickman = stickman,
+        rockWalls = rockWalls,
+        lavaMonsters = lavaMonsters,
+        ignisBoss = ignisBoss
+      )
+    }
+
+    var updatedStickman = stickman
+    var scoreDelta = 0
+    var inkDelta = 0f
+    var bossTookDamage = false
+    var playerTookBossBite = false
+    var wallSmashed = false
+    var monsterBlasted = false
+    var shieldBroken = false
+    val extraParticles = mutableListOf<SketchParticle>()
+
+    val isSuperPowered = updatedStickman.superAuraTimer > 0f ||
+      updatedStickman.boostTimer > 0f ||
+      updatedStickman.blitzTimer > 0f
+
+    val runnerLeftX = updatedStickman.footX - 15f
+    val runnerRightX = updatedStickman.footX + 15f
+    val runnerTopY = updatedStickman.footY - WorldConstants.STICKMAN_HEIGHT + 4f
+    val runnerBotY = updatedStickman.footY
+    val bodySegTop = Vec2(updatedStickman.footX, runnerTopY)
+    val bodySegBot = Vec2(updatedStickman.footX, runnerBotY)
+
+    // 1. Breakable Rock Walls
+    val nextWalls = rockWalls.map { wall ->
+      if (wall.isSmashed) return@map wall
+      val wallLeft = wall.x - wall.width * 0.5f
+      val wallRight = wall.x + wall.width * 0.5f
+      val overlapsX = runnerRightX >= wallLeft && runnerLeftX <= wallRight
+      val overlapsY = runnerBotY >= wall.topY + 4f && runnerTopY <= wall.bottomY - 4f
+
+      if (overlapsX && overlapsY) {
+        if (isSuperPowered) {
+          wallSmashed = true
+          scoreDelta += (25 * level.scoreMultiplier).toInt()
+          extraParticles.addAll(
+            createLineCompletedParticles(
+              listOf(
+                Vec2(wall.x, (wall.topY + wall.bottomY) * 0.5f),
+                Vec2(wall.x, wall.topY + 12f)
+              )
+            )
+          )
+          wall.copy(isSmashed = true)
+        } else if (updatedStickman.invulnerableTimer > 0f) {
+          wall
+        } else if (updatedStickman.hasTitanShield) {
+          shieldBroken = true
+          updatedStickman = updatedStickman.copy(
+            hasTitanShield = false,
+            invulnerableTimer = 1.1f,
+            velocityY = -300f,
+            isGrounded = false
+          )
+          wall.copy(isSmashed = true)
+        } else {
+          updatedStickman = killStickman(updatedStickman, updatedStickman.footX, updatedStickman.footY)
+          wall
+        }
+      } else {
+        wall
+      }
+    }
+
+    // 2. Leaping Lava Monsters
+    val nextMonsters = lavaMonsters.map { monster ->
+      if (monster.isDefeated || !updatedStickman.isAlive) return@map monster
+      val my = monster.currentYAt(animTime)
+      if (my >= WorldConstants.LAVA_SURFACE_Y - 6f) return@map monster
+      val mCenter = Vec2(monster.x, my)
+      val dist = distancePointToSegment(mCenter, bodySegTop, bodySegBot)
+
+      if (dist <= monster.radius + 13f) {
+        if (isSuperPowered) {
+          monsterBlasted = true
+          scoreDelta += (35 * level.scoreMultiplier).toInt()
+          inkDelta += level.maxInkPerLevel * 0.15f
+          extraParticles.addAll(createLineCompletedParticles(listOf(mCenter)))
+          monster.copy(isDefeated = true)
+        } else if (updatedStickman.invulnerableTimer > 0f) {
+          monster
+        } else if (updatedStickman.hasTitanShield) {
+          shieldBroken = true
+          updatedStickman = updatedStickman.copy(
+            hasTitanShield = false,
+            invulnerableTimer = 1.1f,
+            velocityY = -320f,
+            isGrounded = false
+          )
+          monster.copy(isDefeated = true)
+        } else {
+          updatedStickman = killStickman(updatedStickman, updatedStickman.footX, updatedStickman.footY)
+          monster
+        }
+      } else {
+        monster
+      }
+    }
+
+    // 3. Colossal Lava Dragon Boss (Ignis Titan) with Decoupled Velocity & I-Frame Recoil
+    var nextBoss = ignisBoss
+    if (!nextBoss.isDefeated && updatedStickman.isAlive) {
+      val nextHurtCd = (nextBoss.hurtCooldown - dt).coerceAtLeast(0f)
+      val nextBiteCd = (nextBoss.biteCooldown - dt).coerceAtLeast(0f)
+
+      // Decoupled chase velocity: uses referenceSpeed = max(level.runSpeed, stickman.velocityX)
+      val referenceSpeed = max(level.runSpeed, updatedStickman.velocityX)
+      val chaseRatio = when {
+        level.dailyModifier == "Turbo Ignis" -> 1.16f
+        level.levelNumber == 1 -> 1.04f
+        else -> 1.09f
+      }
+      val gap = updatedStickman.footX - nextBoss.x
+
+      val catchupBoost = when {
+        gap > 480f -> referenceSpeed * 1.38f
+        gap > 38f -> referenceSpeed * chaseRatio
+        else -> referenceSpeed * 0.96f
+      }
+
+      val nextKnockbackVx = nextBoss.knockbackVx * (1f - 3.2f * dt).coerceIn(0f, 1f)
+      val effectiveVx = catchupBoost + nextKnockbackVx
+      var nextBossX = nextBoss.x + effectiveVx * dt
+      // Prevent boss from teleporting ahead of the runner
+      if (nextBossX > updatedStickman.footX - 18f) {
+        nextBossX = updatedStickman.footX - 18f
+      }
+
+      val targetBossY = (updatedStickman.footY - 34f + sin(animTime * 3.4f) * 18f)
+        .coerceIn(130f, WorldConstants.LAVA_SURFACE_Y - 56f)
+      val nextBossY = nextBoss.y + (targetBossY - nextBoss.y) * (4.5f * dt).coerceIn(0f, 1f)
+
+      var nextBossHp = nextBoss.hp
+      var finalHurtCd = nextHurtCd
+      var finalBiteCd = nextBiteCd
+      var finalKnockbackVx = nextKnockbackVx
+
+      val distX = abs(updatedStickman.footX - nextBossX)
+      val distY = abs((updatedStickman.footY - 28f) - nextBossY)
+      val hitRangeX = if (isSuperPowered) 115f else 64f
+
+      if (distX < hitRangeX && distY < 76f) {
+        if (isSuperPowered) {
+          if (finalHurtCd <= 0f) {
+            finalHurtCd = 0.9f
+            finalKnockbackVx = -360f
+            nextBossHp = (nextBossHp - 1).coerceAtLeast(0)
+            bossTookDamage = true
+            val pts = if (nextBossHp == 0) 300 else 100
+            scoreDelta += (pts * level.scoreMultiplier).toInt()
+            extraParticles.addAll(createLineCompletedParticles(listOf(Vec2(nextBossX + 24f, nextBossY))))
+          }
+        } else if (finalBiteCd <= 0f && updatedStickman.invulnerableTimer <= 0f) {
+          finalBiteCd = 2.0f
+          finalKnockbackVx = -240f
+          playerTookBossBite = true
+          if (updatedStickman.hasTitanShield) {
+            shieldBroken = true
+            updatedStickman = updatedStickman.copy(
+              hasTitanShield = false,
+              invulnerableTimer = 1.2f
+            )
+          } else {
+            inkDelta -= level.maxInkPerLevel * 0.35f
+            updatedStickman = updatedStickman.copy(
+              velocityY = if (level.levelNumber > 1 && updatedStickman.isGrounded) -210f else updatedStickman.velocityY,
+              isGrounded = if (level.levelNumber > 1 && updatedStickman.isGrounded) false else updatedStickman.isGrounded,
+              invulnerableTimer = 1.0f
+            )
+          }
+        }
+      }
+
+      nextBoss = nextBoss.copy(
+        x = if (nextBossHp <= 0) nextBossX - 240f else nextBossX,
+        y = nextBossY,
+        hp = nextBossHp,
+        hurtCooldown = finalHurtCd,
+        biteCooldown = finalBiteCd,
+        knockbackVx = finalKnockbackVx,
+        isDefeated = nextBossHp <= 0
+      )
+    }
+
+    return CombatStepResult(
+      stickman = updatedStickman,
+      rockWalls = nextWalls,
+      lavaMonsters = nextMonsters,
+      ignisBoss = nextBoss,
+      scoreDelta = scoreDelta,
+      inkDelta = inkDelta,
+      bossTookDamage = bossTookDamage,
+      playerTookBossBite = playerTookBossBite,
+      wallSmashed = wallSmashed,
+      monsterBlasted = monsterBlasted,
+      shieldBroken = shieldBroken,
+      extraParticles = extraParticles
     )
   }
 
@@ -694,7 +1118,7 @@ object PhysicsEngine {
       }
     }
 
-    // 2. Player-drawn line segments
+    // 2. Player-drawn line segments (One-Way Non-Blocking Ink Physics)
     for (line in completedLines) {
       val tool = line.tool
       for (seg in line.segments) {
@@ -705,18 +1129,19 @@ object PhysicsEngine {
 
         if (maxFootX < left.x - LINE_ENDPOINT_MARGIN || minFootX > right.x + LINE_ENDPOINT_MARGIN) continue
 
+        // Ignore near-vertical line segments (abs(segDy) > abs(segDx) * 2.8) unless bouncy trampoline
+        if (abs(dy) > abs(dx) * 2.8f && tool != ChalkTool.SPRING) {
+          continue
+        }
+
         if (dx < 3f) {
-          if (abs(dy) <= 36f) {
+          if (tool == ChalkTool.SPRING || abs(dy) <= 24f) {
             hits.add(SurfaceHit(y = min(left.y, right.y), slopeRadians = 0f, tool = tool))
           }
           continue
         }
 
         val slopeAngle = atan2(dy, dx)
-        if (abs(slopeAngle) > 1.44f && abs(dy) > 42f) {
-          continue
-        }
-
         val clampedSlope = slopeAngle.coerceIn(-MAX_CLIMBABLE_SLOPE_RADIANS, MAX_CLIMBABLE_SLOPE_RADIANS)
         val sampleX = footX.coerceIn(left.x, right.x)
         val t = ((sampleX - left.x) / dx).coerceIn(0f, 1f)
@@ -830,7 +1255,7 @@ object PhysicsEngine {
           val distX = abs(updatedStickman.footX - nextX)
           val distY = abs(updatedStickman.footY - support.y)
           if (distX < 24f && distY < 44f && updatedStickman.isAlive) {
-            if (updatedStickman.boostTimer > 0f || updatedStickman.blitzTimer > 0f || updatedStickman.velocityY > 120f) {
+            if (updatedStickman.boostTimer > 0f || updatedStickman.blitzTimer > 0f || updatedStickman.superAuraTimer > 0f || updatedStickman.velocityY > 120f) {
               if (updatedStickman.velocityY > 120f) {
                 updatedStickman = updatedStickman.copy(velocityY = -360f, isGrounded = false)
               }
@@ -910,12 +1335,14 @@ object PhysicsEngine {
     stickman: StickmanState,
     comboCount: Int,
     dt: Float,
-    activeLines: List<DrawnLine> = emptyList()
+    activeLines: List<DrawnLine> = emptyList(),
+    hasInkMagnetPerk: Boolean = false
   ): Pair<List<ChalkBit>, List<ChalkBit>> {
     if (bits.isEmpty()) return bits to emptyList()
 
     val newlyCollected = mutableListOf<ChalkBit>()
-    val magnetRadius = if (comboCount >= 2 || stickman.blitzTimer > 0f) 135f else 56f
+    val baseMagnet = if (comboCount >= 2 || stickman.blitzTimer > 0f || stickman.superAuraTimer > 0f) 135f else 56f
+    val magnetRadius = if (hasInkMagnetPerk) baseMagnet * 1.35f else baseMagnet
     val bodyCenterX = stickman.footX
     val bodyCenterY = stickman.footY - WorldConstants.STICKMAN_HEIGHT * 0.5f
 
@@ -950,7 +1377,7 @@ object PhysicsEngine {
         newlyCollected.add(collectedBit)
         collectedBit
       } else if (distToStickman <= magnetRadius && distToStickman > 1f) {
-        val pullSpeed = 280f * dt
+        val pullSpeed = 295f * dt
         bit.copy(
           x = bit.x + (dx / distToStickman) * pullSpeed,
           y = bit.y + (dy / distToStickman) * pullSpeed
