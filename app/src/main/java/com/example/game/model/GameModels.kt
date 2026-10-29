@@ -92,10 +92,11 @@ data class LeapingLavaMonster(
   val isDefeated: Boolean = false
 ) {
   fun currentYAt(timeSeconds: Float): Float {
-    val safeCycle = cycleSeconds.coerceAtLeast(1.0f)
+    val safeCycle = cycleSeconds.coerceAtLeast(1.2f)
     val prog = (((timeSeconds + phaseOffset) % safeCycle).let { if (it < 0f) it + safeCycle else it }) / safeCycle
-    if (prog < 0.35f) return baseY + 12f
-    val leapProg = (prog - 0.35f) / 0.65f
+    // Stay submerged for 48% of cycle so the player has a generous safe window
+    if (prog < 0.48f) return baseY + 12f
+    val leapProg = (prog - 0.48f) / 0.52f
     val arc = sin(leapProg * Math.PI.toFloat()).coerceIn(0f, 1f)
     return baseY - (baseY - peakY) * arc
   }
@@ -493,37 +494,37 @@ data class DynamicHazard(
   val x: Float,
   val y: Float,
   // 1. PENDULUM parameters
-  val armLength: Float = 170f,
-  val bobRadius: Float = 20f,
-  val maxAngleRadians: Float = 0.65f,
-  val angularSpeed: Float = 2.2f,
+  val armLength: Float = 150f,
+  val bobRadius: Float = 18f,
+  val maxAngleRadians: Float = 0.55f,
+  val angularSpeed: Float = 1.85f,
   val pendulumStyle: PendulumStyle = PendulumStyle.SINGLE,
   // 2. LEDGE / Rect zone parameters
   val startX: Float = x - 65f,
   val endX: Float = x + 65f,
   val topY: Float = y,
   val bottomY: Float = y + 18f,
-  val cycleSeconds: Float = 3.6f,
-  val visibleRatio: Float = 0.65f,
+  val cycleSeconds: Float = 3.8f,
+  val visibleRatio: Float = 0.68f,
   val ledgeStyle: LedgeStyle = LedgeStyle.ORANGE_CRUMBLING,
   val movesInBiome: Boolean = false,
-  // 3. LAVA_GEYSER parameters (2.5s cycle: bubble warning -> vertical fireball pillar)
-  val geyserTargetTopY: Float = 220f,
-  val geyserWidth: Float = 34f,
+  // 3. LAVA_GEYSER parameters (bubble warning -> vertical fireball pillar)
+  val geyserTargetTopY: Float = 265f,
+  val geyserWidth: Float = 32f,
   // 4. FALLING_SPIKE parameters (ceiling stalactite that drops when player approaches)
   val triggerLeadX: Float = 165f,
-  val spikeDropSpeed: Float = 420f,
-  val spikeHeight: Float = 44f,
-  // 5. LASER_GATE parameters (vertical beam between topY and bottomY toggling every 1.5s)
-  val laserHalfPeriodSeconds: Float = 1.5f,
+  val spikeDropSpeed: Float = 380f,
+  val spikeHeight: Float = 42f,
+  // 5. LASER_GATE parameters (vertical beam between topY and bottomY)
+  val laserHalfPeriodSeconds: Float = 1.6f,
   // 6. SAW_TRACK parameters (buzzsaw moving along track between (trackStartX, trackStartY) and (trackEndX, trackEndY))
-  val trackStartX: Float = x - 90f,
+  val trackStartX: Float = x - 80f,
   val trackStartY: Float = y,
-  val trackEndX: Float = x + 90f,
+  val trackEndX: Float = x + 80f,
   val trackEndY: Float = y,
-  val trackSpeed: Float = 2.0f,
+  val trackSpeed: Float = 1.8f,
   // 8. WIND_UPDRAFT parameters (upward vertical acceleration)
-  val updraftAcceleration: Float = 1480f,
+  val updraftAcceleration: Float = 1160f,
   // Shared phase offset
   val phaseOffset: Float = 0f
 ) {
@@ -566,26 +567,25 @@ data class DynamicHazard(
     if (!movesInBiome && !biome.hasMovingPlatforms) {
       return startX to endX
     }
-    val sway = sin(timeSeconds * 2.1f + phaseOffset) * 28f
+    val sway = sin(timeSeconds * 1.9f + phaseOffset) * 24f
     return (startX + sway) to (endX + sway)
   }
 
   /**
-   * LAVA_GEYSER cycle: shoots a vertical fireball pillar upward every 2.5s (scaled by cycleSeconds).
-   * Returns `0f` when dormant/bubbling, or `0f..1f` eruption height ratio when active.
+   * LAVA_GEYSER cycle: first 64% of cycle is dormant/warning bubble at the lava surface;
+   * remaining 36% is the vertical fireball eruption, giving players a generous safe crossing window.
    */
   fun geyserEruptionRatioAt(timeSeconds: Float): Float {
     val prog = vanishingCycleProgressAt(timeSeconds)
-    // First 58% of cycle is warning bubble at lava surface; remaining 42% is vertical fireball eruption
-    if (prog < 0.58f) return 0f
-    val eruptProg = (prog - 0.58f) / 0.42f
+    if (prog < 0.64f) return 0f
+    val eruptProg = (prog - 0.64f) / 0.36f
     return sin(eruptProg * Math.PI.toFloat()).coerceIn(0f, 1f)
   }
 
   fun isGeyserWarningAt(timeSeconds: Float): Boolean {
     if (type != HazardType.LAVA_GEYSER) return false
     val prog = vanishingCycleProgressAt(timeSeconds)
-    return prog in 0.25f..0.58f
+    return prog in 0.25f..0.64f
   }
 
   fun geyserCurrentTopYAt(timeSeconds: Float): Float {
@@ -594,20 +594,22 @@ data class DynamicHazard(
   }
 
   /**
-   * LASER_GATE toggles ON/OFF every `laserHalfPeriodSeconds` (default 1.5s).
+   * LASER_GATE duty cycle: active for 32% of the full period (`laserHalfPeriodSeconds * 0.64f`)
+   * and OFF for 68% of the full period so players have a fair, readable window to pass through.
    */
   fun isLaserActiveAt(timeSeconds: Float): Boolean {
     if (type != HazardType.LASER_GATE) return false
     val fullPeriod = (laserHalfPeriodSeconds * 2f).coerceAtLeast(0.8f)
     val t = ((timeSeconds + phaseOffset) % fullPeriod).let { if (it < 0f) it + fullPeriod else it }
-    return t < laserHalfPeriodSeconds
+    val activeWindow = laserHalfPeriodSeconds * 0.64f
+    return t < activeWindow
   }
 
   fun isLaserChargingAt(timeSeconds: Float): Boolean {
     if (type != HazardType.LASER_GATE) return false
     val fullPeriod = (laserHalfPeriodSeconds * 2f).coerceAtLeast(0.8f)
     val t = ((timeSeconds + phaseOffset) % fullPeriod).let { if (it < 0f) it + fullPeriod else it }
-    return t >= fullPeriod - 0.45f
+    return t >= fullPeriod - 0.50f
   }
 
   /**
@@ -629,7 +631,7 @@ data class DynamicHazard(
     val rawTipY = if (distancePastTrigger <= 0f) {
       y + spikeHeight
     } else {
-      val fallFraction = (distancePastTrigger / 175f).coerceIn(0f, 1.35f)
+      val fallFraction = (distancePastTrigger / 235f).coerceIn(0f, 1.35f)
       y + spikeHeight + fallFraction * (WorldConstants.LAVA_SURFACE_Y - y)
     }
 

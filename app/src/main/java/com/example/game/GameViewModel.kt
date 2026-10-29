@@ -918,10 +918,10 @@ class GameViewModel(
       state.comboCount
     }
 
-    // 6. Ink recharges slowly over time while not actively drawing (Milestone 40: -40%, Milestone 50: 0 natural regen)
+    // 6. Ink recharges slowly over time while not actively drawing
     val milestoneRegenMult = when (level.levelNumber) {
-      50 -> 0f
-      40 -> 0.6f
+      50 -> 0.75f
+      40 -> 0.85f
       else -> 1f
     }
     val comboBonusMult = 1f + min(nextCombo, 5) * 0.08f

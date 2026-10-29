@@ -485,7 +485,78 @@ class ExampleUnitTest {
     assertEquals(-360f, step1.ignisBoss.knockbackVx, 0.1f)
     assertTrue("Striking Ignis Titan should award bonus score", step1.scoreDelta >= 100)
   }
+
+  @Test
+  fun `obstacles across all 50 levels maintain fair spacing, vertical clearance, and non-overlapping combat hazards`() {
+    for (lvl in 1..50) {
+      val def = LevelCatalog.getLevel(lvl)
+      val startEndX = def.platforms.first().endX
+      val finishX = def.finishLineX
+
+      // 1. Levels 1-5 are clean onboarding levels with no BreakableRockWalls or LeapingLavaMonsters
+      if (lvl <= 5) {
+        assertTrue("Level $lvl should have no BreakableRockWalls during early onboarding", def.rockWalls.isEmpty())
+        assertTrue("Level $lvl should have no LeapingLavaMonsters during early onboarding", def.lavaMonsters.isEmpty())
+      }
+
+      // 2. Levels 1-14 ledges are reliable CYAN_STATIC before Level 15 introduces ORANGE_CRUMBLING
+      if (lvl in 1..14) {
+        val ledges = def.hazards.filter { it.type == com.example.game.model.HazardType.LEDGE }
+        assertTrue(
+          "Level $lvl ledges should all be CYAN_STATIC before Level 15",
+          ledges.all { it.ledgeStyle == com.example.game.model.LedgeStyle.CYAN_STATIC }
+        )
+      }
+
+      // 3. Verify all DynamicHazards respect spawn/finish safe buffers and vertical clearance
+      for (h in def.hazards) {
+        assertTrue(
+          "Hazard in Level $lvl at x=${h.x} must leave safe runway after start platform ($startEndX)",
+          h.x >= startEndX + 200f
+        )
+        assertTrue(
+          "Hazard in Level $lvl at x=${h.x} must leave safe landing buffer before finish ($finishX)",
+          h.x <= finishX - 150f
+        )
+
+        when (h.type) {
+          com.example.game.model.HazardType.PENDULUM -> {
+            val lowestBobY = h.y + h.armLength
+            assertTrue(
+              "Pendulum in Level $lvl (lowestBobY=$lowestBobY) must leave clear underpass corridor",
+              lowestBobY <= 275f
+            )
+          }
+          com.example.game.model.HazardType.LAVA_GEYSER -> {
+            assertTrue(
+              "Lava Geyser in Level $lvl (topY=${h.geyserTargetTopY}) must leave overhead arch clearance",
+              h.geyserTargetTopY >= 230f
+            )
+          }
+          com.example.game.model.HazardType.LASER_GATE -> {
+            val gateSpan = h.bottomY - h.topY
+            assertTrue(
+              "Laser Gate in Level $lvl (span=$gateSpan) must be compact enough to arch over or dip under",
+              gateSpan <= 125f
+            )
+          }
+          else -> Unit
+        }
+      }
+
+      // 4. Verify BreakableRockWalls and LeapingLavaMonsters never overlap NO_DRAW_ZONE or LEDGE
+      for (wall in def.rockWalls) {
+        val overlapsHazard = def.hazards.any { h ->
+          kotlin.math.abs(h.x - wall.x) < 110f || (wall.x in (h.startX - 70f)..(h.endX + 70f))
+        }
+        assertFalse("RockWall in Level $lvl at x=${wall.x} must not overlap any DynamicHazard", overlapsHazard)
+      }
+      for (monster in def.lavaMonsters) {
+        val overlapsHazard = def.hazards.any { h ->
+          kotlin.math.abs(h.x - monster.x) < 110f || (monster.x in (h.startX - 70f)..(h.endX + 70f))
+        }
+        assertFalse("LavaMonster in Level $lvl at x=${monster.x} must not overlap any DynamicHazard", overlapsHazard)
+      }
+    }
+  }
 }
-
-
-

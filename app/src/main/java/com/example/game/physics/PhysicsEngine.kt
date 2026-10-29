@@ -507,7 +507,7 @@ object PhysicsEngine {
     for (hazard in level.hazards) {
       if (hazard.type == HazardType.WIND_UPDRAFT) {
         if (resolvedX in hazard.startX..hazard.endX && prevY >= hazard.topY && prevY - WorldConstants.STICKMAN_HEIGHT <= hazard.bottomY) {
-          vy = (vy - hazard.updraftAcceleration * dt).coerceAtLeast(-390f)
+          vy = (vy - hazard.updraftAcceleration * dt).coerceAtLeast(-285f)
           inUpdraft = true
         }
       }
@@ -682,9 +682,9 @@ object PhysicsEngine {
 
         HazardType.LAVA_GEYSER -> {
           val ratio = hazard.geyserEruptionRatioAt(animTime)
-          if (ratio > 0.06f) {
+          if (ratio > 0.08f) {
             val geyserTop = hazard.geyserCurrentTopYAt(animTime)
-            val halfW = hazard.geyserWidth * 0.5f + 10f
+            val halfW = hazard.geyserWidth * 0.45f + 6f
             val overlapsX = sweptMaxX >= hazard.x - halfW && sweptMinX <= hazard.x + halfW
             val overlapsY = resolvedY >= geyserTop + 4f && stickmanTopY <= WorldConstants.LAVA_SURFACE_Y
             if (overlapsX && overlapsY) {
@@ -709,7 +709,7 @@ object PhysicsEngine {
         }
 
         HazardType.LASER_GATE -> {
-          if (hazard.isLaserActiveAt(animTime)) {
+          if (hazard.isLaserActiveAt(animTime) && nextSuperAuraTimer <= 0f) {
             val overlapsX = sweptMaxX >= hazard.x - 9f && sweptMinX <= hazard.x + 9f
             val overlapsY = resolvedY >= hazard.topY + 4f && stickmanTopY <= hazard.bottomY - 4f
             if (overlapsX && overlapsY) {
@@ -932,19 +932,21 @@ object PhysicsEngine {
       val nextHurtCd = (nextBoss.hurtCooldown - dt).coerceAtLeast(0f)
       val nextBiteCd = (nextBoss.biteCooldown - dt).coerceAtLeast(0f)
 
-      // Decoupled chase velocity: uses referenceSpeed = max(level.runSpeed, stickman.velocityX)
+      // Decoupled chase velocity: rubber-bands to a menacing ~155..220px stalking distance
+      // behind a full-speed runner and only closes in for a bite if the runner slows down or stalls.
       val referenceSpeed = max(level.runSpeed, updatedStickman.velocityX)
       val chaseRatio = when {
-        level.dailyModifier == "Turbo Ignis" -> 1.16f
-        level.levelNumber == 1 -> 1.04f
-        else -> 1.09f
+        level.dailyModifier == "Turbo Ignis" -> 1.06f
+        level.levelNumber == 1 -> 1.01f
+        else -> 1.03f
       }
       val gap = updatedStickman.footX - nextBoss.x
 
       val catchupBoost = when {
-        gap > 480f -> referenceSpeed * 1.38f
-        gap > 38f -> referenceSpeed * chaseRatio
-        else -> referenceSpeed * 0.96f
+        gap > 380f -> referenceSpeed * 1.28f
+        gap > 165f -> level.runSpeed * chaseRatio
+        gap > 75f -> level.runSpeed * 0.98f
+        else -> level.runSpeed * 0.94f
       }
 
       val nextKnockbackVx = nextBoss.knockbackVx * (1f - 3.2f * dt).coerceIn(0f, 1f)
@@ -966,9 +968,9 @@ object PhysicsEngine {
 
       val distX = abs(updatedStickman.footX - nextBossX)
       val distY = abs((updatedStickman.footY - 28f) - nextBossY)
-      val hitRangeX = if (isSuperPowered) 115f else 64f
+      val hitRangeX = if (isSuperPowered) 115f else 58f
 
-      if (distX < hitRangeX && distY < 76f) {
+      if (distX < hitRangeX && distY < 72f) {
         if (isSuperPowered) {
           if (finalHurtCd <= 0f) {
             finalHurtCd = 0.9f
@@ -980,8 +982,8 @@ object PhysicsEngine {
             extraParticles.addAll(createLineCompletedParticles(listOf(Vec2(nextBossX + 24f, nextBossY))))
           }
         } else if (finalBiteCd <= 0f && updatedStickman.invulnerableTimer <= 0f) {
-          finalBiteCd = 2.0f
-          finalKnockbackVx = -240f
+          finalBiteCd = 2.6f
+          finalKnockbackVx = -280f
           playerTookBossBite = true
           if (updatedStickman.hasTitanShield) {
             shieldBroken = true
@@ -990,11 +992,11 @@ object PhysicsEngine {
               invulnerableTimer = 1.2f
             )
           } else {
-            inkDelta -= level.maxInkPerLevel * 0.35f
+            inkDelta -= level.maxInkPerLevel * 0.18f
             updatedStickman = updatedStickman.copy(
               velocityY = if (level.levelNumber > 1 && updatedStickman.isGrounded) -210f else updatedStickman.velocityY,
               isGrounded = if (level.levelNumber > 1 && updatedStickman.isGrounded) false else updatedStickman.isGrounded,
-              invulnerableTimer = 1.0f
+              invulnerableTimer = 1.2f
             )
           }
         }

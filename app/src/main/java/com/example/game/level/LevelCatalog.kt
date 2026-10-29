@@ -661,7 +661,8 @@ object LevelCatalog {
   /**
    * Dynamically generates modular obstacles from the 8-obstacle pool (`PENDULUM`, `LEDGE`,
    * `LAVA_GEYSER`, `FALLING_SPIKE`, `LASER_GATE`, `SAW_TRACK`, `NO_DRAW_ZONE`, `WIND_UPDRAFT`)
-   * based on `LEVEL_DEFINITIONS[level - 1]`, scaling both frequency and difficulty as levels progress.
+   * based on `LEVEL_DEFINITIONS[level - 1]`, scaling both frequency and difficulty as levels progress
+   * while guaranteeing fair reaction windows and vertical clearance.
    */
   fun getHazards(
     level: Int,
@@ -681,31 +682,32 @@ object LevelCatalog {
     val effectiveLength = config.levelLength * blueprint.lengthMultiplier
     val finishX = startPlatformEnd + effectiveLength
 
-    // Frequency scaling: spacing tightens from 680px (L2) down to 285px (L50)
-    val baseHazardSpacing = (680f - t * 395f) / (blueprint.spawnRate * 0.45f + 0.55f).coerceIn(0.75f, 1.35f)
-    val speedMult = difficulty.hazardSpeedMult
+    // Frequency scaling: spacing tightens smoothly from 660px (L2) down to 335px (L50)
+    // so the player always has at least ~1.0s of reaction and drawing space between hazards.
+    val baseHazardSpacing = (660f - t * 325f) / (blueprint.spawnRate * 0.35f + 0.65f).coerceIn(0.80f, 1.25f)
+    val speedMult = difficulty.hazardSpeedMult.coerceIn(0.75f, 1.38f)
 
-    // Difficulty scaling for Swinging Pendulums
-    val pendulumAngularSpeed = (1.85f + t * 2.50f) * speedMult
-    val pendulumMaxAngle = 0.52f + t * 0.50f
-    val pendulumBobRadius = 18f + t * 8f
+    // Balanced scaling for Swinging Pendulums: rhythmic speed and high canopy pivot for clear underpass
+    val pendulumAngularSpeed = (1.50f + t * 1.35f) * speedMult
+    val pendulumMaxAngle = 0.44f + t * 0.30f
+    val pendulumBobRadius = 16f + t * 4f
 
-    // Difficulty scaling for Ledges (Cyan static/bouncy or Orange crumbling)
-    val platformWidth = 150f - t * 58f
-    val platformCycleSeconds = (4.2f - t * 2.3f) / speedMult.coerceAtLeast(0.6f)
-    val platformVisibleRatio = (0.72f - t * 0.30f).coerceIn(0.35f, 0.85f)
+    // Balanced scaling for Ledges (Cyan static/bouncy or Orange crumbling)
+    val platformWidth = 164f - t * 44f
+    val platformCycleSeconds = (4.6f - t * 1.6f) / speedMult.coerceAtLeast(0.7f)
+    val platformVisibleRatio = (0.76f - t * 0.18f).coerceIn(0.55f, 0.85f)
 
     val hazards = mutableListOf<DynamicHazard>()
-    var cursorX = startPlatformEnd + 240f
+    var cursorX = startPlatformEnd + 255f
     var hazardIndex = 0
+    val safeFinishMargin = if (clampedLevel <= 4) 190f else 235f
 
-    while (cursorX < finishX - 180f) {
+    while (cursorX < finishX - safeFinishMargin) {
       // Deterministically cycle through the level's allowed obstacle pool
       val chosenType = if (clampedLevel == 25 && hazardIndex < 2) {
-        // Ensure both PENDULUM and LEDGE appear early in Level 25 for balanced combo coverage
         if (hazardIndex == 0) HazardType.PENDULUM else HazardType.LEDGE
-      } else if (clampedLevel == 50 && hazardIndex < 2) {
-        if (hazardIndex == 0) HazardType.PENDULUM else HazardType.LEDGE
+      } else if (clampedLevel == 50 && hazardIndex < 8) {
+        allowed[hazardIndex % allowed.size]
       } else {
         allowed[(hazardIndex + clampedLevel) % allowed.size]
       }
@@ -713,7 +715,7 @@ object LevelCatalog {
       val elevationShift = if (config.maxDeltaY <= 0.5f) {
         0f
       } else {
-        sin((clampedLevel * 1.1f + hazardIndex * 1.45f).toDouble()).toFloat() * (config.maxDeltaY * 0.65f)
+        sin((clampedLevel * 1.1f + hazardIndex * 1.45f).toDouble()).toFloat() * (config.maxDeltaY * 0.45f)
       }
 
       val phaseOffset = ((clampedLevel * 0.65f) + (hazardIndex * 1.15f)) % 6.28f
@@ -723,13 +725,14 @@ object LevelCatalog {
         HazardType.PENDULUM -> {
           val pStyle = blueprint.pendulumStyle
           val armLen = if (pStyle == PendulumStyle.FAST_SHORT) {
-            132f
+            118f
           } else {
-            (160f + (hazardIndex % 3) * 14f).coerceIn(150f, 195f)
+            (138f + (hazardIndex % 3) * 10f).coerceIn(135f, 160f)
           }
-          val pivotY = (WorldConstants.DEFAULT_GROUND_Y - armLen - 52f + elevationShift * 0.45f)
-            .coerceIn(58f, 185f)
-          val effSpeed = if (pStyle == PendulumStyle.FAST_SHORT) pendulumAngularSpeed * 1.25f else pendulumAngularSpeed
+          // Keep pivot high in the canopy so the pendulum bob's lowest point (~190..265) leaves
+          // generous vertical clearance for the stickman to curve a bridge underneath or time the swing.
+          val pivotY = (68f + elevationShift * 0.20f).coerceIn(54f, 108f)
+          val effSpeed = if (pStyle == PendulumStyle.FAST_SHORT) pendulumAngularSpeed * 1.18f else pendulumAngularSpeed
 
           hazards.add(
             DynamicHazard(
@@ -746,20 +749,20 @@ object LevelCatalog {
             )
           )
 
-          // If DOUBLE_SYNC, spawn a synchronized partner pendulum right beside it
-          if (pStyle == PendulumStyle.DOUBLE_SYNC && cursorX + 96f < finishX - 160f) {
+          // If DOUBLE_SYNC, spawn a synchronized partner pendulum with wider spacing for readable rhythm
+          if (pStyle == PendulumStyle.DOUBLE_SYNC && cursorX + 115f < finishX - safeFinishMargin) {
             hazards.add(
               DynamicHazard(
                 id = baseId + 1,
                 type = HazardType.PENDULUM,
-                x = cursorX + 92f,
+                x = cursorX + 112f,
                 y = pivotY,
                 armLength = armLen,
                 bobRadius = pendulumBobRadius,
                 maxAngleRadians = pendulumMaxAngle,
                 angularSpeed = effSpeed,
                 pendulumStyle = pStyle,
-                phaseOffset = phaseOffset + 0.55f
+                phaseOffset = phaseOffset + 0.42f
               )
             )
           }
@@ -767,18 +770,16 @@ object LevelCatalog {
 
         HazardType.LEDGE -> {
           val stairBoost = if (clampedLevel == 18 || clampedLevel == 21) {
-            -((hazardIndex % 4) * 28f)
+            -((hazardIndex % 4) * 22f)
           } else {
             0f
           }
-          val topY = (WorldConstants.DEFAULT_GROUND_Y - 8f + elevationShift * 0.65f + stairBoost)
-            .coerceIn(180f, 410f)
+          val topY = (WorldConstants.DEFAULT_GROUND_Y - 6f + elevationShift * 0.55f + stairBoost)
+            .coerceIn(195f, 395f)
           val halfW = platformWidth * 0.5f
-          val style = if (clampedLevel <= 14 && blueprint.ledgeStyle == LedgeStyle.CYAN_STATIC && hazardIndex % 2 == 1) {
-            LedgeStyle.ORANGE_CRUMBLING
-          } else {
-            blueprint.ledgeStyle
-          }
+          // Strictly respect blueprint.ledgeStyle so Levels 1-14 only spawn reliable Cyan static ledges
+          // before Level 15 officially introduces Orange crumbling ledges.
+          val style = blueprint.ledgeStyle
 
           hazards.add(
             DynamicHazard(
@@ -800,49 +801,53 @@ object LevelCatalog {
         }
 
         HazardType.LAVA_GEYSER -> {
-          val geyserTopY = (WorldConstants.DEFAULT_GROUND_Y - 95f + elevationShift * 0.35f)
-            .coerceIn(165f, 290f)
+          // Keep geyser peak in 235..295 so a gentle arched bridge above DEFAULT_GROUND_Y (325)
+          // clears the eruption with plenty of headroom below ceiling hazards.
+          val geyserTopY = (WorldConstants.DEFAULT_GROUND_Y - (45f + t * 35f) + elevationShift * 0.25f)
+            .coerceIn(235f, 295f)
           hazards.add(
             DynamicHazard(
               id = baseId,
               type = HazardType.LAVA_GEYSER,
               x = cursorX,
               y = WorldConstants.LAVA_SURFACE_Y,
-              startX = cursorX - 18f,
-              endX = cursorX + 18f,
+              startX = cursorX - 16f,
+              endX = cursorX + 16f,
               topY = geyserTopY,
               bottomY = WorldConstants.LAVA_SURFACE_Y,
               geyserTargetTopY = geyserTopY,
-              geyserWidth = 34f,
-              cycleSeconds = (2.5f / speedMult).coerceIn(1.3f, 3.2f),
+              geyserWidth = 30f,
+              cycleSeconds = (2.8f / speedMult).coerceIn(1.8f, 3.4f),
               phaseOffset = phaseOffset
             )
           )
         }
 
         HazardType.FALLING_SPIKE -> {
-          val ceilingY = (54f + (hazardIndex % 3) * 14f).coerceIn(48f, 92f)
+          val ceilingY = (52f + (hazardIndex % 3) * 10f).coerceIn(48f, 78f)
           hazards.add(
             DynamicHazard(
               id = baseId,
               type = HazardType.FALLING_SPIKE,
               x = cursorX,
               y = ceilingY,
-              startX = cursorX - 16f,
-              endX = cursorX + 16f,
+              startX = cursorX - 15f,
+              endX = cursorX + 15f,
               topY = ceilingY,
-              bottomY = ceilingY + 44f,
-              triggerLeadX = 175f,
-              spikeDropSpeed = 420f * speedMult,
-              spikeHeight = 44f,
+              bottomY = ceilingY + 42f,
+              triggerLeadX = 165f,
+              spikeDropSpeed = 380f * speedMult,
+              spikeHeight = 42f,
               phaseOffset = phaseOffset
             )
           )
         }
 
         HazardType.LASER_GATE -> {
-          val gateTopY = 88f
-          val gateBottomY = (WorldConstants.DEFAULT_GROUND_Y + 95f).coerceAtMost(WorldConstants.LAVA_SURFACE_Y - 18f)
+          // Compact vertical gate (112px tall) so players can time the 68% OFF window,
+          // arch over topY, dip under bottomY, or phase through with Golden Super Aura.
+          val gateTopY = (WorldConstants.DEFAULT_GROUND_Y - 78f + elevationShift * 0.25f).coerceIn(205f, 260f)
+          val gateBottomY = (gateTopY + 112f).coerceIn(315f, 375f)
           hazards.add(
             DynamicHazard(
               id = baseId,
@@ -853,7 +858,7 @@ object LevelCatalog {
               endX = cursorX + 12f,
               topY = gateTopY,
               bottomY = gateBottomY,
-              laserHalfPeriodSeconds = (1.5f / speedMult).coerceIn(0.8f, 2.0f),
+              laserHalfPeriodSeconds = (1.65f / speedMult).coerceIn(1.1f, 2.1f),
               phaseOffset = phaseOffset
             )
           )
@@ -861,11 +866,11 @@ object LevelCatalog {
 
         HazardType.SAW_TRACK -> {
           val isVertical = (hazardIndex % 3 == 2) && clampedLevel >= 28
-          val centerY = (WorldConstants.DEFAULT_GROUND_Y - 22f + elevationShift * 0.45f).coerceIn(190f, 395f)
-          val tStartX = if (isVertical) cursorX else cursorX - 85f
-          val tEndX = if (isVertical) cursorX else cursorX + 85f
-          val tStartY = if (isVertical) (centerY - 75f).coerceAtLeast(130f) else centerY
-          val tEndY = if (isVertical) (centerY + 75f).coerceAtMost(475f) else centerY
+          val centerY = (WorldConstants.DEFAULT_GROUND_Y - 46f + elevationShift * 0.30f).coerceIn(215f, 345f)
+          val tStartX = if (isVertical) cursorX else cursorX - 72f
+          val tEndX = if (isVertical) cursorX else cursorX + 72f
+          val tStartY = if (isVertical) (centerY - 52f).coerceAtLeast(155f) else centerY
+          val tEndY = if (isVertical) (centerY + 52f).coerceAtMost(425f) else centerY
 
           hazards.add(
             DynamicHazard(
@@ -873,21 +878,23 @@ object LevelCatalog {
               type = HazardType.SAW_TRACK,
               x = cursorX,
               y = centerY,
-              bobRadius = 22f,
+              bobRadius = 18f,
               trackStartX = tStartX,
               trackStartY = tStartY,
               trackEndX = tEndX,
               trackEndY = tEndY,
-              trackSpeed = (2.1f + t * 1.4f) * speedMult,
+              trackSpeed = (1.60f + t * 0.95f) * speedMult,
               phaseOffset = phaseOffset
             )
           )
         }
 
         HazardType.NO_DRAW_ZONE -> {
-          val zoneHalfW = (62f + t * 26f).coerceIn(60f, 92f)
-          val zoneTopY = (WorldConstants.DEFAULT_GROUND_Y - 95f + elevationShift * 0.35f).coerceIn(155f, 285f)
-          val zoneBottomY = (WorldConstants.LAVA_SURFACE_Y - 12f)
+          // Bounded width (88..128px) and vertical band so players can ramp/bounce over,
+          // draw above zoneTopY, draw below zoneBottomY, or use Bounce/Turbo tools.
+          val zoneHalfW = (46f + t * 16f).coerceIn(44f, 64f)
+          val zoneTopY = (WorldConstants.DEFAULT_GROUND_Y - 68f + elevationShift * 0.25f).coerceIn(225f, 275f)
+          val zoneBottomY = (zoneTopY + 155f).coerceAtMost(435f)
           hazards.add(
             DynamicHazard(
               id = baseId,
@@ -904,8 +911,8 @@ object LevelCatalog {
         }
 
         HazardType.WIND_UPDRAFT -> {
-          val draftHalfW = 48f
-          val draftTopY = 85f
+          val draftHalfW = 46f
+          val draftTopY = 92f
           val draftBottomY = WorldConstants.LAVA_SURFACE_Y - 8f
           hazards.add(
             DynamicHazard(
@@ -917,25 +924,25 @@ object LevelCatalog {
               endX = cursorX + draftHalfW,
               topY = draftTopY,
               bottomY = draftBottomY,
-              updraftAcceleration = 1520f * speedMult.coerceIn(0.85f, 1.35f),
+              updraftAcceleration = 1160f * speedMult.coerceIn(0.85f, 1.2f),
               phaseOffset = phaseOffset
             )
           )
-          // Pair wind updraft with an overhead spike or pendulum threat so ceiling drawing is rewarded
-          if (hazardIndex % 2 == 0) {
+          // Only pair wind updraft with an overhead spike when FALLING_SPIKE is part of the level's pool
+          if (hazardIndex % 2 == 0 && HazardType.FALLING_SPIKE in allowed) {
             hazards.add(
               DynamicHazard(
                 id = baseId + 2,
                 type = HazardType.FALLING_SPIKE,
                 x = cursorX + 18f,
-                y = 56f,
-                startX = cursorX + 2f,
-                endX = cursorX + 34f,
-                topY = 56f,
-                bottomY = 100f,
-                triggerLeadX = 190f,
-                spikeDropSpeed = 410f * speedMult,
-                spikeHeight = 44f,
+                y = 54f,
+                startX = cursorX + 3f,
+                endX = cursorX + 33f,
+                topY = 54f,
+                bottomY = 96f,
+                triggerLeadX = 170f,
+                spikeDropSpeed = 370f * speedMult,
+                spikeHeight = 42f,
                 phaseOffset = phaseOffset
               )
             )
@@ -944,7 +951,8 @@ object LevelCatalog {
       }
 
       val jitterRatio = (((clampedLevel * 19 + hazardIndex * 43) % 41) - 20) / 100f
-      val stepX = (baseHazardSpacing * (1f + jitterRatio * 0.30f)).coerceAtLeast(235f)
+      val minAllowedSpacing = if (clampedLevel <= 10) 310f else 285f
+      val stepX = (baseHazardSpacing * (1f + jitterRatio * 0.22f)).coerceAtLeast(minAllowedSpacing)
       cursorX += stepX
       hazardIndex++
     }
@@ -953,15 +961,19 @@ object LevelCatalog {
   }
 
   /**
-   * Generates Breakable Rock Walls and Leaping Lava Monsters for Ignis Titan Edition combat.
+   * Generates Breakable Rock Walls and Leaping Lava Monsters for Ignis Titan Edition combat,
+   * ensuring they scale progressively (Lava Monsters from Level 6+, Rock Walls from Level 9+)
+   * and NEVER overlap existing modular hazards (`hazards`).
    */
   fun getCombatHazards(
     level: Int,
     config: LevelConfig = getLevelConfig(level),
-    difficulty: DifficultyMode = config.difficultyMode
+    difficulty: DifficultyMode = config.difficultyMode,
+    existingHazards: List<DynamicHazard> = emptyList()
   ): Pair<List<BreakableRockWall>, List<LeapingLavaMonster>> {
     val clampedLevel = level.coerceIn(1, TOTAL_LEVELS)
-    if (clampedLevel <= 1) return emptyList<BreakableRockWall>() to emptyList<LeapingLavaMonster>()
+    // Keep Levels 1-5 focused purely on core bridge drawing and early modular obstacles
+    if (clampedLevel <= 5) return emptyList<BreakableRockWall>() to emptyList<LeapingLavaMonster>()
 
     val blueprint = getBlueprint(clampedLevel)
     val startPlatformEnd = 520f
@@ -971,37 +983,60 @@ object LevelCatalog {
     val walls = mutableListOf<BreakableRockWall>()
     val monsters = mutableListOf<LeapingLavaMonster>()
 
-    val spacing = (820f - clampedLevel * 6.5f).coerceIn(420f, 820f)
-    var cursorX = startPlatformEnd + 460f
+    val spacing = (920f - clampedLevel * 6.0f).coerceIn(520f, 920f)
+    var cursorX = startPlatformEnd + 510f
     var idx = 0
 
-    while (cursorX < finishX - 240f) {
-      if (idx % 2 == 0 && clampedLevel >= 4) {
-        val wallBottomY = (WorldConstants.DEFAULT_GROUND_Y - 6f).coerceIn(240f, 380f)
-        val wallTopY = wallBottomY - 68f
-        walls.add(
-          BreakableRockWall(
-            id = clampedLevel * 100 + idx,
-            x = cursorX,
-            topY = wallTopY,
-            bottomY = wallBottomY,
-            width = 30f
-          )
-        )
-      } else {
-        val peakY = (WorldConstants.DEFAULT_GROUND_Y - 48f).coerceIn(210f, 340f)
-        monsters.add(
-          LeapingLavaMonster(
-            id = clampedLevel * 100 + idx,
-            x = cursorX,
-            baseY = WorldConstants.LAVA_SURFACE_Y,
-            peakY = peakY,
-            cycleSeconds = (2.6f / difficulty.hazardSpeedMult).coerceIn(1.4f, 3.2f),
-            phaseOffset = (idx * 1.3f + clampedLevel * 0.5f) % 6.28f,
-            radius = 18f
-          )
-        )
+    while (cursorX < finishX - 280f) {
+      // Find a candidate X that does not overlap any existing DynamicHazard
+      var candidateX = cursorX
+      val conflictsWithHazard = existingHazards.any { h ->
+        val minClearance = when (h.type) {
+          HazardType.NO_DRAW_ZONE, HazardType.LEDGE, HazardType.SAW_TRACK -> 155f
+          else -> 130f
+        }
+        kotlin.math.abs(h.x - candidateX) < minClearance ||
+          (candidateX in (h.startX - 95f)..(h.endX + 95f))
       }
+
+      if (conflictsWithHazard) {
+        candidateX += 165f
+      }
+
+      val stillConflicts = candidateX >= finishX - 260f || existingHazards.any { h ->
+        kotlin.math.abs(h.x - candidateX) < 120f ||
+          (candidateX in (h.startX - 80f)..(h.endX + 80f))
+      }
+
+      if (!stillConflicts) {
+        if (idx % 2 == 0 && clampedLevel >= 9) {
+          val wallBottomY = (WorldConstants.DEFAULT_GROUND_Y - 4f).coerceIn(260f, 360f)
+          val wallTopY = wallBottomY - 52f
+          walls.add(
+            BreakableRockWall(
+              id = clampedLevel * 100 + idx,
+              x = candidateX,
+              topY = wallTopY,
+              bottomY = wallBottomY,
+              width = 28f
+            )
+          )
+        } else {
+          val peakY = (WorldConstants.DEFAULT_GROUND_Y - 32f).coerceIn(245f, 335f)
+          monsters.add(
+            LeapingLavaMonster(
+              id = clampedLevel * 100 + idx,
+              x = candidateX,
+              baseY = WorldConstants.LAVA_SURFACE_Y,
+              peakY = peakY,
+              cycleSeconds = (2.8f / difficulty.hazardSpeedMult.coerceIn(0.8f, 1.35f)).coerceIn(1.8f, 3.4f),
+              phaseOffset = (idx * 1.3f + clampedLevel * 0.5f) % 6.28f,
+              radius = 16f
+            )
+          )
+        }
+      }
+
       cursorX += spacing
       idx++
     }
@@ -1109,6 +1144,7 @@ object LevelCatalog {
   ): LevelDefinition {
     val cfg = getLevelConfig(levelNumber, difficulty, mapBiome)
     val blueprint = getBlueprint(levelNumber)
+    val levelHazards = getHazards(levelNumber, cfg, difficulty, mapBiome)
     val bits = mutableListOf<ChalkBit>()
     val callouts = mutableListOf<ScriptedCallout>()
     val guides = mutableListOf<GuideStroke>()
@@ -1134,13 +1170,28 @@ object LevelCatalog {
       cursorX += stepX
       if (cursorX >= finishX - 50f) break
 
-      val targetY = if (cfg.maxDeltaY <= 0.5f) {
+      var targetY = if (cfg.maxDeltaY <= 0.5f) {
         WorldConstants.DEFAULT_GROUND_Y - 24f
       } else {
         val wave = sin((levelNumber * 1.3f + segmentIndex * 1.15f).toDouble()).toFloat()
-        val rawDelta = wave * (cfg.maxDeltaY * 0.65f)
-        (WorldConstants.DEFAULT_GROUND_Y - 22f + rawDelta).coerceIn(180f, 405f)
+        val rawDelta = wave * (cfg.maxDeltaY * 0.52f)
+        (WorldConstants.DEFAULT_GROUND_Y - 22f + rawDelta).coerceIn(185f, 390f)
       }
+
+      // Ensure ChalkBit pickups are never trapped inside a NO_DRAW_ZONE or SAW_TRACK hub:
+      // lift the pickup above the zone so it guides the player along the safe arch!
+      for (h in levelHazards) {
+        if (h.type == HazardType.NO_DRAW_ZONE && cursorX in (h.startX - 18f)..(h.endX + 18f)) {
+          if (targetY in (h.topY - 12f)..(h.bottomY + 12f)) {
+            targetY = (h.topY - 26f).coerceAtLeast(155f)
+          }
+        } else if (h.type == HazardType.SAW_TRACK && kotlin.math.abs(cursorX - h.x) < 48f) {
+          if (kotlin.math.abs(targetY - h.y) < 38f) {
+            targetY = (h.y - 52f).coerceAtLeast(160f)
+          }
+        }
+      }
+
       currentY = targetY
 
       val isGoldStar = (levelNumber == 19 && segmentIndex % 2 == 0) || (segmentIndex % 4 == 2)
@@ -1149,7 +1200,7 @@ object LevelCatalog {
           id = levelNumber * 100 + segmentIndex,
           x = cursorX,
           y = currentY,
-          inkAmount = if (isGoldStar) 340f else 240f,
+          inkAmount = if (isGoldStar) 340f else 250f,
           isStar = isGoldStar
         )
       )
@@ -1223,7 +1274,7 @@ object LevelCatalog {
       )
     )
 
-    val (rockWalls, lavaMonsters) = getCombatHazards(levelNumber, cfg, difficulty)
+    val (rockWalls, lavaMonsters) = getCombatHazards(levelNumber, cfg, difficulty, levelHazards)
     val bossHp = when {
       levelNumber == 50 -> 8
       levelNumber % 10 == 0 -> 6
@@ -1264,7 +1315,7 @@ object LevelCatalog {
       chalkBits = bits,
       thumbtacks = emptyList(),
       scribblers = emptyList(),
-      hazards = getHazards(levelNumber, cfg, difficulty, mapBiome),
+      hazards = levelHazards,
       rockWalls = rockWalls,
       lavaMonsters = lavaMonsters,
       bossMaxHp = bossHp,
